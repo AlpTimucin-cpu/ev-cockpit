@@ -61,6 +61,15 @@ class OsrmRoadDetourRepository @Inject constructor(
             candidates = chosen.map { it.station },
             message = "Karayolu sapması hesaplanamadı: OSRM rota servisi ayarlanmadı"
         )
+        // Candidate-station sweeps are automatic. Never send six unrequested
+        // road queries to a shared public test service; explicit selected-stop
+        // route calculations still work through OsrmRouteRepository.
+        if (selected.publicDemo) return@withContext RoadDetourCatalog(
+            routeId = routeId,
+            candidates = chosen.map { it.station },
+            message = "TEST OSRM: istasyon sapmaları otomatik taranmaz; " +
+                "bir şarj durağını elle seçerek rotayı yeniden hesaplayabilirsiniz."
+        )
         val api = Retrofit.Builder().baseUrl(selected.root)
             .client(OsrmDemoRateLimiter.client(http, selected.publicDemo)).build()
             .create(OsrmService::class.java)
