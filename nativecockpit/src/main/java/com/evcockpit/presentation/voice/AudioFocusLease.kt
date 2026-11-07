@@ -1,8 +1,14 @@
 package com.evcockpit.presentation.voice
 
 /**
- * Pure Kotlin lifecycle guard for a single short navigation utterance.
- * Android AudioFocus and third-party media behavior remain OS responsibilities.
+ * One short navigation utterance's AudioFocus lease.
+ * Each successful acquire after release gets a fresh generation. Capturing
+ * that generation BEFORE posting loss callbacks prevents a queued old loss
+ * from stopping speech that already acquired a new lease.
+ *
+ * Android OS callbacks delivered after the new request cannot be attributed
+ * to an older platform request without OS-level identifiers; device QA remains
+ * necessary.
  */
 internal class AudioFocusLease(
     private val requestFocus: () -> Boolean,
@@ -10,16 +16,29 @@ internal class AudioFocusLease(
 ) {
     private var held = false
     private var closed = false
+    private var generation = 0L
 
     @Synchronized
     fun acquire(): Boolean {
         if (closed) return false
         if (held) return true
-        held = runCatching(requestFocus).getOrDefault(false)
-        return held
+        val success = runCatching(requestFocus).getOrDefault(false)
+        if (success) {
+            held = true
+            generation++
+        }
+        return success
     }
 
-    /** An old queued focus event must never stop a released/closed utterance. */
+    /** Capture on receipt, not later inside a posted Runnable. */
+    @Synchronized
+    fun lossGeneration(): Long? = generation.takeIf { held && !closed }
+
+    @Synchronized
+    fun shouldStopAfterLoss(expectedGeneration: Long): Boolean =
+        held && !closed && generation == expectedGeneration
+
+    /** Retained for existing JVM simulations. */
     @Synchronized
     fun shouldStopAfterLoss(): Boolean = held && !closed
 
