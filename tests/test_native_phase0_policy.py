@@ -58,6 +58,35 @@ class NativePhase0SourcePolicyTest(unittest.TestCase):
         self.assertNotIn("temp = candidate", parser)
         self.assertIn("return result(MebResponseStatus.VALID_RAW, bytes)", parser)
 
+    def test_android_auto_is_navigation_only_and_trip_updates_are_acknowledged(self):
+        source = MODULE / "src/main/java/com/evcockpit"
+        manifest = (MODULE / "src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+        service = (source / "car/EyaCarAppService.kt").read_text(encoding="utf-8")
+        car_screen = (source / "car/EyaCarNavigationScreen.kt").read_text(encoding="utf-8")
+        gate = (source / "car/CarGuidancePolicy.kt").read_text(encoding="utf-8")
+        greeting = (source / "presentation/voice/WelcomeGreetingManager.kt").read_text(
+            encoding="utf-8"
+        )
+        media = (source / "presentation/media/MediaHomeScreen.kt").read_text(
+            encoding="utf-8"
+        )
+        video_policy = (source / "presentation/media/PhoneVideoSafetyPolicy.kt").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("androidx.car.app.category.NAVIGATION", manifest)
+        for forbidden in ("WebView", "MediaWebViewScreen", "VideoView", "ExoPlayer"):
+            self.assertNotIn(forbidden, service)
+            self.assertNotIn(forbidden, car_screen)
+        self.assertIn("gate.onPublished(current, now)", car_screen)
+        self.assertIn("gate.onPublishFailed(now)", car_screen)
+        self.assertIn("lastFailedAtMs", gate)
+        self.assertIn("welcome.stopForNavigation()", car_screen)
+        self.assertIn("if (!focusGranted) {", greeting)
+        self.assertIn("if (navigationOwnsSpeech())", greeting)
+        self.assertIn("PhoneVideoSafetyPolicy.allow(", media)
+        self.assertIn("freshVehicleSpeedKmh != null", video_policy)
+        self.assertIn("phoneNotProjected && userConfirmedParked && obdConnected", video_policy)
+
     def test_actual_native_module_and_pinned_wrapper(self):
         settings = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")
         wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")

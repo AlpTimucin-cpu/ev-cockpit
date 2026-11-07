@@ -37,9 +37,30 @@ class CarGuidancePolicyTest {
         val g = CarGuidancePolicy().snapshot(route(),fix(),t)!!
         val gate = CarTripUpdateGate()
         assertTrue(gate.shouldPublish(g,t))
+        gate.onPublished(g,t)
         assertFalse(gate.shouldPublish(g,t+1000))
         assertTrue(gate.shouldPublish(g,t+10_001))
     }
+    @Test fun rejectedTripIpcNeverBecomesPublishedAndRetriesAfterBackoff() {
+        val g = CarGuidancePolicy().snapshot(route(),fix(),t)!!
+        val gate = CarTripUpdateGate()
+        assertTrue(gate.shouldPublish(g,t))
+        gate.onPublishFailed(t)
+        assertFalse(gate.shouldPublish(g,t+1_000L))
+        assertTrue(gate.shouldPublish(g,t+2_100L))
+        gate.onPublished(g,t+2_100L)
+        assertFalse(gate.shouldPublish(g,t+2_200L))
+        gate.clear()
+        assertTrue(gate.shouldPublish(g,t+2_201L))
+    }
+
+    @Test fun aDifferentManeuverIsPublishedImmediatelyAfterAcknowledgement() {
+        val g = CarGuidancePolicy().snapshot(route(),fix(),t)!!
+        val gate = CarTripUpdateGate()
+        gate.onPublished(g,t)
+        assertTrue(gate.shouldPublish(g.copy(nextManeuverId = "other"),t+100))
+    }
+
     @Test fun unknownOsrmTurnNeverGetsInventedIcon() {
         assertNull(CarTurnMapping.fromOsrm("unknown","right"))
         assertEquals(CarTurn.RIGHT, CarTurnMapping.fromOsrm("turn","right"))

@@ -61,22 +61,47 @@ class CarGuidancePolicy {
     }
 }
 
-/** Avoid one host IPC per GPS/clock tick and retain responsive step transitions. */
+/**
+ * Android Auto host IPC needs an explicit acknowledgement.
+ * A failed update must NOT be recorded as a published trip. Retrying the
+ * exact same cue is bounded to prevent flooding an unavailable head unit.
+ */
 class CarTripUpdateGate {
-    private var last: CarGuidance? = null
-    private var publishedMs: Long = 0L
+    private var accepted: CarGuidance? = null
+    private var acceptedAtMs: Long = 0L
+    private var lastFailedAtMs: Long? = null
 
-    fun clear() { last = null; publishedMs = 0L }
+    fun clear() {
+        accepted = null
+        acceptedAtMs = 0L
+        lastFailedAtMs = null
+    }
 
     fun shouldPublish(candidate: CarGuidance, nowMs: Long): Boolean {
-        val prior = last
-        val changed = prior == null || prior.routeId != candidate.routeId ||
-            prior.nextManeuverId != candidate.nextManeuverId ||
-            kotlin.math.abs(prior.remainingMeters - candidate.remainingMeters) >= 100.0 ||
+        if (nowMs <= 0L || candidate.routeId.isBlank() ||
+            candidate.remainingMeters < 0.0 ||
+            !candidate.remainingMeters.isFinite()
+        ) return false
+        val failedAt = lastFailedAtMs
+        if (failedAt != null && (nowMs < failedAt || nowMs - failedAt < 2_000L))
+            return false
+        val prior = accepted ?: return true
+        if (prior.routeId != candidate.routeId ||
+            prior.nextManeuverId != candidate.nextManeuverId
+        ) return true
+        return kotlin.math.abs(prior.remainingMeters - candidate.remainingMeters) >= 100.0 ||
             (prior.nextMeters != null && candidate.nextMeters != null &&
                 kotlin.math.abs(prior.nextMeters - candidate.nextMeters) >= 25.0) ||
-            nowMs - publishedMs >= 10_000L
-        if (changed) { last = candidate; publishedMs = nowMs }
-        return changed
+            nowMs < acceptedAtMs || nowMs - acceptedAtMs >= 10_000L
+    }
+
+    fun onPublished(candidate: CarGuidance, nowMs: Long) {
+        accepted = candidate
+        acceptedAtMs = nowMs
+        lastFailedAtMs = null
+    }
+
+    fun onPublishFailed(nowMs: Long) {
+        lastFailedAtMs = nowMs
     }
 }

@@ -12,6 +12,7 @@ import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.evcockpit.data.settings.UserSettings
 import com.evcockpit.data.settings.UserSettingsRepository
+import com.evcockpit.car.CarNavigationOwnership
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -94,6 +95,14 @@ class WelcomeGreetingManager @Inject constructor(
         main.post { obdClaimed = false }
     }
 
+    /** Host navigation is higher-priority than optional startup speech. */
+    fun stopForNavigation() {
+        main.post { closeSession() }
+    }
+
+    private fun navigationOwnsSpeech(): Boolean =
+        CarNavigationOwnership.navigating.value || audioDucking.hasNavigationSpeech()
+
     private fun requestGreeting(isObd: Boolean) {
         main.post {
             if (isObd) {
@@ -109,6 +118,10 @@ class WelcomeGreetingManager @Inject constructor(
                         Log.w(TAG, "Welcome settings unavailable", error)
                         return@launch
                     }
+                if (navigationOwnsSpeech()) {
+                    Log.i(TAG, "Welcome suppressed: active navigation has priority")
+                    return@launch
+                }
                 if (!current.isWelcomeGreetingEnabled) {
                     Log.i(TAG, "Welcome disabled by user")
                     return@launch
@@ -182,11 +195,20 @@ class WelcomeGreetingManager @Inject constructor(
     }
 
     private fun speakGreeting() {
+        if (navigationOwnsSpeech()) {
+            Log.i(TAG, "Welcome skipped: navigation is active")
+            closeSession()
+            return
+        }
         val tts = engine ?: return closeSession()
         focusGranted = runCatching {
             audio.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         }.getOrDefault(false)
-        if (!focusGranted) Log.w(TAG, "Welcome audio focus denied; trying TTS")
+        if (!focusGranted) {
+            Log.w(TAG, "Welcome audio focus denied; greeting not spoken")
+            closeSession()
+            return
+        }
 
         val params = Bundle().apply {
             putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, voicePrefs.volume.coerceIn(0.15f, 1f))

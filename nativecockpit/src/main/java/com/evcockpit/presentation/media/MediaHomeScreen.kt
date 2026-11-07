@@ -27,17 +27,24 @@ private val Muted = Color(0xFFB2C5D3)
 @Composable
 fun MediaHomeScreen(
     phoneAllowed: Boolean,
-    vehicleMoving: Boolean,
+    obdConnected: Boolean,
+    freshVehicleSpeedKmh: Double?,
     modifier: Modifier = Modifier
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<MediaSite?>(null) }
     // This acknowledgement is not an authoritative vehicle Park measurement.
     var userSaysParked by rememberSaveable { mutableStateOf(false) }
-    val videoAllowed = phoneAllowed && !vehicleMoving && userSaysParked
+    val videoAllowed = PhoneVideoSafetyPolicy.allow(
+        phoneNotProjected = phoneAllowed,
+        userConfirmedParked = userSaysParked,
+        obdConnected = obdConnected,
+        freshVehicleSpeedKmh = freshVehicleSpeedKmh
+    )
 
-    LaunchedEffect(phoneAllowed, vehicleMoving) {
-        if (!phoneAllowed || vehicleMoving) selected = null
+    LaunchedEffect(phoneAllowed, obdConnected, freshVehicleSpeedKmh) {
+        if (!PhoneVideoSafetyPolicy.allow(phoneAllowed, true, obdConnected,
+                freshVehicleSpeedKmh)) selected = null
     }
 
     Column(
@@ -102,10 +109,11 @@ fun MediaHomeScreen(
                                 color = Muted,
                                 style = MaterialTheme.typography.bodySmall)
                         }
-                        if (!phoneAllowed || vehicleMoving) {
+                        if (!PhoneVideoSafetyPolicy.allow(phoneAllowed, true, obdConnected,
+                                freshVehicleSpeedKmh)) {
                             Text(
-                                "Araç hareket ederken veya Android Auto bağlıyken " +
-                                    "video açılmaz.",
+                                "Android Auto bağlıysa, güncel OBD hızı yoksa veya araç hareketliyse " +
+                                    "video kilitlidir. Durmak Park konumu doğrulaması değildir.",
                                 color = Color(0xFFFFC582),
                                 style = MaterialTheme.typography.bodySmall
                             )
