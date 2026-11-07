@@ -25,7 +25,9 @@ fun ParkedStreamingDialog(
         Surface(Modifier.fillMaxSize(), color = Color(0xFF07111D)) {
             MediaHomeScreen(
                 phoneAllowed = playbackAllowed,
-                vehicleMoving = false,
+                // Legacy API has no measured OBD speed: fail closed for video.
+                obdConnected = false,
+                freshVehicleSpeedKmh = null,
                 modifier = modifier.fillMaxSize()
             )
         }
