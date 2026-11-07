@@ -34,6 +34,13 @@ class HourlyForecastParserTest {
         ), payload()))
     }
 
+    @Test fun missingEtaHourMustNotFallBackToNearbyButWrongForecast() {
+        val afterLastAvailableHour = site.copy(
+            etaEpochMillis = (epoch + 3600L + 2800L) * 1000L
+        )
+        assertNull(HourlyForecastParser.match(afterLastAvailableHour, payload()))
+    }
+
     @Test fun rejectsMissingOrInvalidNumericalData() {
         assertNull(HourlyForecastParser.match(site, payload(temps = "12,null")))
         assertNull(HourlyForecastParser.match(site, JsonParser.parseString(
