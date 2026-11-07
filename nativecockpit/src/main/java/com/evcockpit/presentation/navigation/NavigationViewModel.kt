@@ -43,11 +43,9 @@ import com.evcockpit.domain.usecase.NavigationSpeechBridge
 import com.evcockpit.domain.usecase.RouteProgressTracker
 import com.evcockpit.domain.usecase.RouteDeviationPolicy
 import com.evcockpit.domain.usecase.WeatherChangeAlertGate
-import com.evcockpit.domain.usecase.EvBaselineEnergyEstimator
-import com.evcockpit.domain.usecase.BaselineEnergyInputs
 import com.evcockpit.domain.usecase.BaselineEnergyResult
-import com.evcockpit.domain.usecase.DepartureSoc
-import com.evcockpit.domain.usecase.ConsumptionBasis
+import com.evcockpit.domain.usecase.RemainingRouteEnergyPolicy
+import com.evcockpit.domain.usecase.VerifiedBatterySocPolicy
 import com.evcockpit.presentation.cockpit.CockpitUiState
 import com.evcockpit.presentation.route.RoutePlannerUiState
 import com.evcockpit.presentation.voice.AppAudioDucking
@@ -147,13 +145,19 @@ class NavigationViewModel @Inject constructor(
         val lastGpsAt = source.gps?.recordedAtMillis
             ?.takeIf { it <= now && it >= gpsWaitSinceMs } ?: gpsWaitSinceMs
         val telemetry = source.telemetry
-        val energy = estimateEnergy(route, telemetry, now, configuration.vehicle)
         val baseRoute = progress.enrich(route, usableGps, now)
+        val batteryReading = VerifiedBatterySocPolicy.read(telemetry, now)
+        val energy = if (route?.routeId != null) RemainingRouteEnergyPolicy.estimate(
+            baseRoute, telemetry, configuration.vehicle, now
+        ) else null
         val visualRoute = if (energy is BaselineEnergyResult.Estimate) {
-            baseRoute?.copy(estimatedArrivalSocPercent = energy.arrivalSocPercent)
+            baseRoute?.copy(
+                estimatedArrivalSocPercent = energy.arrivalSocPercent
+                    .takeIf { it.isFinite() && it in 0.0..100.0 }
+            )
         } else baseRoute?.copy(estimatedArrivalSocPercent = null)
         CockpitUiState(
-            socPercent = telemetry.socPercent.current(now),
+            socPercent = batteryReading?.percent,
             speedKmh = telemetry.speedKmh.current(now),
             voltageV = telemetry.voltageV.current(now),
             batteryTemperatureC = telemetry.batteryTemperatureC.current(now),
@@ -170,48 +174,6 @@ class NavigationViewModel @Inject constructor(
             gpsFix = usableGps
         )
     }
-    /**
-     * Fail-closed bridge to the tested energy estimator.
-     * Calibration keys must be set from a separately validated configuration.
-     * Unverified SoC/usable capacity never become made-up vehicle measurements.
-     */
-    private fun estimateEnergy(
-        route: RouteSnapshot?,
-        telemetry: VehicleTelemetry,
-        now: Long,
-        profile: VehicleProfileConfig
-    ): BaselineEnergyResult? {
-        if (route?.routeId == null) return null
-        if (!profile.readyForEstimate()) return BaselineEnergyResult.Unavailable(
-            CoreIssue.CONFIG_UNCONFIRMED.messageTr
-        )
-        val capacity = profile.usableBatteryKwh
-            ?: return BaselineEnergyResult.Unavailable("Kullanılabilir batarya bilinmiyor")
-        val consumption = profile.referenceWhPerKm()
-            ?: return BaselineEnergyResult.Unavailable("Referans tüketim bilinmiyor")
-        val reserve = profile.arrivalReservePercent
-            ?: return BaselineEnergyResult.Unavailable("Varış rezervi bilinmiyor")
-
-        // No synthetic SoC or default 80% substitution.
-        val fresh = telemetry.socPercent.current(now)
-            ?: return BaselineEnergyResult.Unavailable("Waiting for real BMS SoC")
-        val measuredAt = telemetry.socPercent.measuredAtMillis
-            ?: return BaselineEnergyResult.Unavailable("No BMS timestamp")
-        val soc = DepartureSoc.FreshObd(fresh, measuredAt)
-
-        return EvBaselineEnergyEstimator.estimate(
-            BaselineEnergyInputs(
-                route = route, departureSoc = soc,
-                usableBatteryKwh = capacity,
-                consumptionWhPerKm = consumption,
-                consumptionBasis = ConsumptionBasis.REFERENCE_MODEL,
-                requiredArrivalSocPercent = reserve,
-                nowMs = now,
-                speedKmh = telemetry.speedKmh.current(now)
-            )
-        )
-    }
-
     private val plannerState = combine(
         _planner, routes.options, routes.selectedIndex
     ) { state, options, index ->
