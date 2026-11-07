@@ -67,7 +67,11 @@ android {
 
     buildTypes {
         getByName("debug") {
-            // Debug variant for development; uses the same real GPS and OBD repositories.
+            // Separate install ID and launcher name: never replace a user's
+            // real signed app or trigger an incompatible-signature update.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-TEST"
+            // No synthetic GPS, BMS SoC or OBD test modes are enabled.
             isMinifyEnabled = false
         }
         getByName("release") {
