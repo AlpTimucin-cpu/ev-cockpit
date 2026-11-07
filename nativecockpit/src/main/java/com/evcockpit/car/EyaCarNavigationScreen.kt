@@ -123,8 +123,11 @@ class EyaCarNavigationScreen(
 
     private fun beginNavigation() {
         if (activeRouteId != null) return
-        val current = guidance ?: return // user must have a REAL route and a fresh GPS fix
-        if (route?.routeId != current.routeId) return
+        val now = System.currentTimeMillis()
+        val current = guidance?.takeIf {
+            it.gpsRecordedAtMs <= now && now - it.gpsRecordedAtMs <= 5_000L
+        } ?: return // no stale tap-to-start from a previously rendered host template
+        if (fix?.usable(now) != true || route?.routeId != current.routeId) return
         try {
             manager.navigationStarted()
             // Priority: navigation voice pre-empts optional welcome greeting.
@@ -218,7 +221,10 @@ class EyaCarNavigationScreen(
                 } else "Güncel GPS ve dönüş bilgisi bekleniyor").build())
             pane.addRow(Row.Builder().setTitle("Navigasyonu bitir")
                 .setOnClickListener { endNavigation() }.build())
-        } else if (guidance != null) {
+        } else if (guidance != null &&
+            guidance!!.gpsRecordedAtMs <= System.currentTimeMillis() &&
+            System.currentTimeMillis() - guidance!!.gpsRecordedAtMs <= 5_000L
+        ) {
             pane.addRow(Row.Builder().setTitle("Navigasyonu başlat")
                 .setOnClickListener { beginNavigation() }.build())
         } else {
