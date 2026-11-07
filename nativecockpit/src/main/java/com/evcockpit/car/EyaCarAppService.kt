@@ -29,19 +29,20 @@ class EyaCarAppService : CarAppService() {
     override fun onCreateSession(): Session {
         // Shared singleton gate prevents duplicates if OBD connects as well.
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, ducking)
+        return EyaCarSession(routes, ducking, welcome)
     }
 
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, ducking)
+        return EyaCarSession(routes, ducking, welcome)
     }
 }
 
 private class EyaCarSession(
     private val routes: RouteRepository,
-    private val ducking: AppAudioDucking
+    private val ducking: AppAudioDucking,
+    private val welcome: WelcomeGreetingManager
 ) : Session() {
     override fun onCreateScreen(intent: Intent): Screen =
-        EyaCarNavigationScreen(carContext, routes, ducking)
+        EyaCarNavigationScreen(carContext, routes, ducking, welcome)
 }
