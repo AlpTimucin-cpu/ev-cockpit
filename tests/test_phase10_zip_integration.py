@@ -105,6 +105,18 @@ class Phase10ZipIntegrationTest(unittest.TestCase):
             "data/obd/ObdWireCommandPolicy.kt"
         ))
 
+    def test_opt_in_raw_028c_hypothesis_is_display_only(self):
+        dialog = code("presentation/obd/ObdSettingsDialog.kt")
+        # Formatter chain uses line wrap; ensure both endpoints exist.
+        self.assertIn("unverified028cFromTypedPayload(payload)", dialog)
+        self.assertIn('item.request == "22028C"', dialog)
+        self.assertIn('item.responder == "17FE007B"', dialog)
+        self.assertIn("zipHypothesisVisible", dialog)
+        self.assertIn("DOĞRULANMAMIŞ", dialog)
+        self.assertNotIn("vehicleRepository", dialog)
+        self.assertNotIn("VehicleTelemetry(", dialog)
+        self.assertNotIn("socEvidence", dialog)
+
     def test_old_zip_source_and_unverified_bms_were_not_ported(self):
         java_root = ROOT / "nativecockpit/src/main/java"
         self.assertFalse((java_root / "tr/yolarkadasi").exists())
