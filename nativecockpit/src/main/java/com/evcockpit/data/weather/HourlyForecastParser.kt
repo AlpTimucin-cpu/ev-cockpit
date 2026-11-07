@@ -35,8 +35,10 @@ internal object HourlyForecastParser {
                 bestIndex = i
             }
         }
-        // Refuse a wrong day, wrong timezone, or out-of-range forecast.
-        if (bestIndex < 0 || bestOffset > 3_600L) return null
+        // Hourly forecasts should normally be within 30 minutes of ETA.
+        // Allow 45 minutes for sampling jitter but reject the wrong adjacent
+        // hour instead of treating a distant forecast as an ETA prediction.
+        if (bestIndex < 0 || bestOffset > 2_700L) return null
         val timestamp = times[bestIndex].readLong() ?: return null
         val temperature = temp[bestIndex].readDouble()
             ?.takeIf { it in -90.0..65.0 } ?: return null
