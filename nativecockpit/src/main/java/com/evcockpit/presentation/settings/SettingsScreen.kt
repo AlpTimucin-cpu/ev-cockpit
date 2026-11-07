@@ -37,6 +37,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evcockpit.data.settings.UserSettingsRepository
+import com.evcockpit.domain.model.ZipId4PureReference
 import com.evcockpit.presentation.sound.ActiveSoundManager
 import java.util.Locale
 
@@ -63,6 +64,8 @@ fun SettingsScreen(
     var reserveEntry by remember(configuration.vehicle) {
         mutableStateOf(configuration.vehicle.arrivalReservePercent?.toString().orEmpty())
     }
+    // ZIP candidate data is never saved or marked verified by the import button.
+    var zipDraftStaged by remember(configuration.vehicle) { mutableStateOf(false) }
     var osrmEntry by remember(configuration.endpoints) {
         mutableStateOf(configuration.endpoints.osrmBaseUrl.orEmpty())
     }
@@ -100,6 +103,47 @@ fun SettingsScreen(
                     color = Color(0xFFAEC4D6),
                     style = MaterialTheme.typography.bodySmall
                 )
+                HorizontalDivider()
+                Text(
+                    "Yüklenen ZIP · ID.4 Pure referans bilgileri",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    "ZIP prototipi: ${ZipId4PureReference.DRIVE_POWER_KW} kW / " +
+                        "${ZipId4PureReference.DRIVE_POWER_PS} PS, net batarya " +
+                        "${ZipId4PureReference.CANDIDATE_NET_BATTERY_KWH.toInt()} kWh, " +
+                        "DC tepe ${ZipId4PureReference.CANDIDATE_PEAK_DC_KW.toInt()} kW, " +
+                        "AC ${ZipId4PureReference.CANDIDATE_AC_KW.toInt()} kW, " +
+                        "WLTP ${ZipId4PureReference.CLAIMED_WLTP_MIN_KM}–" +
+                        "${ZipId4PureReference.CLAIMED_WLTP_MAX_KM} km (prototip iddiası).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFAEC4D6)
+                )
+                Text(
+                    "Bu veriler üretici sertifikası veya araçtan okunan BMS ölçümü değildir. " +
+                        "ZIP derlenmemiştir. 145 kW DC, 11 kW AC ve WLTP değerlerini " +
+                        "aracına özel olarak doğrula. Mevcut ayarlar otomatik değiştirilmez.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val draft = ZipId4PureReference.stagedDraft(configuration.vehicle)
+                        batteryEntry = draft.usableBatteryKwh?.toString().orEmpty()
+                        dcEntry = draft.peakDcKw?.toString().orEmpty()
+                        zipDraftStaged = true
+                    }
+                ) { Text("ZIP'deki 52 kWh / 145 kW değerlerini taslağa al") }
+                if (zipDraftStaged) {
+                    Text(
+                        "ZIP taslağı yalnızca giriş alanlarına aktarıldı, kaydedilmedi. " +
+                            "Tüketim ve varış rezervini ayrıca belirleyip doğrulama " +
+                            "düğmesine basman gerekir.",
+                        color = Color(0xFFFFCA80),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                HorizontalDivider()
                 OutlinedTextField(
                     value = batteryEntry, onValueChange = { batteryEntry = it },
                     label = { Text("Kullanılabilir batarya (kWh) — teyit gerekli") },
@@ -115,6 +159,23 @@ fun SettingsScreen(
                     label = { Text("Referans tüketim (kWh/100 km) — senaryo") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
+                Text(
+                    "Kişisel sürüş tüketimi senaryosu — gerçek BMS ölçümü değil",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { consumptionEntry = "10.5" },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Yaz · 10,5") }
+                    OutlinedButton(
+                        onClick = { consumptionEntry = "18.0" },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Kış · 18,0") }
+                }
                 OutlinedTextField(
                     value = reserveEntry, onValueChange = { reserveEntry = it },
                     label = { Text("Varış rezervi (%) — kullanıcı tercihi") },
