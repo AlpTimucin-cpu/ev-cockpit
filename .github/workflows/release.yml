@@ -28,7 +28,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release-security-hold:
+    name: Release blocked until signing incident and certificate continuity are resolved
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stop unsafe public release
+        shell: bash
+        run: |
+          echo "::error title=RELEASE SECURITY HOLD::Historical signing key exposure must be assessed, compromised credentials revoked, and owner certificate continuity checked. No signed or temporary Release APK may be published."
+          exit 1
+
   signed-release:
+    # The old publishing job contains temporary-key and historical bundle paths.
+    # It MUST remain unreachable until a separately reviewed workflow replaces it.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
