@@ -48,7 +48,11 @@ class NativePhase0SourcePolicyTest(unittest.TestCase):
         self.assertNotIn("manual ?: cycle", repository)
         self.assertNotIn("EngineeringMath.update(", repository)
         self.assertIn("if (manual != null)", repository)
-        self.assertIn("runMebReadOnlyQuery(conn, protocol, command)", repository)
+        self.assertIn("runMebReadOnlyQuery(conn, protocol, manual)", repository)
+        self.assertIn("ObdDiagnosticSafetyPolicy.canRequest(", repository)
+        self.assertIn("ObdDiagnosticSafetyPolicy.canExecute(", repository)
+        self.assertIn("ObdProtocolRestorer.restore(", repository)
+        self.assertIn("throw fatal", repository)
 
     def test_unverified_meb_raw_responses_never_become_scaled_soc(self):
         parser = (MODULE / "src/main/java/com/evcockpit/data/obd/MebUdsParser.kt"

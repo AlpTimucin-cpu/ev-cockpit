@@ -11,6 +11,8 @@ data class ObdConnectionState(
     val selectedDevice: String? = null,
     val error: String? = null,
     val lastSpeedAtMs: Long? = null,
+    /** Last direct SAE PID 010D speed, never inferred from GPS or a default. */
+    val lastSpeedKmh: Double? = null,
     val lastPollSucceeded: Boolean = false,
     val diagnosticBusy: Boolean = false,
     val diagnosticResult: MebDiagnosticReport? = null

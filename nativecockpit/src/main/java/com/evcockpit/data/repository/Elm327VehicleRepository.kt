@@ -31,6 +31,9 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
 import com.evcockpit.data.obd.ElmSpeedParser
 import com.evcockpit.data.obd.MebUdsParser
+import com.evcockpit.data.obd.ObdWireCommandPolicy
+import com.evcockpit.data.obd.ObdProtocolRestorer
+import com.evcockpit.data.obd.ObdProtocolRestoreException
 import com.evcockpit.domain.model.EngineeringMath
 import com.evcockpit.domain.model.EngineeringMetrics
 import com.evcockpit.domain.model.EngineeringSnapshot
@@ -44,6 +47,7 @@ import com.evcockpit.domain.repository.ObdConnectionController
 import com.evcockpit.domain.repository.ObdTransport
 import com.evcockpit.domain.usecase.Elm327Session
 import com.evcockpit.domain.usecase.ElmSessionPhase
+import com.evcockpit.domain.usecase.ObdDiagnosticSafetyPolicy
 import com.evcockpit.domain.repository.VehicleRepository
 
 /**
@@ -71,6 +75,16 @@ class Elm327VehicleRepository @Inject constructor(
 
     private fun recalculate() {
         _metrics.value = EngineeringMath.calculate(_engineering.value, System.currentTimeMillis())
+    }
+
+    /** Do not leave old speed in either dashboard OR engineering screen. */
+    private fun clearSpeedObservation() {
+        _telemetry.value = VehicleTelemetry()
+        _engineering.value = _engineering.value.copy(speedKmh = TimedValue())
+        recalculate()
+        _connection.value = _connection.value.copy(
+            lastPollSucceeded = false, lastSpeedAtMs = null, lastSpeedKmh = null
+        )
     }
     private val diagnosticRequests = Channel<String>(capacity=1)
     private var task: Job? = null
@@ -144,7 +158,7 @@ class Elm327VehicleRepository @Inject constructor(
         socket?.closeSilently()
         socket = null
         _connection.value = _connection.value.copy(phase=ObdPhase.CONNECTING,
-            selectedDevice=address,error=null,lastSpeedAtMs=null,
+            selectedDevice=address,error=null,lastSpeedAtMs=null,lastSpeedKmh=null,
             lastPollSucceeded=false,diagnosticBusy=false,diagnosticResult=null)
         task = scope.launch {
             _telemetry.value = VehicleTelemetry()
@@ -165,7 +179,8 @@ class Elm327VehicleRepository @Inject constructor(
                             (e.message?.take(100) ?: "cihaz türünü kontrol edin.")
                     }
                     _connection.value = _connection.value.copy(
-                        phase=ObdPhase.ERROR, diagnosticBusy=false, error=reason
+                        phase=ObdPhase.ERROR, diagnosticBusy=false, lastPollSucceeded=false,
+                        lastSpeedAtMs=null, lastSpeedKmh=null, error=reason
                     )
                 }
             } finally {
@@ -176,6 +191,7 @@ class Elm327VehicleRepository @Inject constructor(
                     _metrics.value=EngineeringMetrics()
                     if (_connection.value.phase != ObdPhase.ERROR)
                         _connection.value=_connection.value.copy(phase=ObdPhase.DISCONNECTED,
+                            lastPollSucceeded=false,lastSpeedAtMs=null,lastSpeedKmh=null,
                             diagnosticBusy=false,diagnosticResult=null)
                 }
             }
@@ -184,7 +200,16 @@ class Elm327VehicleRepository @Inject constructor(
 
     override fun requestMebDiagnostic(command: String) {
         if (command !in MebUdsParser.ALLOWED_REQUESTS) return
-        if (_connection.value.phase != ObdPhase.CONNECTED || _connection.value.diagnosticBusy) return
+        if (!ObdDiagnosticSafetyPolicy.canRequest(
+                _connection.value, System.currentTimeMillis()
+            )
+        ) {
+            _connection.value = _connection.value.copy(
+                error = "MEB ham sorgusu için güncel gerçek 0 km/sa OBD ölçümü gerekir. " +
+                    "Aracı güvenli biçimde P konumuna alın; hız sıfır olması P kanıtı değildir."
+            )
+            return
+        }
         _connection.value=_connection.value.copy(diagnosticBusy=true,diagnosticResult=null,error=null)
         if (diagnosticRequests.trySend(command).isFailure) {
             _connection.value=_connection.value.copy(diagnosticBusy=false,
@@ -238,36 +263,54 @@ class Elm327VehicleRepository @Inject constructor(
                     _engineering.value = _engineering.value.copy(speedKmh = TimedValue(speed, now))
                     recalculate()
                     _connection.value = _connection.value.copy(
-                        lastPollSucceeded = true, lastSpeedAtMs = now
+                        lastPollSucceeded = true, lastSpeedAtMs = now, lastSpeedKmh = speed
                     )
                 } else {
-                    _telemetry.value = VehicleTelemetry()
-                    _connection.value = _connection.value.copy(lastPollSucceeded = false)
+                    clearSpeedObservation()
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _telemetry.value = VehicleTelemetry()
-                _connection.value = _connection.value.copy(lastPollSucceeded = false)
+                clearSpeedObservation()
             }
 
             if (manual != null) {
-                val command = manual
-                try {
-                    val response = runMebReadOnlyQuery(conn, protocol, command)
-                    val parsed = MebUdsParser.parse(command, response, System.currentTimeMillis())
-                    // Only the raw reply is exposed. No unverified DID conversion
-                    // may populate the battery, temperature or engineering telemetry.
-                    _connection.value = _connection.value.copy(
-                        diagnosticBusy = false, diagnosticResult = parsed, error = null
+                if (!ObdDiagnosticSafetyPolicy.canExecute(
+                        _connection.value, System.currentTimeMillis()
                     )
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
+                ) {
                     _connection.value = _connection.value.copy(
-                        diagnosticBusy = false,
-                        error = "MEB read failed; DID/CAN mapping is unverified"
+                        diagnosticBusy = false, diagnosticResult = null,
+                        error = "Ham MEB sorgusu iptal edildi: güncel 0 km/sa ölçümü yok."
                     )
+                } else {
+                    try {
+                        val response = runMebReadOnlyQuery(conn, protocol, manual)
+                        val parsed = MebUdsParser.parse(
+                            manual, response, System.currentTimeMillis()
+                        )
+                        // Only raw ECU reply is exposed. Never derive SoC/SoH
+                        // from unverified DID scaling or headers.
+                        _connection.value = _connection.value.copy(
+                            diagnosticBusy = false, diagnosticResult = parsed, error = null
+                        )
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (fatal: ObdProtocolRestoreException) {
+                        // Unconfirmed CAN/filter reset: never poll PID 010D
+                        // through a potentially stale 29-bit diagnostic filter.
+                        clearSpeedObservation()
+                        _connection.value = _connection.value.copy(
+                            diagnosticBusy = false, diagnosticResult = null,
+                            error = "CAN ayarları geri yüklenemedi; bağlantı güvenli biçimde kesildi."
+                        )
+                        throw fatal
+                    } catch (_: Exception) {
+                        _connection.value = _connection.value.copy(
+                            diagnosticBusy = false,
+                            error = "MEB read failed; DID/CAN mapping is unverified"
+                        )
+                    }
                 }
             }
 
@@ -318,43 +361,42 @@ class Elm327VehicleRepository @Inject constructor(
     private suspend fun runMebReadOnlyQuery(
         conn: BluetoothSocket, protocol: Elm327Session, command: String
     ): String {
-        // ELM: battery ECU 29-bit/500kbps; 2AB2 capacity is 11-bit 710/77A.
-        // UDS service 22 READ ONLY; this function never sends service 2E/31/14.
-        var initiated=false
+        require(command in MebUdsParser.ALLOWED_REQUESTS)
+        // Candidate ECU addresses are unverified for this specific ID.4.
+        // ReadDataByIdentifier 22 only; no diagnostic write services.
+        val capacityRead = command == "222AB2"
+        val configuration = if (capacityRead) listOf(
+            "ATH1", "ATSP6", "ATCAF1", "ATCFC1",
+            "ATSH710", "ATCRA77A", "ATFCSH710",
+            "ATFCSD300000", "ATFCSM1"
+        ) else listOf(
+            "ATH1", "ATSP7", "ATCP17", "ATCAF1", "ATCFC1",
+            "ATSHFC007B", "ATCRA17FE007B", "ATFCSH17FC007B",
+            "ATFCSD300000", "ATFCSM1"
+        )
+        var configurationAttempted = false
         try {
-            val capacityRead = command == "222AB2"
-            // These CAN settings are unverified candidate values; no address mapping
-            // has been validated on this specific ID.4. The read is user-initiated
-            // and raw-only. Do not reuse the response as BMS telemetry.
-            val configuration = if (capacityRead) listOf(
-                "ATH1", "ATSP6", "ATCAF1", "ATCFC1",
-                "ATSH710", "ATCRA77A", "ATFCSH710",
-                "ATFCSD300000", "ATFCSM1"
-            ) else listOf(
-                "ATH1", "ATSP7", "ATCP17", "ATCAF1", "ATCFC1",
-                "ATSHFC007B", "ATCRA17FE007B", "ATFCSH17FC007B",
-                "ATFCSD300000", "ATFCSM1"
-            )
             for (adapterCommand in configuration) {
-                val reply=sendAndRead(conn,adapterCommand)
-                if (reply.contains('?') || reply.uppercase().contains("ERROR"))
-                    throw IOException("ELM protocol setting unsupported")
+                configurationAttempted = true
+                val reply = sendAndRead(conn, adapterCommand)
+                if (!ObdWireCommandPolicy.acknowledged(adapterCommand, reply))
+                    throw IOException("ELM diagnostic setting not acknowledged: $adapterCommand")
             }
-            initiated=true
             return protocol.readRawOnce(command)
         } finally {
-            if (initiated || conn.isConnected) {
-                // Drop restrictive CAN RX filter / custom ISO-TP flow control
-                // before trying generic SAE 010D across any 11-bit ECU.
-                for (reset in listOf("ATFCSM0", "ATCRA", "ATSP0", "ATH0")) {
-                    try { sendAndRead(conn, reset) }
-                    catch (_: Exception) { /* fail closed on the next read */ }
-                }
+            if (configurationAttempted) {
+                ObdProtocolRestorer.restore(
+                    exchange = { reset -> sendAndRead(conn, reset) },
+                    close = { conn.closeSilently() }
+                )
             }
         }
     }
 
     private suspend fun sendAndRead(conn:BluetoothSocket,command:String):String {
+        require(ObdWireCommandPolicy.allowed(command)) {
+            "Unauthorized ELM command rejected before transport write"
+        }
         conn.outputStream.write((command+"\r").toByteArray(Charsets.US_ASCII))
         conn.outputStream.flush()
         return try {
@@ -390,7 +432,7 @@ class Elm327VehicleRepository @Inject constructor(
         _metrics.value=EngineeringMetrics()
         _connection.value=_connection.value.copy(phase=ObdPhase.DISCONNECTED,
             selectedDevice=null,lastPollSucceeded=false,lastSpeedAtMs=null,
-            diagnosticBusy=false,diagnosticResult=null,error=null)
+            lastSpeedKmh=null,diagnosticBusy=false,diagnosticResult=null,error=null)
     }
 
     private fun BluetoothSocket.closeSilently() { try { close() } catch (_:Exception) { } }
