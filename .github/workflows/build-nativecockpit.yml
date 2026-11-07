@@ -86,6 +86,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_phase7_safety_policy.py' -v
           python3 -m unittest discover -s tests -p 'test_phase8_weather_provenance.py' -v
           python3 -m unittest discover -s tests -p 'test_phase9_obd_safety.py' -v
+          python3 -m unittest discover -s tests -p 'test_phase10_zip_integration.py' -v
 
       - name: Android lint (do not waive failures)
         id: lint
