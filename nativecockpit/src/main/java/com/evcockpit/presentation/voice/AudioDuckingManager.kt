@@ -29,9 +29,10 @@ class AudioDuckingManager(
             change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT ||
             change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
         ) {
-            main.post {
-                // Late callbacks must not resurrect/interrupt closed TTS.
-                if (lease.shouldStopAfterLoss()) onFocusLost()
+            val capturedGeneration = lease.lossGeneration()
+            if (capturedGeneration != null) main.post {
+                // A prior utterance's queued loss cannot stop the next one.
+                if (lease.shouldStopAfterLoss(capturedGeneration)) onFocusLost()
             }
         }
     }
