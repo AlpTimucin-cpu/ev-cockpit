@@ -51,6 +51,7 @@ class EyaCarNavigationScreen(
     private val progress = RouteProgressTracker()
     private val guidancePolicy = CarGuidancePolicy()
     private val gate = CarTripUpdateGate()
+    private val navigationSessionToken = Any()
     private var work: CoroutineScope? = null
     private var route: RouteSnapshot? = routes.currentRoute.value
     private var fix: GpsFix? = null
@@ -74,6 +75,7 @@ class EyaCarNavigationScreen(
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
+                if (closed || work != null) return // avoid duplicate GPS/ticker collectors
                 manager.setNavigationManagerCallback(callbacks)
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(surface)
                 tracker.start()
@@ -133,7 +135,7 @@ class EyaCarNavigationScreen(
             // Priority: navigation voice pre-empts optional welcome greeting.
             welcome.stopForNavigation()
             activeRouteId = current.routeId
-            CarNavigationOwnership.setNavigating(true)
+            CarNavigationOwnership.claim(navigationSessionToken)
             withoutGpsSinceMs = 0L
             gate.clear()
             speechPolicy.reset()
@@ -149,13 +151,16 @@ class EyaCarNavigationScreen(
         val wasActive = activeRouteId != null
         activeRouteId = null
         withoutGpsSinceMs = 0L
-        CarNavigationOwnership.setNavigating(false)
+        val wasOwner = CarNavigationOwnership.release(navigationSessionToken)
         voice.stop()
         speechPolicy.reset()
         gate.clear()
         if (wasActive) {
-            try { manager.navigationEnded() }
-            catch (e: RuntimeException) { Log.w("EyaCarNavigation", "Host navigation end", e) }
+            // Old Screen must never end a newer Session's host navigation.
+            if (wasOwner) {
+                try { manager.navigationEnded() }
+                catch (e: RuntimeException) { Log.w("EyaCarNavigation", "Host navigation end", e) }
+            }
             invalidate()
         }
     }
@@ -165,6 +170,10 @@ class EyaCarNavigationScreen(
         current: CarGuidance?, now: Long
     ) {
         val started = activeRouteId ?: return
+        if (!CarNavigationOwnership.owns(navigationSessionToken)) {
+            endNavigation() // another Android Auto screen acquired the session
+            return
+        }
         if (currentRoute?.routeId != started || !validRouteGeometry(currentRoute.routePoints)) {
             endNavigation() // new alternative means a new explicit trip
             return
@@ -206,7 +215,8 @@ class EyaCarNavigationScreen(
     }
 
     override fun onGetTemplate(): Template {
-        val active = activeRouteId != null
+        val active = activeRouteId != null &&
+            CarNavigationOwnership.owns(navigationSessionToken)
         val g = guidance?.takeIf { it.routeId == activeRouteId }
         val pane = Pane.Builder()
             .addRow(Row.Builder().setTitle(summary.title).addText(summary.detail).build())
