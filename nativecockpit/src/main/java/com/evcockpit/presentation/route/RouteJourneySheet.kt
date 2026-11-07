@@ -288,6 +288,52 @@ fun RouteJourneySheet(
                             color = SheetSubtle
                         )
                     }
+                    if (routeMatches && charging.roadDetours.routeId == route.routeId) {
+                        val roads = charging.roadDetours
+                        JourneyCard {
+                            Text("KARAYOLU SAPMASI · OSRM", color = SheetBlue,
+                                style = MaterialTheme.typography.labelMedium)
+                            Text(
+                                when {
+                                    roads.loading -> "DC/CCS durakları gerçek karayolu üzerinde kontrol ediliyor…"
+                                    roads.checked.isNotEmpty() ->
+                                        "${roads.checked.size} istasyon için sapma hesabı alındı"
+                                    else -> "Doğrulanmış karayolu sapması henüz yok"
+                                },
+                                color = SheetSubtle
+                            )
+                            roads.message?.let {
+                                Text(it, color = SheetWarn,
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text(
+                                "Kuş uçuşu koridor yalnızca aday seçer. OSRM ile gidiş-" +
+                                    "dönüş sapması doğrulanmayan istasyon için 0 km varsayılmaz.",
+                                color = SheetSubtle,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        roads.checked.forEach { checked ->
+                            val station = roads.candidates.firstOrNull {
+                                it.id == checked.stationId
+                            }
+                            if (station != null) JourneyCard {
+                                Text(station.name, fontWeight = FontWeight.SemiBold)
+                                Text("Ek karayolu: ${decimal(checked.additionalKm)} km" +
+                                    " · Başlangıçtan istasyona: " +
+                                    kilometers(checked.roadDistanceToStationKm),
+                                    color = SheetMint)
+                                checked.additionalMinutes?.let {
+                                    Text("Ek OSRM süre tahmini: ${decimal(it)} dk · trafik içermez",
+                                        color = SheetSubtle,
+                                        style = MaterialTheme.typography.bodySmall)
+                                }
+                                TextButton(onClick = { onOpenStation(station) }) {
+                                    Text("Detaylar ve rotaya ekle", color = SheetBlue)
+                                }
+                            }
+                        }
+                    }
                     if (routeMatches && plan is AutomaticChargePlan.Estimate) {
                         if (plan.stops.isEmpty()) Text(
                             "Model bu rota için şarj durağı önermiyor.",
@@ -311,6 +357,11 @@ fun RouteJourneySheet(
                                         "   ·   Önerilen enerji: ${decimal(stop.suggestedEnergyKwh)} kWh",
                                     style = MaterialTheme.typography.bodySmall
                                 )
+                                stop.verifiedAdditionalRoadKm?.let {
+                                    Text("OSRM kontrolü · ek yol: ${decimal(it)} km",
+                                        color = SheetMint,
+                                        style = MaterialTheme.typography.bodySmall)
+                                }
                                 stop.verifiedPowerKw?.let {
                                     Text("EPDK belirtilen güç: ${decimal(it)} kW",
                                         color = SheetSubtle,
@@ -349,8 +400,8 @@ fun RouteJourneySheet(
                         )
                     }
                     Text(
-                        "Şarj durakları öneridir. Ulaşılabilirlik, soket doluluğu " +
-                            "ve gerçek sürüş sapması doğrulanmamıştır.",
+                        "İstasyon sapmaları OSRM güzergâhı üzerinden kontrol edilir. " +
+                            "Çoklu durak rotası, gerçek doluluk, fiyat, erişim ve şarj süresi garanti edilmez.",
                         style = MaterialTheme.typography.labelSmall, color = SheetSubtle
                     )
                 }

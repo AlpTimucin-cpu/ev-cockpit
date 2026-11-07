@@ -23,6 +23,14 @@ object OsrmRequestFormat {
     /** One to five genuine, user-selected charging stop coordinates.
      * The route visits them in order; no synthetic GPS or straight-line segment.
      */
+    /** Minimal OSRM geometry-free check: only two road-leg distances are read. */
+    fun urlDetour(
+        origin: GeoCoordinate,
+        station: GeoCoordinate,
+        destination: GeoCoordinate
+    ): String = urlVia(origin, listOf(station), destination).substringBefore('?') +
+        "?alternatives=false&steps=false&overview=false"
+
     fun urlVia(
         origin: GeoCoordinate,
         stops: List<GeoCoordinate>,

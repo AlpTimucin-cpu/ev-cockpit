@@ -28,8 +28,29 @@ class AutomaticDcChargingPlannerTest {
         )
     )
 
+    private fun roadChecked(station: ChargingStation): List<DCCorridorCandidate> =
+        AutomaticDcChargingPlanner.candidates(route, listOf(station)).map { item ->
+            item.copy(roadDetour = RoadDetour(
+                routeId = requireNotNull(route.routeId),
+                stationId = item.station.id,
+                additionalKm = 4.0,
+                roadDistanceToStationKm = item.distanceFromStartKm + 2.0,
+                totalViaDistanceKm = requireNotNull(route.totalKm) + 4.0,
+                additionalMinutes = 8.0,
+                verifiedAtMillis = 1_800_000_000_000L
+            ))
+        }
+
+    @Test fun uncheckedAirCorridorIsNotAnAutomaticChargingStop() {
+        val unchecked = AutomaticDcChargingPlanner.candidates(route, listOf(dc))
+        val result = AutomaticDcChargingPlanner.plan(
+            route, unchecked, baseline, 60.0, 80.0, 15.0
+        )
+        assertTrue(result is AutomaticChargePlan.Unavailable)
+    }
+
     @Test fun oneVerifiedDcCandidateEnablesModelStopWithoutAssumingPower() {
-        val candidates = AutomaticDcChargingPlanner.candidates(route, listOf(dc))
+        val candidates = roadChecked(dc)
         assertEquals(1, candidates.size)
         val plan = AutomaticDcChargingPlanner.plan(route, candidates, baseline, 60.0, 80.0, 15.0)
         assertTrue(plan is AutomaticChargePlan.Estimate)
@@ -44,15 +65,15 @@ class AutomaticDcChargingPlannerTest {
             sockets = listOf(ChargingSocket("one", "CCS2", "DC", "150 kW"))
         )
         val verified = AutomaticDcChargingPlanner.plan(
-            route, AutomaticDcChargingPlanner.candidates(route, listOf(specified)),
+            route, roadChecked(specified),
             baseline, 60.0, 80.0, 15.0
         ) as AutomaticChargePlan.Estimate
         assertEquals(150.0, verified.stops.single().verifiedPowerKw!!, 0.01)
 
         val unknown = AutomaticDcChargingPlanner.plan(
-            route, AutomaticDcChargingPlanner.candidates(route, listOf(dc.copy(
+            route, roadChecked(dc.copy(
                 sockets = listOf(ChargingSocket("one", "CCS2", "DC", "150"))
-            ))),
+            )),
             baseline, 60.0, 80.0, 15.0
         ) as AutomaticChargePlan.Estimate
         assertNull(unknown.stops.single().verifiedPowerKw)
@@ -64,7 +85,7 @@ class AutomaticDcChargingPlannerTest {
     }
 
     @Test fun differentChargeTargetsAreExplicitModeledPreferences() {
-        val corridor = AutomaticDcChargingPlanner.candidates(route, listOf(dc))
+        val corridor = roadChecked(dc)
         val optimal = AutomaticDcChargingPlanner.plan(
             route, corridor, baseline, 60.0, 80.0, 15.0, 80.0
         ) as AutomaticChargePlan.Estimate
@@ -83,7 +104,7 @@ class AutomaticDcChargingPlannerTest {
 
     @Test fun chargeTargetOutsideSafeModelRangeIsRejected() {
         val result = AutomaticDcChargingPlanner.plan(
-            route, AutomaticDcChargingPlanner.candidates(route, listOf(dc)),
+            route, roadChecked(dc),
             baseline, 60.0, 80.0, 15.0, 120.0
         )
         assertTrue(result is AutomaticChargePlan.Unavailable)

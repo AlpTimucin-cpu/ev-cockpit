@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import com.evcockpit.domain.model.*
 import com.evcockpit.domain.repository.*
 import com.evcockpit.domain.usecase.*
+import com.evcockpit.data.repository.OsrmRoadDetourRepository
 
 /** ABRP-style stop preferences alter the charging target in the model.
  * Actual stop count and charging time are not guaranteed.
@@ -29,7 +30,8 @@ data class RouteChargingUiState(
     val stopPreference: RouteStopPreference = RouteStopPreference.OPTIMAL,
     val plan: AutomaticChargePlan = AutomaticChargePlan.Empty,
     val socSource: String = "MODEL/ESTIMATE",
-    val catalogIsStale: Boolean = false
+    val catalogIsStale: Boolean = false,
+    val roadDetours: RoadDetourCatalog = RoadDetourCatalog()
 )
 
 /** Separate use case owner: no changes to the media, OBD or navigation UI. */
@@ -38,7 +40,8 @@ class RouteChargePlanViewModel @Inject constructor(
     @ApplicationContext context: Context,
     routes: RouteRepository,
     charging: ChargingRepository,
-    vehicle: VehicleRepository
+    vehicle: VehicleRepository,
+    private val roadVerifier: OsrmRoadDetourRepository
 ) : ViewModel() {
     private val preferences = context.getSharedPreferences(
         "eya_energy_calibration", Context.MODE_PRIVATE
@@ -90,6 +93,28 @@ class RouteChargePlanViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), Prepared())
 
+    // Read-only bounded OSRM via checks, separate from active navigation.
+    // Route or EPDK catalog changes cancel previous verification immediately.
+    private val roadCatalog: StateFlow<RoadDetourCatalog> = prepared
+        .flatMapLatest { preparedRoute ->
+            flow {
+                val activeRoute = preparedRoute.route?.takeIf {
+                    !it.routeId.isNullOrBlank()
+                }
+                if (activeRoute == null) {
+                    emit(RoadDetourCatalog())
+                } else {
+                    emit(RoadDetourCatalog(routeId = activeRoute.routeId, loading = true))
+                    emit(roadVerifier.inspect(activeRoute, preparedRoute.candidates))
+                }
+            }
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000L),
+            RoadDetourCatalog()
+        )
+
     private val clock = flow {
         while (true) {
             emit(System.currentTimeMillis())
@@ -103,9 +128,11 @@ class RouteChargePlanViewModel @Inject constructor(
     }.getOrNull()
 
     val uiState: StateFlow<RouteChargingUiState> = combine(
-        prepared, vehicle.telemetry, clock, options
-    ) { selected, telemetry, now, selectedOptions ->
+        prepared, roadCatalog, vehicle.telemetry, clock, options
+    ) { selected, roads, telemetry, now, selectedOptions ->
         val route = selected.route
+        val currentRoads = roads.takeIf { it.routeId == route?.routeId }
+            ?: RoadDetourCatalog(routeId = route?.routeId, loading = true)
         if (route?.routeId == null)
             return@combine RouteChargingUiState(
                 arrivalReservePercent = selectedOptions.reservePercent,
@@ -124,7 +151,8 @@ class RouteChargePlanViewModel @Inject constructor(
             plan = AutomaticChargePlan.Unavailable(
                 "Kalibre edilmiş kapasite ve tüketim bilgileri gerekli"
             ),
-            catalogIsStale = selected.cacheStale
+            catalogIsStale = selected.cacheStale,
+            roadDetours = currentRoads
         )
 
         val freshObd = telemetry.socPercent.current(now)
@@ -139,7 +167,8 @@ class RouteChargePlanViewModel @Inject constructor(
                     "Gerçek BMS SoC ölçümü bekleniyor. OBD bağlı ve PID doğrulanmış olmalı."
                 ),
                 socSource = "OBD / BMS BAĞLANTISI BEKLENİYOR",
-                catalogIsStale = selected.cacheStale
+                catalogIsStale = selected.cacheStale,
+                roadDetours = currentRoads
             )
         }
         val soc = freshObd
@@ -158,7 +187,9 @@ class RouteChargePlanViewModel @Inject constructor(
             )
         )
         val plan = AutomaticDcChargingPlanner.plan(
-            route, selected.candidates, baseline, capacity, soc, reserve,
+            route, selected.candidates.map { candidate ->
+                candidate.copy(roadDetour = currentRoads.evidence(candidate.station.id))
+            }, baseline, capacity, soc, reserve,
             selectedOptions.preference.chargingTargetPercent
         )
         RouteChargingUiState(
@@ -167,7 +198,8 @@ class RouteChargePlanViewModel @Inject constructor(
             stopPreference = selectedOptions.preference,
             plan = plan,
             socSource = "CANLI OBD SoC · TAHMİNİ ENERJİ MODELİ",
-            catalogIsStale = selected.cacheStale
+            catalogIsStale = selected.cacheStale,
+            roadDetours = currentRoads
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), RouteChargingUiState())
 }
