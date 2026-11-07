@@ -27,7 +27,8 @@ private val Muted = Color(0xFFB2C5D3)
 @Composable
 fun MediaHomeScreen(
     phoneAllowed: Boolean,
-    verifiedStationary: Boolean,
+    obdConnected: Boolean,
+    freshVehicleSpeedKmh: Double?,
     modifier: Modifier = Modifier
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -37,12 +38,13 @@ fun MediaHomeScreen(
     val videoAllowed = PhoneVideoSafetyPolicy.allow(
         phoneNotProjected = phoneAllowed,
         userConfirmedParked = userSaysParked,
-        obdConnected = verifiedStationary,
-        freshVehicleSpeedKmh = if (verifiedStationary) 0.0 else null
+        obdConnected = obdConnected,
+        freshVehicleSpeedKmh = freshVehicleSpeedKmh
     )
 
-    LaunchedEffect(phoneAllowed, verifiedStationary) {
-        if (!phoneAllowed || !verifiedStationary) selected = null
+    LaunchedEffect(phoneAllowed, obdConnected, freshVehicleSpeedKmh) {
+        if (!PhoneVideoSafetyPolicy.allow(phoneAllowed, true, obdConnected,
+                freshVehicleSpeedKmh)) selected = null
     }
 
     Column(
@@ -107,7 +109,8 @@ fun MediaHomeScreen(
                                 color = Muted,
                                 style = MaterialTheme.typography.bodySmall)
                         }
-                        if (!phoneAllowed || !verifiedStationary) {
+                        if (!PhoneVideoSafetyPolicy.allow(phoneAllowed, true, obdConnected,
+                                freshVehicleSpeedKmh)) {
                             Text(
                                 "Android Auto bağlıysa, güncel OBD hızı yoksa veya araç hareketliyse " +
                                     "video kilitlidir. Durmak Park konumu doğrulaması değildir.",
