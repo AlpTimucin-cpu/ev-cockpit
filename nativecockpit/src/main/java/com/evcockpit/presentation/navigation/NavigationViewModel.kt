@@ -569,7 +569,7 @@ class NavigationViewModel @Inject constructor(
                             error = when {
                                 result.message.contains("internet", ignoreCase = true) ->
                                     "İnternet bağlantısı yok"
-                                else -> "Rota hesaplanamadı (OSRM): " + result.message.take(90)
+                                else -> "Rota hesaplanamadı (OSRM): " + result.message.take(350)
                             }
                         ) }
                 }
