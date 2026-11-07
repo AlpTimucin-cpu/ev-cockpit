@@ -11,7 +11,7 @@ sealed interface AutomaticChargePlan {
         val stops: List<ProposedDcStop>,
         val totalSuggestedChargeKwh: Double,
         val assumedChargeTargetPercent: Double = 80.0,
-        val source: String = "MODEL/ESTIMATE · actual driving detour and charger availability are unverified"
+        val source: String = "MODEL/ESTIMATE · OSRM station detours checked; multi-stop route, availability and charger access are not guaranteed"
     ) : AutomaticChargePlan
 }
 
@@ -21,12 +21,15 @@ data class ProposedDcStop(
     val suggestedEnergyKwh: Double,
     val estimatedArrivalSocPercent: Double,
     /** Only if EPDK powerRaw has an EXPLICIT kW unit. Never guess from a bare number. */
-    val verifiedPowerKw: Double? = null
+    val verifiedPowerKw: Double? = null,
+    val verifiedAdditionalRoadKm: Double? = null
 )
 
 data class DCCorridorCandidate(
     val station: ChargingStation,
-    val distanceFromStartKm: Double
+    val distanceFromStartKm: Double,
+    /** Null means no road check, NOT zero additional driving. */
+    val roadDetour: RoadDetour? = null
 )
 
 /** Pure offline feasibility proposal; requires separately calibrated energy inputs. */
@@ -79,12 +82,15 @@ object AutomaticDcChargingPlanner {
         val destinationKm = route.totalKm!!
         var energyKwh = usableBatteryKwh * startSocPercent / 100.0
         var lastKm = 0.0
+        // Charge the entire previous detour again on departure: deliberately
+        // conservative, NOT a verified multi-stop vehicle itinerary.
+        var previousDetourKm = 0.0
         val planned = mutableListOf<ProposedDcStop>()
         val used = HashSet<String>()
         // Charger speeds are NOT inferred from ambiguous EPDK powerRaw.
         // Charging target is an explicit user model setting, not a car command.
         repeat(12) {
-            val destinationNeed = (destinationKm - lastKm) * energyPerKm
+            val destinationNeed = (destinationKm - lastKm + previousDetourKm) * energyPerKm
             if (energyKwh - destinationNeed >= batteryReserve) {
                 return AutomaticChargePlan.Estimate(
                     planned, planned.sumOf { it.suggestedEnergyKwh },
@@ -93,8 +99,12 @@ object AutomaticDcChargingPlanner {
             }
             val reachable = corridor.asSequence()
                 .filter { it.station.id !in used && it.distanceFromStartKm > lastKm + 1.0 }
+                .filter { it.roadDetour?.validFor(route.routeId, it.station.id) == true }
                 .filter { candidate ->
-                    val demand = (candidate.distanceFromStartKm - lastKm) * energyPerKm
+                    val extra = requireNotNull(candidate.roadDetour).additionalKm
+                    val conservativeLeg = candidate.distanceFromStartKm - lastKm +
+                        previousDetourKm + extra
+                    val demand = conservativeLeg * energyPerKm
                     energyKwh - demand >= batteryReserve
                 }
                 .maxByOrNull { it.distanceFromStartKm }
@@ -102,7 +112,9 @@ object AutomaticDcChargingPlanner {
                     "No validated DC candidate is reachable while preserving the reserve"
                 )
 
-            val driveEnergy = (reachable.distanceFromStartKm - lastKm) * energyPerKm
+            val verifiedDetour = requireNotNull(reachable.roadDetour)
+            val driveEnergy = (reachable.distanceFromStartKm - lastKm +
+                previousDetourKm + verifiedDetour.additionalKm) * energyPerKm
             val arrivalKwh = energyKwh - driveEnergy
             val targetKwh = usableBatteryKwh * chargingTargetPercent / 100.0
             val chargeKwh = (targetKwh - arrivalKwh).coerceAtLeast(0.0)
@@ -118,11 +130,13 @@ object AutomaticDcChargingPlanner {
                 reachable.station.sockets.asSequence()
                     .filter { it.isDc }
                     .mapNotNull { verifiedDcKw(it.powerRaw) }
-                    .maxOrNull()
+                    .maxOrNull(),
+                verifiedAdditionalRoadKm = verifiedDetour.additionalKm
             )
             used += reachable.station.id
             energyKwh = targetKwh
             lastKm = reachable.distanceFromStartKm
+            previousDetourKm = verifiedDetour.additionalKm
         }
         return AutomaticChargePlan.Unavailable("The route requires too many charging stops")
     }
