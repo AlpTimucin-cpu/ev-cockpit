@@ -40,7 +40,12 @@ class OsrmDemoRateLimiter @Inject constructor() {
          */
         fun client(base: OkHttpClient, demo: Boolean): OkHttpClient {
             if (!demo) return base
-            return base.newBuilder().addInterceptor { chain ->
+            return base.newBuilder()
+                // Coordinates must never be redirected to an HTTP host or
+                // an unapproved different service.
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .addInterceptor { chain ->
                 val identified = chain.request().newBuilder().header(
                     "User-Agent",
                     "EV-Cockpit-Debug/1.0 (+https://github.com/AlpTimucin-cpu/ev-cockpit)"
