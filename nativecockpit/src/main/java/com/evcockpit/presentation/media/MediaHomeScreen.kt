@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +34,8 @@ fun MediaHomeScreen(
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<MediaSite?>(null) }
+    val context = LocalContext.current
+    var musicLaunchError by remember { mutableStateOf<String?>(null) }
     // This acknowledgement is not an authoritative vehicle Park measurement.
     var userSaysParked by rememberSaveable { mutableStateOf(false) }
     val videoAllowed = PhoneVideoSafetyPolicy.allow(
@@ -181,7 +184,51 @@ fun MediaHomeScreen(
             1 -> Box(Modifier.fillMaxSize()) {
                 RadioScreen(compact = true)
             }
-            2 -> Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            2 -> Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Resmî müzik uygulamaları",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White
+                )
+                Text(
+                    "ZIP referansındaki Spotify / YouTube Music kısayolları. " +
+                        "Yalnızca telefonda yüklü olan resmî uygulama açılır; " +
+                        "abonelik ve oynatma o uygulamanın sorumluluğundadır.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OfficialMusicApp.entries.forEach { app ->
+                        OutlinedButton(
+                            onClick = {
+                                musicLaunchError = when (
+                                    MediaLauncher.launchOfficialMusicApp(context, app)
+                                ) {
+                                    is MediaLaunchState.Launched -> null
+                                    MediaLaunchState.NotInstalled ->
+                                        "${app.title} yüklü değil. Resmî uygulamayı yükleyin."
+                                    MediaLaunchState.Blocked ->
+                                        "${app.title} Android tarafından başlatılamadı."
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text(app.title) }
+                    }
+                }
+                musicLaunchError?.let { message ->
+                    Text(
+                        message,
+                        color = Color(0xFFFFC582),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                HorizontalDivider(color = Color(0xFF344252))
                 InternalMediaPlayer(
                     modifier = Modifier.fillMaxWidth(),
                     allowVideo = false
