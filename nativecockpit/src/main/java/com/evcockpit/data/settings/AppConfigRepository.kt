@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.evcockpit.BuildConfig
 import com.evcockpit.domain.model.AppConfiguration
 import com.evcockpit.domain.model.ServiceEndpointConfig
 import com.evcockpit.domain.model.VehicleProfileConfig
@@ -33,6 +34,7 @@ class AppConfigRepository @Inject constructor(@ApplicationContext context: Conte
         val OSRM = stringPreferencesKey("osrm_https_root")
         val GEOCODER = stringPreferencesKey("geocoder_https_root")
         val WEATHER = stringPreferencesKey("weather_https_root")
+        val DEMO_ROUTING_CONSENT = booleanPreferencesKey("debug_osrm_demo_opt_in")
     }
 
     val configuration: Flow<AppConfiguration> = store.data
@@ -53,7 +55,9 @@ class AppConfigRepository @Inject constructor(@ApplicationContext context: Conte
             val endpoints = ServiceEndpointConfig(
                 osrmBaseUrl = p[Keys.OSRM]?.takeIf(String::isNotBlank),
                 geocodingBaseUrl = p[Keys.GEOCODER] ?: "https://nominatim.openstreetmap.org/",
-                weatherBaseUrl = p[Keys.WEATHER] ?: "https://api.open-meteo.com/"
+                weatherBaseUrl = p[Keys.WEATHER] ?: "https://api.open-meteo.com/",
+                debugDemoRoutingApproved = BuildConfig.DEBUG &&
+                    p[Keys.DEMO_ROUTING_CONSENT] == true
             )
             AppConfiguration(
                 vehicle = vehicle.takeIf { it.valid() } ?: VehicleProfileConfig(),
@@ -75,6 +79,17 @@ class AppConfigRepository @Inject constructor(@ApplicationContext context: Conte
             set(Keys.CONSUMPTION, profile.consumptionKwhPer100Km)
             set(Keys.RESERVE, profile.arrivalReservePercent)
             p[Keys.CONFIRMED] = profile.userConfirmed
+        }
+    }
+
+    /**
+     * Explicit debug-build consent. Never allow release APKs to persist or
+     * use the public demonstration routing service.
+     */
+    suspend fun saveDemoRoutingConsent(approved: Boolean) {
+        require(BuildConfig.DEBUG) { "Genel OSRM demo yalnızca test APK'sında kullanılabilir" }
+        store.edit { p ->
+            p[Keys.DEMO_ROUTING_CONSENT] = approved
         }
     }
 
