@@ -240,7 +240,9 @@ class NavigationViewModel @Inject constructor(
                     val setting = _voice.value
                     val risk = if (forecast.routeId == activeId &&
                         route?.routeId == activeId
-                    ) changeGate.increasedWarning(forecast, now) else null
+                    ) changeGate.increasedWarning(
+                        forecast, now, route.validProgress()
+                    ) else null
                     if (risk != null && route != null && _foreground.value &&
                         (route.nextTurnMeters == null || route.nextTurnMeters > 650.0) &&
                         setting.enabled && setting.status in setOf(
