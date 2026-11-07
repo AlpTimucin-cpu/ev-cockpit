@@ -27,9 +27,12 @@ object ZipPrototypeLabPolicy {
 
     /**
      * Reproduces the ZIP's *candidate* value(b, off=1, len=1, div=2.5).
-     * Input is an explicitly typed OFFLINE UDS application payload:
-     * '62 02 8C aa bb' (without CAN/ISO-TP headers). Never accepts a
-     * Bluetooth reply as authenticated BMS data and never writes telemetry.
+     * Input is an UDS application payload '62 02 8C aa bb'
+     * (without CAN/ISO-TP headers). The offline lab takes typed samples;
+     * the user-initiated raw OBD diagnostics screen may also display its
+     * output only after the independent header-aware MebUdsParser accepted
+     * a read. The scale itself remains UNVERIFIED; this math authenticates
+     * neither an ECU nor a BMS signal and NEVER writes vehicle telemetry.
      */
     fun unverified028cFromTypedPayload(input: String): Double? {
         val compact = input.trim().uppercase().replace(Regex("[ \\t]"), "")
