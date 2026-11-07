@@ -78,6 +78,7 @@ fun SettingsScreen(
     }
     var voicesExpanded by remember { mutableStateOf(false) }
     var profilesExpanded by remember { mutableStateOf(false) }
+    var zipLabExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.loadInstalledTurkishVoices() }
 
@@ -204,6 +205,17 @@ fun SettingsScreen(
                     },
                     style = MaterialTheme.typography.bodySmall
                 )
+                HorizontalDivider()
+                OutlinedButton(
+                    onClick = { zipLabExpanded = !zipLabExpanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (zipLabExpanded) "ZIP deney laboratuvarını kapat"
+                        else "ZIP'deki riskli özellikleri çevrimdışı incele"
+                    )
+                }
+                if (zipLabExpanded) ZipPrototypeLabPanel()
                 HorizontalDivider()
                 Text("Ağ hizmetleri (HTTPS)", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
