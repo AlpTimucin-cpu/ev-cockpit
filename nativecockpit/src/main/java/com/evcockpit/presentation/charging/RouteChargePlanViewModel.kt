@@ -98,12 +98,14 @@ class RouteChargePlanViewModel @Inject constructor(
     private val roadCatalog: StateFlow<RoadDetourCatalog> = prepared
         .flatMapLatest { preparedRoute ->
             flow {
-                val route = preparedRoute.route
-                if (route?.routeId.isNullOrBlank()) {
+                val activeRoute = preparedRoute.route?.takeIf {
+                    !it.routeId.isNullOrBlank()
+                }
+                if (activeRoute == null) {
                     emit(RoadDetourCatalog())
                 } else {
-                    emit(RoadDetourCatalog(routeId = route.routeId, loading = true))
-                    emit(roadVerifier.inspect(route, preparedRoute.candidates))
+                    emit(RoadDetourCatalog(routeId = activeRoute.routeId, loading = true))
+                    emit(roadVerifier.inspect(activeRoute, preparedRoute.candidates))
                 }
             }
         }
