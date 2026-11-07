@@ -163,6 +163,10 @@ fun CockpitScreen(
         onOriginSelected = onRouteOriginSelected, onDestinationSelected = onRouteDestinationSelected,
         onGps = onRouteFromGps, onPlan = onRoutePlan,
         onChooseAlternative = onRouteAlternative, onClear = onRouteClear,
+        onOpenRoutingSettings = {
+            routePlanner = false
+            onOpenSoundSettings() // opens the shared vehicle + routing settings
+        },
         measuredSocPercent = displayState.socPercent
     )
     if (engineeringOpen) TechnicalAnalysisSheet(
