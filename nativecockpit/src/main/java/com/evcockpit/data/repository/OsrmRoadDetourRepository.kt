@@ -3,6 +3,9 @@ package com.evcockpit.data.repository
 import com.evcockpit.data.routing.OsrmDetourResponseParser
 import com.evcockpit.data.routing.OsrmRequestFormat
 import com.evcockpit.data.routing.OsrmService
+import com.evcockpit.data.routing.RoutingEndpointPolicy
+import com.evcockpit.data.routing.OsrmDemoRateLimiter
+import com.evcockpit.BuildConfig
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.domain.model.*
 import com.evcockpit.domain.usecase.BoundedNetworkRetry
@@ -26,7 +29,8 @@ import kotlin.math.abs
  */
 @Singleton
 class OsrmRoadDetourRepository @Inject constructor(
-    private val configuration: AppConfigRepository
+    private val configuration: AppConfigRepository,
+    private val demoLimiter: OsrmDemoRateLimiter
 ) {
     private val http = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -50,13 +54,15 @@ class OsrmRoadDetourRepository @Inject constructor(
         if (chosen.isEmpty()) return@withContext RoadDetourCatalog(
             routeId = routeId, message = "Rotaya 5 km yakın doğrulanabilir DC/CCS adayı yok"
         )
-        val root = configuration.configuration.first().endpoints.osrmBaseUrl
-            ?: return@withContext RoadDetourCatalog(
-                routeId = routeId,
-                candidates = chosen.map { it.station },
-                message = "Gerçek sapma için kendi HTTPS OSRM sunucusu ayarlanmalı"
-            )
-        val api = Retrofit.Builder().baseUrl(root).client(http).build()
+        val selected = RoutingEndpointPolicy.choose(
+            configuration.configuration.first().endpoints, BuildConfig.DEBUG
+        ) ?: return@withContext RoadDetourCatalog(
+            routeId = routeId,
+            candidates = chosen.map { it.station },
+            message = "Karayolu sapması hesaplanamadı: OSRM rota servisi ayarlanmadı"
+        )
+        val api = Retrofit.Builder().baseUrl(selected.root)
+            .client(OsrmDemoRateLimiter.client(http, selected.publicDemo)).build()
             .create(OsrmService::class.java)
         val results = mutableListOf<RoadDetour>()
         for (candidate in chosen) {
@@ -66,7 +72,7 @@ class OsrmRoadDetourRepository @Inject constructor(
             )
             try {
                 val response = BoundedNetworkRetry.io(maxAttempts = 2) {
-                    api.route(request)
+                    demoLimiter.execute(selected.publicDemo) { api.route(request) }
                 }
                 if (!response.isSuccessful) {
                     response.errorBody()?.close()
