@@ -18,6 +18,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.evcockpit.domain.model.ObdConnectionState
 import com.evcockpit.domain.model.ObdPhase
 import com.evcockpit.domain.model.MebResponseStatus
+import com.evcockpit.domain.usecase.ObdDiagnosticSafetyPolicy
 import java.util.Locale
 
 @Composable
@@ -31,6 +32,9 @@ fun ObdSettingsDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val manualDiagnosticReady = ObdDiagnosticSafetyPolicy.canRequest(
+        state, System.currentTimeMillis()
+    )
     Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false)) {
         Surface(Modifier.fillMaxWidth(.94f).fillMaxHeight(.90f).imePadding(),
             shape=MaterialTheme.shapes.large) {
@@ -83,18 +87,27 @@ fun ObdSettingsDialog(
                     HorizontalDivider()
                     Text(stringResource(R.string.native_experimental_meb_ecu_readings),style=MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.native_test_only_while_parked_and_in_your_own_vehicle_queries_use_read_only_u) +
-                        "Community PID sources have not been validated on your device; results are not applied to navigation SoC/SoH fields.",
+                        "MEB adresleri ve ölçekleri bu araç üzerinde doğrulanmadı. Ham cevaplar SoC/SoH değildir. " +
+                        "Önce aracı güvenli biçimde P konumuna alın; ölçülen 0 km/sa, P konumunun kanıtı değildir.",
                         style=MaterialTheme.typography.bodySmall)
+                    if (!manualDiagnosticReady) {
+                        Text(
+                            "Ham teşhis sorgusu kilitli: son 3 saniyede alınmış gerçek " +
+                                "SAE PID 010D hız ölçümü 0–0,5 km/sa olmalıdır.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     OutlinedButton(onClick={ { onMebDiagnostic("22028C") } },
-                        enabled=!state.diagnosticBusy,modifier=Modifier.fillMaxWidth()) {
+                        enabled=manualDiagnosticReady,modifier=Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.native_read_bms_state_of_charge_22028c))
                     }
                     OutlinedButton(onClick={ { onMebDiagnostic("221E0E") } },
-                        enabled=!state.diagnosticBusy,modifier=Modifier.fillMaxWidth()) {
+                        enabled=manualDiagnosticReady,modifier=Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.native_maximum_battery_temperature_221e0e))
                     }
                     OutlinedButton(onClick={ { onMebDiagnostic("221E3D") } },
-                        enabled=!state.diagnosticBusy,modifier=Modifier.fillMaxWidth()) {
+                        enabled=manualDiagnosticReady,modifier=Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.native_battery_current_raw_response_only_221e3d))
                     }
                     if (state.diagnosticBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
