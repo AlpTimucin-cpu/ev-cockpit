@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -33,6 +34,7 @@ import kotlinx.coroutines.launch
 import com.evcockpit.car.CarNavigationOwnership
 import com.evcockpit.data.location.FusedCurrentLocationProvider
 import com.evcockpit.data.weather.OpenMeteoWeatherRepository
+import com.evcockpit.data.routing.RoutingEndpointPolicy
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.settings.UserSettingsRepository
 import com.evcockpit.domain.model.*
@@ -348,6 +350,22 @@ class NavigationViewModel @Inject constructor(
         }
         planningJob?.cancel()
         planningJob = viewModelScope.launch {
+            // Never initiate background/automatic requests against a shared
+            // public demonstration server while the car is moving.
+            val service = RoutingEndpointPolicy.choose(
+                appConfigRepository.configuration.first().endpoints, BuildConfig.DEBUG
+            )
+            if (service?.publicDemo == true) {
+                _planner.update {
+                    it.copy(
+                        planning = false,
+                        error = "TEST OSRM: rotadan çıkıldı. Paylaşımlı deneme " +
+                            "sunucusuna otomatik istek gönderilmiyor. " +
+                            "Güvenle durduğunuzda rotayı elle yenileyin."
+                    )
+                }
+                return@launch
+            }
             _planner.update { it.copy(planning = true, error = null) }
             if (_voice.value.enabled) guide.speakIfIdle(
                 "Rotadan çıktınız. Rota yeniden hesaplanıyor.", _voice.value.volume
