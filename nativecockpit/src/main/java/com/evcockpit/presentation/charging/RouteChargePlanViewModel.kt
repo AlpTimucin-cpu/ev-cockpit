@@ -61,7 +61,7 @@ class RouteChargePlanViewModel @Inject constructor(
     private val options = MutableStateFlow(UserPlanSettings(
         reserveOverridePercent = if (preferences.contains("arrivalReservePct")) {
             preferences.getFloat("arrivalReservePct", Float.NaN)
-                .takeIf { it.isFinite() && it in 5f..40f }
+                .takeIf { it.isFinite() && it in 0f..50f }
         } else null,
         preference = runCatching {
             RouteStopPreference.valueOf(
@@ -72,7 +72,7 @@ class RouteChargePlanViewModel @Inject constructor(
 
     fun setArrivalReservePercent(value: Float) {
         if (!value.isFinite()) return
-        val safe = value.coerceIn(5f, 40f)
+        val safe = value.coerceIn(0f, 50f)
         preferences.edit().putFloat("arrivalReservePct", safe).apply()
         options.value = options.value.copy(reserveOverridePercent = safe)
     }
@@ -137,7 +137,7 @@ class RouteChargePlanViewModel @Inject constructor(
         val route = prepared.route
         val reserve = selectedOptions.reserveOverridePercent?.toDouble()
             ?: selected.config.vehicle.arrivalReservePercent
-        val displayReserve = (reserve?.toFloat() ?: 20f).coerceIn(5f, 40f)
+        val displayReserve = (reserve?.toFloat() ?: 20f).coerceIn(0f, 50f)
         val currentRoads = roads.takeIf { it.routeId == route?.routeId }
             ?: RoadDetourCatalog(routeId = route?.routeId, loading = true)
         fun state(plan: AutomaticChargePlan, source: String): RouteChargingUiState =
