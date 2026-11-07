@@ -79,6 +79,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Public demo routing has no traffic, uptime or navigation guarantees.
+     * Only available in Debug TEST APK after explicit user opt-in.
+     */
+    fun setDebugDemoRoutingConsent(approved: Boolean) {
+        viewModelScope.launch {
+            try {
+                appConfigRepository.saveDemoRoutingConsent(approved)
+                configErrorState.value = null
+            } catch (_: IllegalArgumentException) {
+                configErrorState.value = "OSRM denemesi yalnızca TEST sürümünde kullanılabilir."
+            }
+        }
+    }
+
     fun saveServiceUrls(osrm: String, geocoding: String, weather: String) {
         val endpoints = ServiceEndpointConfig(
             osrmBaseUrl = osrm.trim().ifEmpty { null },
