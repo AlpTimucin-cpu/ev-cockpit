@@ -32,6 +32,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import com.evcockpit.data.obd.ElmSpeedParser
 import com.evcockpit.data.obd.MebUdsParser
 import com.evcockpit.data.obd.ObdWireCommandPolicy
+import com.evcockpit.data.obd.ObdProtocolRestorer
 import com.evcockpit.data.obd.ObdProtocolRestoreException
 import com.evcockpit.domain.model.EngineeringMath
 import com.evcockpit.domain.model.EngineeringMetrics
@@ -384,24 +385,10 @@ class Elm327VehicleRepository @Inject constructor(
             return protocol.readRawOnce(command)
         } finally {
             if (configurationAttempted) {
-                // Every reset requires a positive ELM acknowledgement. Any
-                // missing ACK poisons this connection; close rather than
-                // resuming speed polling under an unknown CAN header/filter.
-                try {
-                    for (reset in listOf("ATFCSM0", "ATCRA", "ATSP0", "ATH0")) {
-                        val reply = sendAndRead(conn, reset)
-                        if (!ObdWireCommandPolicy.acknowledged(reset, reply))
-                            throw IOException("ELM reset was not acknowledged: $reset")
-                    }
-                } catch (cancel: CancellationException) {
-                    conn.closeSilently()
-                    throw cancel
-                } catch (failure: Exception) {
-                    conn.closeSilently()
-                    throw ObdProtocolRestoreException(
-                        "ELM CAN filter/protocol reset failed; session invalidated", failure
-                    )
-                }
+                ObdProtocolRestorer.restore(
+                    exchange = { reset -> sendAndRead(conn, reset) },
+                    close = { conn.closeSilently() }
+                )
             }
         }
     }
