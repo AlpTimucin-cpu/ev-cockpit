@@ -71,10 +71,10 @@ fun RouteJourneySheet(
     val routeMatches = charging.routeId == route.routeId
     // Keep slider movement local; persist once, after the gesture finishes.
     var reserveDraft by remember { mutableFloatStateOf(
-        charging.arrivalReservePercent.coerceIn(5f, 40f)
+        charging.arrivalReservePercent.coerceIn(0f, 50f)
     ) }
     LaunchedEffect(charging.arrivalReservePercent) {
-        reserveDraft = charging.arrivalReservePercent.coerceIn(5f, 40f)
+        reserveDraft = charging.arrivalReservePercent.coerceIn(0f, 50f)
     }
 
     ModalBottomSheet(
@@ -248,8 +248,8 @@ fun RouteJourneySheet(
                             value = reserveDraft,
                             onValueChange = { reserveDraft = it },
                             onValueChangeFinished = { onSetReserve(reserveDraft) },
-                            valueRange = 5f..40f,
-                            steps = 34
+                            valueRange = 0f..50f,
+                            steps = 49
                         )
                         Text(
                             "Bu değer kullanıcı tercihidir, araçtan ölçülen SoC değildir.",
