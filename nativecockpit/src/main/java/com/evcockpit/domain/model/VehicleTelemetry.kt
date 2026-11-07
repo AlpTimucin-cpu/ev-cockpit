@@ -16,5 +16,10 @@ data class VehicleTelemetry(
     val speedKmh: TimedValue<Double> = TimedValue(),
     val voltageV: TimedValue<Double> = TimedValue(),
     val batteryTemperatureC: TimedValue<Double> = TimedValue(),
-    val powerKw: TimedValue<Double> = TimedValue()
+    val powerKw: TimedValue<Double> = TimedValue(),
+    /**
+     * Optional, independently sourced BMS SoC measurement proof.
+     * Never populated by raw UDS guesses or a user-entered scenario.
+     */
+    val socEvidence: CoreEvidence<Double>? = null
 )
