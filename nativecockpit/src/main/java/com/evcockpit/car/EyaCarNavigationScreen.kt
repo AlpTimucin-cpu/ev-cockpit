@@ -32,13 +32,15 @@ import com.evcockpit.domain.usecase.RouteProgressTracker
 import com.evcockpit.presentation.voice.NativeVoiceGuide
 import com.evcockpit.presentation.voice.AppAudioDucking
 import com.evcockpit.presentation.voice.VoicePreference
+import com.evcockpit.presentation.voice.WelcomeGreetingManager
 import kotlin.math.roundToInt
 
 /** Real OSRM geometry + measured GPS only. Foreground Android Auto session, not a navigation FGS. */
 class EyaCarNavigationScreen(
     context: CarContext,
     private val routes: RouteRepository,
-    ducking: AppAudioDucking
+    ducking: AppAudioDucking,
+    private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
     private val tracker = CarGpsTracker(context.applicationContext)
     private val surface = EyaCarMapSurface(context)
@@ -125,6 +127,8 @@ class EyaCarNavigationScreen(
         if (route?.routeId != current.routeId) return
         try {
             manager.navigationStarted()
+            // Priority: navigation voice pre-empts optional welcome greeting.
+            welcome.stopForNavigation()
             activeRouteId = current.routeId
             CarNavigationOwnership.setNavigating(true)
             withoutGpsSinceMs = 0L
@@ -170,9 +174,14 @@ class EyaCarNavigationScreen(
         }
         withoutGpsSinceMs = 0L
         if (gate.shouldPublish(current, now)) {
-            try { manager.updateTrip(CarTripFactory.trip(current)) }
-            catch (e: RuntimeException) { Log.w("EyaCarNavigation", "Trip update rejected", e) }
-            invalidate()
+            try {
+                manager.updateTrip(CarTripFactory.trip(current))
+                gate.onPublished(current, now)
+                invalidate()
+            } catch (e: RuntimeException) {
+                gate.onPublishFailed(now)
+                Log.w("EyaCarNavigation", "Trip update rejected; bounded retry", e)
+            }
         }
         if (voicePrefs.enabled && currentFix != null &&
             voice.status == NativeVoiceGuide.Status.READY) {
@@ -203,18 +212,18 @@ class EyaCarNavigationScreen(
         if (active) {
             val step = g?.nextCue
             val meters = g?.nextMeters
-            pane.addRow(Row.Builder().setTitle("Next maneuver")
+            pane.addRow(Row.Builder().setTitle("Sıradaki manevra")
                 .addText(if (step != null && meters != null) {
                     "$step · ${meters.roundToInt()} m"
-                } else "Waiting for current GPS and maneuver data").build())
-            pane.addRow(Row.Builder().setTitle("End navigation")
+                } else "Güncel GPS ve dönüş bilgisi bekleniyor").build())
+            pane.addRow(Row.Builder().setTitle("Navigasyonu bitir")
                 .setOnClickListener { endNavigation() }.build())
         } else if (guidance != null) {
-            pane.addRow(Row.Builder().setTitle("Start navigation")
+            pane.addRow(Row.Builder().setTitle("Navigasyonu başlat")
                 .setOnClickListener { beginNavigation() }.build())
         } else {
-            pane.addRow(Row.Builder().setTitle("To get started")
-                .addText("Select a route and grant location permission on the phone").build())
+            pane.addRow(Row.Builder().setTitle("Başlamak için")
+                .addText("Telefondan rota seçin ve konuma izin verin").build())
         }
         val content = PaneTemplate.Builder(pane.build())
         if (carContext.carAppApiLevel < 7) {
