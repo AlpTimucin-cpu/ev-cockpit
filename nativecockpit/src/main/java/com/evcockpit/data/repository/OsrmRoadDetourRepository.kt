@@ -61,8 +61,8 @@ class OsrmRoadDetourRepository @Inject constructor(
         val results = mutableListOf<RoadDetour>()
         for (candidate in chosen) {
             val endpoint = candidate.station.coordinate
-            val request = OsrmRequestFormat.urlVia(
-                route.routePoints.first(), listOf(endpoint), route.routePoints.last()
+            val request = OsrmRequestFormat.urlDetour(
+                route.routePoints.first(), endpoint, route.routePoints.last()
             )
             try {
                 val response = BoundedNetworkRetry.io(maxAttempts = 2) {
