@@ -221,10 +221,13 @@ class EyaCarNavigationScreen(
                 } else "Güncel GPS ve dönüş bilgisi bekleniyor").build())
             pane.addRow(Row.Builder().setTitle("Navigasyonu bitir")
                 .setOnClickListener { endNavigation() }.build())
-        } else if (guidance != null &&
-            guidance!!.gpsRecordedAtMs <= System.currentTimeMillis() &&
-            System.currentTimeMillis() - guidance!!.gpsRecordedAtMs <= 5_000L
-        ) {
+        } else if (guidance?.let { current ->
+            val now = System.currentTimeMillis()
+            current.gpsRecordedAtMs <= now &&
+                now - current.gpsRecordedAtMs <= 5_000L &&
+                fix?.usable(now) == true &&
+                route?.routeId == current.routeId
+        } == true) {
             pane.addRow(Row.Builder().setTitle("Navigasyonu başlat")
                 .setOnClickListener { beginNavigation() }.build())
         } else {
