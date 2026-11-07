@@ -12,6 +12,15 @@ sealed interface MediaLaunchState {
     data object Blocked : MediaLaunchState
 }
 
+/**
+ * Audio-only launch shortcuts from the uploaded reference ZIP.
+ * Installed official apps own subscriptions and playback. No video/DRM bypass.
+ */
+enum class OfficialMusicApp(val title: String, val packageId: String) {
+    SPOTIFY("Spotify", "com.spotify.music"),
+    YOUTUBE_MUSIC("YouTube Music", "com.google.android.apps.youtube.music")
+}
+
 /** External DRM players keep their own playback, focus and picture-in-picture lifecycle. */
 object MediaLauncher {
     // Real package IDs must match the installed media-engine APK.
@@ -41,6 +50,10 @@ object MediaLauncher {
             // YouTube deliberately uses our protected in-app WebView.
             MediaSite.YOUTUBE -> MediaLaunchState.Blocked
         }
+
+    /** Phone media tab only. Does not expose Android Auto templates. */
+    fun launchOfficialMusicApp(context: Context, app: OfficialMusicApp): MediaLaunchState =
+        launchPackage(context, app.packageId)
 
     /** Compatibility for existing callers expecting Result<Unit>. */
     fun openOfficialApp(context: Context, site: MediaSite): Result<Unit> =

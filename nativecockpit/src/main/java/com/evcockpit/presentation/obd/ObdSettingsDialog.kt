@@ -11,6 +11,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -19,6 +23,7 @@ import com.evcockpit.domain.model.ObdConnectionState
 import com.evcockpit.domain.model.ObdPhase
 import com.evcockpit.domain.model.MebResponseStatus
 import com.evcockpit.domain.usecase.ObdDiagnosticSafetyPolicy
+import com.evcockpit.domain.usecase.ZipPrototypeLabPolicy
 import java.util.Locale
 
 @Composable
@@ -112,6 +117,9 @@ fun ObdSettingsDialog(
                     }
                     if (state.diagnosticBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
                     state.diagnosticResult?.let { item ->
+                        var zipHypothesisVisible by remember(item.request, item.receivedAtMillis) {
+                            mutableStateOf(false)
+                        }
                         Text("Son sorgu: ${item.request} · ${diagnosticLabel(item.status)}",
                             style=MaterialTheme.typography.bodyMedium)
                         if (item.status == MebResponseStatus.VALID_RAW) {
@@ -123,8 +131,46 @@ fun ObdSettingsDialog(
                                 Text(String.format(Locale.forLanguageTag("en-US"),
                                     "Candidate maximum battery temperature: %.2f °C",temp))
                             }
-                            item.payloadHex?.let { Text("Raw payload: $it",
-                                style=MaterialTheme.typography.bodySmall) }
+                            item.payloadHex?.let { payload ->
+                                Text("Raw payload: $payload",
+                                    style=MaterialTheme.typography.bodySmall)
+                                // Experimental interpretation is opt-in and remains
+                                // a text-only hypothesis, NEVER vehicle telemetry.
+                                if (item.request == "22028C" &&
+                                    item.responder == "17FE007B"
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            zipHypothesisVisible = !zipHypothesisVisible
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            if (zipHypothesisVisible)
+                                                "ZIP 028C hipotezini gizle"
+                                            else "ZIP 028C aday hesabını göster · deneysel"
+                                        )
+                                    }
+                                    if (zipHypothesisVisible) {
+                                        val candidate = ZipPrototypeLabPolicy
+                                            .unverified028cFromTypedPayload(payload)
+                                        Text(
+                                            candidate?.let {
+                                                String.format(Locale.US,
+                                                    "ZIP ADAYI: %.1f %% · DOĞRULANMAMIŞ", it)
+                                            } ?: "ZIP hipotezi hesaplanamadı; veri reddedildi.",
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            "Aday 028C formülü bu ID.4 için doğrulanmadı. " +
+                                                "SoC, SoH, rota/şarj planı ve gösterge değerleri " +
+                                                "bu sonuçtan güncellenmez.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
                         } else {
                             Text(stringResource(R.string.native_no_validated_ecu_response_received_data_was_not_used),
                                 style=MaterialTheme.typography.bodySmall)

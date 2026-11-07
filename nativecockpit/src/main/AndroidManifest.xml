@@ -19,6 +19,9 @@
         <package android:name="com.netflix.mediaclient" />
         <package android:name="com.disney.disneyplus" />
         <package android:name="com.amazon.avod.thirdpartyclient" />
+        <!-- Phase 10: optional official audio shortcuts from owner-provided ZIP. -->
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.apps.youtube.music" />
     </queries>
 
     <application
