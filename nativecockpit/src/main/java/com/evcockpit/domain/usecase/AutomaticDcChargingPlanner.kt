@@ -77,6 +77,7 @@ object AutomaticDcChargingPlanner {
             !baseline.effectiveWhPerKm.isValidPositive()
         ) return AutomaticChargePlan.Unavailable("No validated route and energy calibration")
 
+        val confirmedRouteId = requireNotNull(route.routeId)
         val energyPerKm = baseline.effectiveWhPerKm / 1000.0
         val batteryReserve = reserveSocPercent / 100.0 * usableBatteryKwh
         val destinationKm = route.totalKm!!
@@ -99,7 +100,7 @@ object AutomaticDcChargingPlanner {
             }
             val reachable = corridor.asSequence()
                 .filter { it.station.id !in used && it.distanceFromStartKm > lastKm + 1.0 }
-                .filter { it.roadDetour?.validFor(route.routeId, it.station.id) == true }
+                .filter { it.roadDetour?.validFor(confirmedRouteId, it.station.id) == true }
                 .filter { candidate ->
                     val extra = requireNotNull(candidate.roadDetour).additionalKm
                     val conservativeLeg = candidate.distanceFromStartKm - lastKm +
