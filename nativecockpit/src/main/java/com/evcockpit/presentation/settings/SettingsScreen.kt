@@ -38,6 +38,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evcockpit.data.settings.UserSettingsRepository
 import com.evcockpit.domain.model.ZipId4PureReference
+import com.evcockpit.domain.model.UserDrivingScenarios
 import com.evcockpit.presentation.sound.ActiveSoundManager
 import java.util.Locale
 
@@ -168,11 +169,17 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { consumptionEntry = "10.5" },
+                        onClick = {
+                            consumptionEntry = UserDrivingScenarios.summer
+                                .midpointKwhPer100Km.toString()
+                        },
                         modifier = Modifier.weight(1f)
                     ) { Text("Yaz · 10,5") }
                     OutlinedButton(
-                        onClick = { consumptionEntry = "18.0" },
+                        onClick = {
+                            consumptionEntry = UserDrivingScenarios.winter
+                                .midpointKwhPer100Km.toString()
+                        },
                         modifier = Modifier.weight(1f)
                     ) { Text("Kış · 18,0") }
                 }
@@ -189,9 +196,12 @@ fun SettingsScreen(
                     }, modifier = Modifier.fillMaxWidth()
                 ) { Text("Araç parametrelerini kullanıcı olarak onayla") }
                 Text(
-                    if (configuration.vehicle.userConfirmed)
-                        "Kullanıcı teyitli senaryo parametreleri. CAN/BMS ölçümü değildir."
-                    else "Araç parametreleri teyit edilmedi — enerji hesabı kullanılamıyor.",
+                    when {
+                        zipDraftStaged -> "ZIP taslağı kaydedilmedi; önce gözden geçirip onayla."
+                        configuration.vehicle.userConfirmed ->
+                            "Kullanıcı teyitli senaryo parametreleri. CAN/BMS ölçümü değildir."
+                        else -> "Araç parametreleri teyit edilmedi — enerji hesabı kullanılamıyor."
+                    },
                     style = MaterialTheme.typography.bodySmall
                 )
                 HorizontalDivider()
