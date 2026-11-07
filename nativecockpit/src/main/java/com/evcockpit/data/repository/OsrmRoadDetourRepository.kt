@@ -75,13 +75,14 @@ class OsrmRoadDetourRepository @Inject constructor(
                 }
                 val body = response.body() ?: continue
                 val evidence = body.use {
-                    // Reject excessive JSON rather than consuming unbounded input.
-                    val content = it.string()
-                    OsrmDetourResponseParser.parse(
-                        content, routeId, candidate.station.id,
-                        requireNotNull(route.totalKm), route.osrmDurationSeconds,
-                        System.currentTimeMillis()
-                    )
+                    // Never download an unbounded OSRM payload into memory.
+                    val source = it.source()
+                    if (source.request(200_001L)) null else
+                        OsrmDetourResponseParser.parse(
+                            source.readUtf8(), routeId, candidate.station.id,
+                            requireNotNull(route.totalKm), route.osrmDurationSeconds,
+                            System.currentTimeMillis()
+                        )
                 }
                 if (evidence != null) results += evidence
             } catch (cancel: CancellationException) {
