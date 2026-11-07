@@ -67,6 +67,44 @@ class Phase10ZipIntegrationTest(unittest.TestCase):
         self.assertNotIn("MediaWebViewScreen", car)
         self.assertNotIn("launchOfficialMusicApp", car)
 
+    def test_zip_unsafe_models_live_only_inside_offline_lab(self):
+        lab = code("domain/usecase/ZipPrototypeLabPolicy.kt")
+        panel = code("presentation/settings/ZipPrototypeLabPanel.kt")
+        settings = code("presentation/settings/SettingsScreen.kt")
+        self.assertIn("ZipPrototypeLabPanel()", settings)
+        self.assertIn("zipLabExpanded", settings)
+        self.assertIn("ZIP_INITIAL_DEMO_SOC_PERCENT = 80.0", lab)
+        self.assertIn("unverified028cFromTypedPayload", lab)
+        self.assertIn("prototypeWouldAcceptUnsafeCommand", lab)
+        self.assertIn("prototypeWouldPermitVideo", lab)
+        self.assertIn("ZIP deney laboratuvarı", panel)
+        self.assertIn("Gerçek video kilidi AÇILMADI", panel)
+        self.assertIn("CANLI GPS/OBD DEĞİL", panel)
+        # Source isolation: this UI cannot transmit to ECU, set navigation
+        # speed/SoC, invoke a video player or persist a dangerous toggle.
+        for forbidden in (
+            "android.bluetooth", "VehicleRepository", "ObdConnectionController",
+            "AppConfigRepository", "DataStore", "MediaLauncher",
+            "MediaWebViewScreen", "startActivity(", "ExoPlayer",
+            "onMebDiagnostic", "ZipPrototypeLabPolicy.prototypeWouldPermitVideo("
+        ):
+            if forbidden == "ZipPrototypeLabPolicy.prototypeWouldPermitVideo(":
+                self.assertNotIn(forbidden, code("presentation/media/MediaHomeScreen.kt"))
+            else:
+                self.assertNotIn(forbidden, panel)
+        self.assertNotIn("ZipPrototypeLabPolicy", code(
+            "data/repository/Elm327VehicleRepository.kt"
+        ))
+        self.assertNotIn("ZipPrototypeLabPolicy", code(
+            "presentation/navigation/NavigationViewModel.kt"
+        ))
+        self.assertNotIn("ZipPrototypeLabPolicy", code(
+            "presentation/media/PhoneVideoSafetyPolicy.kt"
+        ))
+        self.assertIn("MebUdsParser.ALLOWED_REQUESTS", code(
+            "data/obd/ObdWireCommandPolicy.kt"
+        ))
+
     def test_old_zip_source_and_unverified_bms_were_not_ported(self):
         java_root = ROOT / "nativecockpit/src/main/java"
         self.assertFalse((java_root / "tr/yolarkadasi").exists())
