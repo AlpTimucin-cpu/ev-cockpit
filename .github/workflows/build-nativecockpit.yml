@@ -114,7 +114,8 @@ jobs:
           unzip -t "$apk" > /dev/null
           sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           "$sdk/build-tools/36.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/native-badging.txt"
-          grep -Fq "package: name='com.evcockpit'" "$RUNNER_TEMP/native-badging.txt"
+          grep -Fq "package: name='com.evcockpit.debug'" "$RUNNER_TEMP/native-badging.txt"
+          grep -Fq "application-label:'EV Cockpit TEST'" "$RUNNER_TEMP/native-badging.txt"
           "$sdk/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml \
             > "$RUNNER_TEMP/native-manifest.txt"
           grep -Fq 'androidx.car.app.CarAppService' "$RUNNER_TEMP/native-manifest.txt"
