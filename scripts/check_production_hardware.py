@@ -57,7 +57,17 @@ assert "candidate.connect()" in repo and "connectSpp(device)" in repo
 assert "Elm327Session(transport)" in repo
 assert "ElmSessionPhase.READY" in repo
 assert 'protocol.readRawOnce("010D")' in repo
-assert "runMebReadOnlyQuery(conn, protocol, command)" in repo
+# Phase 9: the actual one-shot manual request has a second speed gate
+# after a fresh 010D poll and before the first AT/CAN diagnostic setting.
+assert "runMebReadOnlyQuery(conn, protocol, manual)" in repo
+assert "ObdDiagnosticSafetyPolicy.canRequest(" in repo
+assert "ObdDiagnosticSafetyPolicy.canExecute(" in repo
+assert "ObdWireCommandPolicy.allowed(command)" in repo
+assert "ObdProtocolRestorer.restore(" in repo
+assert "catch (fatal: ObdProtocolRestoreException)" in repo
+assert "_engineering.value.copy(speedKmh = TimedValue())" in repo
+assert "lastSpeedKmh = speed" in repo
+assert "lastSpeedAtMs=null,lastSpeedKmh=null" in repo
 assert "protocol.close()" in repo
 
 assert "withContext(Dispatchers.IO) { runSession(device) }" in repo
