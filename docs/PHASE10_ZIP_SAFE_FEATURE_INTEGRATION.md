@@ -75,3 +75,19 @@ Kısıtlı `<queries>` manifest izinleri ile paket görünürlüğü sağlanır;
 - **Gerçek telefon + ID.4/ELM327/Android Auto**, resmi araç teknik değerleri ve Play Store/Release imzalama doğrulaması **yapılmadı**.
 - Debug paket `com.evcockpit.debug` / **EV Cockpit TEST** ayrı kurulabilir, imzalı stable Release değildir.
 - `main` üzerinde eski manuel Release akışını durduracak **güvenlik PR #32** hâlâ ayrıca incelenip birleştirilmelidir.
+
+
+## EK — Kullanıcının talebiyle riskli prototip mantığının çevrimdışı laboratuvara aktarılması
+
+Sorumluluk kabulü üzerine **prototipin riskli davranışları da incelenebilir hâle getirildi**, fakat bunlar **canlı araca/ekrana etkinleştirilmedi**. `Ayarlar → ZIP'deki riskli özellikleri çevrimdışı incele` düğmesi `ZipPrototypeLabPanel` panelini açar. Kullanıcı bu ekranın gerçek ölçüm olmadığını kabul ettikten sonra:
+
+1. ZIP'teki başlangıç **%80 SoC** ve **18,5 kWh/100 km tüketim** varsayımıyla, 52 kWh üzerinden yaklaşık menzil yalnızca "ZIP DEMO / TAHMİN" etiketiyle hesaplanır; kullanıcı değiştirebilir. **BMS veri kaynağı oluşturulmaz**.
+2. ZIP'teki `Obd.value(b, 1, 1, 2.5)` formülü, yalnızca kullanıcının elle girdiği `62 02 8C ...` **uygulama verisi HEX** örneğinde hesaplanır ve "DOĞRULANMAMIŞ 028C ADAYI" olarak gösterilir; ECU kaynağı/ISO-TP başlığı burada doğrulanmaz. SoC/SoH/rotaya bağlanmaz.
+3. ZIP'in yalnızca `01`/`22` başlangıcına bakan gevşek ELM sorgu filtresi, yazılan metni **offline** kabul/ret şeklinde gösterebilir. **AT/CAN/UDS komutu göndermez**, gerçek bağlantıda FAZ 9 allowlist korunur.
+4. ZIP'teki **test hızı** ve **hareket hâlinde "Yolcu modu"** anahtarının eski kodda nasıl davranacağı, hafızada tutulan 0–150 km/sa örnek hız ve kullanıcı anahtarıyla karşılaştırılır. **Bu anahtar Android Auto'ya, gerçek video oynatıcıya veya `PhoneVideoSafetyPolicy`'ye bağlı değildir.**
+
+Laboratuvar verileri **ne DataStore'a yazılır ne araçtan okunur**. Sayfadan ayrılınca Compose `remember` belleği silinir. Konum izni, Bluetooth bağlantısı, ham UDS yazma veya video oynatımı başlatmaz. ZIP'in tehlikeli davranışı gerçek kullanımda açılmaz; uygulama, sürücünün hareket hâlinde dikkatini dağıtan video kilidi için istisna yaratmaz.
+
+**Sınır:** Prototipin kendisi hâlâ derlenmemiştir. Laboratuvarı eklemek prototipteki kontrol zafiyetlerini onaylamak, BMS PID ölçeklerini doğrulamak veya Volkswagen/Android Auto üretim sertifikası anlamına gelmez.
+
+**Ek testler:** `ZipPrototypeLabPolicyTest` (örnek 80% SoC, eksik/yanlış 028C HEX, gevşek prefix ve yolcu modu davranışı), `test_phase10_zip_integration.py` (laboratuvarın gerçek OBD, GPS, medya ve ayar saklama akışlarına bağlanmaması).
