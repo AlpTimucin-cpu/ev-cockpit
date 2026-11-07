@@ -1,7 +1,6 @@
 package com.evcockpit.data.routing
 
 import com.evcockpit.domain.model.RoadDetour
-import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlin.math.abs
@@ -66,11 +65,11 @@ internal object OsrmDetourResponseParser {
     }
 
     private fun JsonObject.finite(key: String): Double? = try {
-        get(key)?.takeUnless(JsonElement::isJsonNull)
+        get(key)?.takeIf { !it.isJsonNull }
             ?.asDouble?.takeIf { it.isFinite() }
     } catch (_: RuntimeException) { null }
 
     private fun JsonObject.primitiveString(key: String): String? = try {
-        get(key)?.takeUnless(JsonElement::isJsonNull)?.asString
+        get(key)?.takeIf { !it.isJsonNull }?.asString
     } catch (_: RuntimeException) { null }
 }
