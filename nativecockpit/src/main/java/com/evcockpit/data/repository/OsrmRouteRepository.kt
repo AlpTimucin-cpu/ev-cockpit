@@ -1,6 +1,7 @@
 package com.evcockpit.data.repository
 
 import com.google.gson.JsonParser
+import com.evcockpit.BuildConfig
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.domain.usecase.BoundedNetworkRetry
 import kotlinx.coroutines.flow.first
@@ -24,15 +25,18 @@ import com.evcockpit.domain.repository.RouteRepository
 
 @Singleton
 class OsrmRouteRepository @Inject constructor(
-    private val appConfig: AppConfigRepository
+    private val appConfig: AppConfigRepository,
+    private val demoLimiter: OsrmDemoRateLimiter
 ) : RouteRepository {
     private val http = OkHttpClient.Builder()
         .connectTimeout(9, TimeUnit.SECONDS)
         .readTimeout(17, TimeUnit.SECONDS)
         .callTimeout(22, TimeUnit.SECONDS)
         .build()
-    private fun osrm(root: String): OsrmService = Retrofit.Builder()
-        .baseUrl(root).client(http).build().create(OsrmService::class.java)
+    private fun osrm(chosen: RoutingEndpointPolicy.Choice): OsrmService = Retrofit.Builder()
+        .baseUrl(chosen.root)
+        .client(OsrmDemoRateLimiter.client(http, chosen.publicDemo))
+        .build().create(OsrmService::class.java)
 
     private fun photon(root: String): PhotonService = Retrofit.Builder()
         .baseUrl(root).client(http).build().create(PhotonService::class.java)
@@ -78,18 +82,21 @@ class OsrmRouteRepository @Inject constructor(
         destination: RoutePlace,
         stops: List<GeoCoordinate>
     ): RouteCalculationResult = withContext(Dispatchers.IO) {
-        val root = appConfig.configuration.first().endpoints.osrmBaseUrl
-            ?: return@withContext RouteCalculationResult.Failure(
-                null, CoreIssue.CONFIG_UNCONFIRMED.messageTr +
-                    " Kendi HTTPS OSRM sunucunuzun adresini Ayarlar bölümüne girin."
-            )
+        val chosen = RoutingEndpointPolicy.choose(
+            appConfig.configuration.first().endpoints, BuildConfig.DEBUG
+        ) ?: return@withContext RouteCalculationResult.Failure(
+            null, RoutingEndpointPolicy.unavailableMessage(BuildConfig.DEBUG)
+        )
         val url = try {
             OsrmRequestFormat.urlVia(origin, stops, destination.coordinate)
         } catch (error: IllegalArgumentException) {
             return@withContext RouteCalculationResult.Failure(null, error.message ?: "Coordinate error")
         }
         try {
-            val response = BoundedNetworkRetry.io { osrm(root).route(url) }
+            val api = osrm(chosen)
+            val response = BoundedNetworkRetry.io {
+                demoLimiter.execute(chosen.publicDemo) { api.route(url) }
+            }
             if (!response.isSuccessful) {
                 val info = response.errorBody()?.use { body ->
                     val bytes = body.bytes()
@@ -103,7 +110,12 @@ class OsrmRouteRepository @Inject constructor(
             val body = response.body()
                 ?: return@withContext RouteCalculationResult.Failure(null, "OSRM boş yanıt döndürdü")
             val alternatives = try {
-                body.use { OsrmResponseParser.parse(it.string(), destination.label) }
+                body.use { responseBody ->
+                    // Refuse an unbounded JSON payload from any remote endpoint.
+                    val source = responseBody.source()
+                    if (source.request(5_000_001L)) throw IOException("OSRM yanıtı fazla büyük")
+                    OsrmResponseParser.parse(source.readUtf8(), destination.label)
+                }
             } catch (error: RuntimeException) {
                 return@withContext RouteCalculationResult.Failure(null,
                     "OSRM rota verileri okunamadı: ${error.message?.take(80) ?: "geçersiz JSON"}")
