@@ -91,3 +91,16 @@ Laboratuvar verileri **ne DataStore'a yazılır ne araçtan okunur**. Sayfadan a
 **Sınır:** Prototipin kendisi hâlâ derlenmemiştir. Laboratuvarı eklemek prototipteki kontrol zafiyetlerini onaylamak, BMS PID ölçeklerini doğrulamak veya Volkswagen/Android Auto üretim sertifikası anlamına gelmez.
 
 **Ek testler:** `ZipPrototypeLabPolicyTest` (örnek 80% SoC, eksik/yanlış 028C HEX, gevşek prefix ve yolcu modu davranışı), `test_phase10_zip_integration.py` (laboratuvarın gerçek OBD, GPS, medya ve ayar saklama akışlarına bağlanmaması).
+
+
+### EK — Gerçek, manuel `22028C` ham yanıttan ZIP aday okuması
+
+Kullanıcının talebi üzerine, deney laboratuvarına ilave olarak mevcut **OBD Ayarları → MEB ham teşhis** ekranına `ZIP 028C aday hesabını göster · deneysel` düğmesi eklendi. Bu düğme:
+
+- Kullanıcının **kendisi** başlattığı, FAZ 9 tarafından izin verilen ve **taze gerçek sıfıra yakın PID 010D** şartlarını sağlayan `22028C` ham sorgusundan sonra;
+- `MebUdsParser` sonucunda **`VALID_RAW`** ve beklenen **`17FE007B`** ECU adresi geldiğinde;
+- Sadece kullanıcı düğmeye basarsa, orijinal ZIP'in **ikinci uygulama veri baytı / 2,5** iddiasını **`ZIP ADAYI · DOĞRULANMAMIŞ`** etiketiyle gösterir.
+
+Bu aday yalnızca `ObdSettingsDialog` içinde *metindir*. `Elm327VehicleRepository`, `VehicleTelemetry.socEvidence`, `EngineeringMath`, `VerifiedBatterySocPolicy`, gerçek kokpit, şarj/rota enerjisi veya SoH **güncellenmez**. ECU adresi kabul edilmiş olsa bile ölçek ve DID'in ID.4 Pure'daki anlamı doğrulanmış sayılmaz. `22028C` otomatik veya hareket hâlinde sorgulanmaz. Kullanıcı, park hâlinde elle yapılan araştırma dışında bu sonuçla karar vermemelidir.
+
+Bu, çevrimdışı ZIP laboratuvarının araba/veri bağlantısı olmadığı gerçeğini değiştirmez: gerçek ham veri okuması **önceden mevcut manuel OBD teşhis ekranında**, farklı bir kullanıcı işlemiyle yapılır.
