@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.evcockpit.BuildConfig
 import com.evcockpit.data.settings.UserSettingsRepository
 import com.evcockpit.domain.model.ZipId4PureReference
 import com.evcockpit.domain.model.UserDrivingScenarios
@@ -217,15 +218,57 @@ fun SettingsScreen(
                 }
                 if (zipLabExpanded) ZipPrototypeLabPanel()
                 HorizontalDivider()
-                Text("Ağ hizmetleri (HTTPS)", style = MaterialTheme.typography.titleMedium)
+                Text("Rota ve ağ hizmetleri", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Rota çizimi için araç BMS SoC'si veya batarya profili onayı gerekmez. " +
+                        "Enerji / varış şarj tahminleri ayrıca gerçek veriler ve kullanıcı " +
+                        "teyidi gerektirir.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                if (BuildConfig.DEBUG) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Sınırlı OSRM deneme rotası (TEST)",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                "Ücretsiz, paylaşımlı, garantisiz. Başlangıç, hedef ve " +
+                                    "durak koordinatları harici FOSSGIS/OSRM servisine " +
+                                    "gönderilir. Canlı trafik yoktur; sürüşte doğrulamadan " +
+                                    "güvenmeyin. Yalnızca kişisel test için.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFFFCA80)
+                            )
+                        }
+                        Switch(
+                            checked = configuration.endpoints.debugDemoRoutingApproved,
+                            onCheckedChange = viewModel::setDebugDemoRoutingConsent
+                        )
+                    }
+                    Text(
+                        if (configuration.endpoints.debugDemoRoutingApproved)
+                            "TEST OSRM etkin. Kendi HTTPS adresiniz varsa öncelik ondadır."
+                        else "TEST OSRM kapalı. Rota için kendi HTTPS servisinizi " +
+                            "girmeniz veya deneme kullanımını açıkça etkinleştirmeniz gerekir.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFAEC4D6)
+                    )
+                    HorizontalDivider()
+                }
                 OutlinedTextField(
                     value = osrmEntry, onValueChange = { osrmEntry = it },
                     label = { Text("Kendi OSRM sunucunuzun kök adresi") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 Text(
-                    "OSRM herkese açık demo sunucusu üretimde kullanılmaz. " +
-                        "Adres yoksa rota isteği yapılmaz.",
+                    "Özel OSRM: üretim için HTTPS servis adresi girin. " +
+                        "Genel demo adresi bu alana kaydedilemez; TEST denemesi " +
+                        "yalnızca yukarıdaki açık onayla kullanılabilir.",
                     style = MaterialTheme.typography.bodySmall
                 )
                 OutlinedTextField(
