@@ -26,6 +26,10 @@ class AppAudioDucking @Inject constructor() {
         activeSpeakers.remove(owner)
         state.value = activeSpeakers.isNotEmpty()
     }
+
+    /** Navigation speech has priority over an optional startup greeting. */
+    @Synchronized fun hasNavigationSpeech(): Boolean =
+        activeSpeakers.any { it.startsWith("navigation:") }
 }
 
 /** Shared by the phone radio without adding DI to a Composable. */
