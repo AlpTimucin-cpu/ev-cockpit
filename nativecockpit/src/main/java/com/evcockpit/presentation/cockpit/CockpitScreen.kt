@@ -297,8 +297,8 @@ fun CockpitScreen(
         if (selectedPage == 1) {
             MediaHomeScreen(
                 phoneAllowed = phoneMediaAllowed,
-                vehicleMoving = obdConnection.phase == ObdPhase.CONNECTED &&
-                    (state.speedKmh ?: 0.0) > 1.0,
+                verifiedStationary = obdConnection.phase == ObdPhase.CONNECTED &&
+                    state.speedKmh?.let { it.isFinite() && it in 0.0..0.5 } == true,
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
         } else {
