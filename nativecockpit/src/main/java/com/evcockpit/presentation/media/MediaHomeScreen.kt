@@ -27,17 +27,22 @@ private val Muted = Color(0xFFB2C5D3)
 @Composable
 fun MediaHomeScreen(
     phoneAllowed: Boolean,
-    vehicleMoving: Boolean,
+    verifiedStationary: Boolean,
     modifier: Modifier = Modifier
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<MediaSite?>(null) }
     // This acknowledgement is not an authoritative vehicle Park measurement.
     var userSaysParked by rememberSaveable { mutableStateOf(false) }
-    val videoAllowed = phoneAllowed && !vehicleMoving && userSaysParked
+    val videoAllowed = PhoneVideoSafetyPolicy.allow(
+        phoneNotProjected = phoneAllowed,
+        userConfirmedParked = userSaysParked,
+        obdConnected = verifiedStationary,
+        freshVehicleSpeedKmh = if (verifiedStationary) 0.0 else null
+    )
 
-    LaunchedEffect(phoneAllowed, vehicleMoving) {
-        if (!phoneAllowed || vehicleMoving) selected = null
+    LaunchedEffect(phoneAllowed, verifiedStationary) {
+        if (!phoneAllowed || !verifiedStationary) selected = null
     }
 
     Column(
@@ -102,10 +107,10 @@ fun MediaHomeScreen(
                                 color = Muted,
                                 style = MaterialTheme.typography.bodySmall)
                         }
-                        if (!phoneAllowed || vehicleMoving) {
+                        if (!phoneAllowed || !verifiedStationary) {
                             Text(
-                                "Araç hareket ederken veya Android Auto bağlıyken " +
-                                    "video açılmaz.",
+                                "Android Auto bağlıysa, güncel OBD hızı yoksa veya araç hareketliyse " +
+                                    "video kilitlidir. Durmak Park konumu doğrulaması değildir.",
                                 color = Color(0xFFFFC582),
                                 style = MaterialTheme.typography.bodySmall
                             )
