@@ -39,6 +39,7 @@ fun RoutePlannerDialog(
     onPlan: () -> Unit,
     onChooseAlternative: (Int) -> Unit,
     onClear: () -> Unit,
+    onOpenRoutingSettings: () -> Unit,
     measuredSocPercent: Double? = null
 ) {
     val scrollState = rememberScrollState()
@@ -246,9 +247,18 @@ fun RoutePlannerDialog(
                             state.error?.let { error ->
                                 Text(
                                     text = error,
+                                    modifier = Modifier.fillMaxWidth(),
                                     color = Color(0xFFFFB17C),
                                     style = MaterialTheme.typography.bodySmall
                                 )
+                                if (error.contains("Rota servisi ayarlanmadı")) {
+                                    OutlinedButton(
+                                        onClick = onOpenRoutingSettings,
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                    ) {
+                                        Text("OSRM / rota servisi ayarlarını aç")
+                                    }
+                                }
                             }
 
                             if (state.options.isNotEmpty()) {
