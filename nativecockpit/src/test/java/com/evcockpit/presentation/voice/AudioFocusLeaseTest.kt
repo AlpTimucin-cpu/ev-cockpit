@@ -50,6 +50,26 @@ class AudioFocusLeaseTest {
         assertEquals(1, abandoned)
     }
 
+    @Test fun staleQueuedLossFromOldLeaseCannotStopNewTtsUtterance() {
+        var grants = 0
+        val focus = AudioFocusLease(
+            requestFocus = { grants++; true },
+            abandonFocus = { }
+        )
+        assertTrue(focus.acquire())
+        val oldEvent = focus.lossGeneration()!!
+        assertTrue(focus.shouldStopAfterLoss(oldEvent))
+        focus.release()
+        assertTrue(focus.acquire())
+        val currentEvent = focus.lossGeneration()!!
+        assertEquals(2, grants)
+        assertTrue(currentEvent > oldEvent)
+        assertFalse(focus.shouldStopAfterLoss(oldEvent))
+        assertTrue(focus.shouldStopAfterLoss(currentEvent))
+        focus.close()
+        assertFalse(focus.shouldStopAfterLoss(currentEvent))
+    }
+
     @Test fun focusDeniedDoesNotModifyMediaOrClaimOwnership() {
         var mediaVolume = 1.0
         var releases = 0
