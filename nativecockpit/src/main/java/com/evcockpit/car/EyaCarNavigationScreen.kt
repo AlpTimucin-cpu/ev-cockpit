@@ -231,6 +231,26 @@ class EyaCarNavigationScreen(
                             surface.updateWeatherPoints(emptyList())
                             weatherMapPointsExpired = true // offline forecast text remains available
                         }
+                        maybeReattachNavigation(r, f, fresh, now)
+                        val continuation = continuity.state.value
+                        if (activeRouteId != null && continuation.phase == CarContinuityPhase.OFF) {
+                            endNavigation() // explicit notification stop or terminated service
+                        }
+                        val message = when (continuation.phase) {
+                            CarContinuityPhase.PHONE_ACTION_REQUIRED ->
+                                "Arka plan GPS Android tarafından engellendi; telefondaki Ayarlar'dan başlatın."
+                            CarContinuityPhase.GPS_UNAVAILABLE ->
+                                "Arka plan GPS sinyali bekleniyor."
+                            CarContinuityPhase.ACTIVE ->
+                                "Arka plan GPS hizmeti etkin."
+                            CarContinuityPhase.STARTING ->
+                                "Arka plan GPS hizmeti başlatılıyor."
+                            CarContinuityPhase.OFF -> null
+                        }
+                        if (continuityMessage != message) {
+                            continuityMessage = message
+                            invalidate()
+                        }
                         updateActiveNavigation(r, f, fresh, now)
                         maybeAnnounceWeather(r, f, now)
                         if (weatherVisible && lastWeatherPageMinute != now / 60_000L) {
@@ -241,25 +261,24 @@ class EyaCarNavigationScreen(
                 }
             }
             override fun onStop(owner: LifecycleOwner) {
-                // No foreground service yet: stop rather than claim background navigation.
-                endNavigation()
+                // The host may disconnect or replace its Session. Keep only the
+                // user-started location service; host IPC and voice stop here.
+                detachForHost()
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
                 detourVerificationKey = null
-                weatherJob?.cancel(); weatherJob = null
-                dismissWeatherAlert()
                 weatherJob?.cancel(); weatherJob = null
                 dismissWeatherAlert()
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
-                manager.clearNavigationManagerCallback()
+                runCatching { manager.clearNavigationManagerCallback() }
             }
             override fun onDestroy(owner: LifecycleOwner) {
-                endNavigation()
+                detachForHost()
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
-                detourVerificationKey = null
+                weatherJob?.cancel(); weatherJob = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
