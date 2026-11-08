@@ -65,7 +65,43 @@ jobs:
           grep -Eq '^distributionSha256Sum=[a-f0-9]{64}$' gradle/wrapper/gradle-wrapper.properties
           test -s nativecockpit/build.gradle.kts
           grep -Fq 'include(":nativecockpit")' settings.gradle.kts
-          ./gradlew --version --no-daemon
+          # Keep the checked-in Wrapper unchanged; only use a temporary
+          # mirror when the official Gradle distribution redirects to a 5xx.
+          if ! ./gradlew --version --no-daemon > "$RUNNER_TEMP/gradle-wrapper.log" 2>&1; then
+            if ! grep -Eq 'HTTP response code: 50[234]|Server returned HTTP response code: 50[234]' \
+                "$RUNNER_TEMP/gradle-wrapper.log"; then
+              cat "$RUNNER_TEMP/gradle-wrapper.log"
+              exit 1
+            fi
+            echo "::warning::Official Gradle distribution returned HTTP 5xx; trying SHA-256-pinned mirror."
+            archive="$RUNNER_TEMP/gradle-8.14.3-bin.zip"
+            expected="$(sed -n 's/^distributionSha256Sum=//p' gradle/wrapper/gradle-wrapper.properties)"
+            test "$expected" = 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
+            verified=false
+            for mirror in \
+              'https://mirrors.aliyun.com/gradle/distributions/v8.14.3/gradle-8.14.3-bin.zip' \
+              'https://mirror.nju.edu.cn/gradle/gradle-8.14.3-bin.zip'; do
+              rm -f "$archive"
+              if curl --fail --location --retry 2 --retry-all-errors \
+                --connect-timeout 15 --max-time 360 --silent --show-error \
+                "$mirror" --output "$archive"; then
+                actual="$(sha256sum "$archive" | cut -d' ' -f1)"
+                if test "$actual" = "$expected"; then
+                  verified=true
+                  break
+                fi
+                echo "::error::Fallback Gradle archive checksum mismatch; refusing to execute."
+                exit 1
+              fi
+            done
+            test "$verified" = true
+            # Local file URI only for this ephemeral runner; never committed.
+            sed -i "s|^distributionUrl=.*|distributionUrl=file://${archive}|" \
+              gradle/wrapper/gradle-wrapper.properties
+            ./gradlew --version --no-daemon
+          else
+            cat "$RUNNER_TEMP/gradle-wrapper.log"
+          fi
           ./gradlew projects --no-daemon --console=plain
 
       - name: Production source policy checks
