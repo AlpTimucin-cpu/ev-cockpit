@@ -7,7 +7,7 @@ import java.util.Locale
 
 /** UI-only formatting: unknown input never becomes 0 or an invented value. */
 object CockpitFormat {
-    private val turkish = Locale.forLanguageTag("en-US")
+    private val turkish = Locale.forLanguageTag("tr-TR")
 
     fun percent(v: Double?): String =
         v?.takeIf { it.isFinite() && it in 0.0..100.0 }
