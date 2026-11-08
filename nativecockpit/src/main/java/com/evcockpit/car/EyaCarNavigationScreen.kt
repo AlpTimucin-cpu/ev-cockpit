@@ -8,6 +8,8 @@ import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.Alert
+import androidx.car.app.model.CarText
 import androidx.car.app.model.Distance
 import androidx.car.app.model.DistanceSpan
 import androidx.car.app.model.ItemList
@@ -22,6 +24,8 @@ import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.car.app.navigation.model.PlaceListNavigationTemplate
+import androidx.car.app.navigation.model.NavigationTemplate
+import androidx.car.app.navigation.model.MessageInfo
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +41,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.evcockpit.domain.model.GpsFix
+import com.evcockpit.domain.model.RouteWeatherState
 import com.evcockpit.domain.model.ChargingCatalog
 import com.evcockpit.domain.model.RoadDetourCatalog
 import com.evcockpit.domain.model.VehicleProfileConfig
@@ -44,6 +49,8 @@ import com.evcockpit.domain.model.VehicleTelemetry
 import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.repository.OsrmRoadDetourRepository
+import com.evcockpit.data.weather.OpenMeteoWeatherRepository
+import com.evcockpit.domain.usecase.WeatherChangeAlertGate
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
 import com.evcockpit.domain.repository.RouteRepository
@@ -65,6 +72,7 @@ class EyaCarNavigationScreen(
     private val vehicle: VehicleRepository,
     private val config: AppConfigRepository,
     private val detours: OsrmRoadDetourRepository,
+    private val weather: OpenMeteoWeatherRepository,
     ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
@@ -105,6 +113,25 @@ class EyaCarNavigationScreen(
     private var detourVerificationKey: String? = null
     private var lastChargingFixTimestamp: Long? = null
 
+    // Foreground-only ETA forecasts: one refresh per 30 minutes per route.
+    private val weatherRefreshGate = CarWeatherRefreshGate()
+    private var weatherAlertGate = WeatherChangeAlertGate()
+    private var weatherRouteId: String? = null
+    private var weatherState = RouteWeatherState()
+    private var weatherJob: Job? = null
+    private var weatherVisible = false
+    private var weatherAlertUntilMs: Long = 0L
+    private var weatherAlertMessage: String? = null
+    private var pendingWeatherSpeech: String? = null
+    private var weatherSpeechUntilMs: Long = 0L
+    private var lastWeatherPageMinute: Long = -1L
+    private var weatherMapPointsExpired = false
+
+    private companion object {
+        const val WEATHER_ALERT_ID = 0xEA12
+        const val WEATHER_ALERT_DURATION_MS = 10_000L
+    }
+
     private val callbacks = object : NavigationManagerCallback {
         override fun onStopNavigation() {
             // Host navigation ownership changed: immediately stop all trip IPC and voice.
@@ -123,6 +150,11 @@ class EyaCarNavigationScreen(
                 manager.setNavigationManagerCallback(callbacks)
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(surface)
                 tracker.start()
+                val cachedForecastAge = weatherState.ageMinutes(System.currentTimeMillis())
+                weatherMapPointsExpired = cachedForecastAge == null || cachedForecastAge > 45L
+                surface.updateWeatherPoints(
+                    weatherState.points.takeUnless { weatherMapPointsExpired } ?: emptyList()
+                )
                 val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
                 work = scope
                 val ticker = flow {
@@ -169,6 +201,7 @@ class EyaCarNavigationScreen(
                     }.collect { (r, f, now) ->
                         route = r
                         fix = f
+                        resetWeatherForRoute(r?.routeId)
                         surface.update(r, f)
                         if (chargingVisible && lastChargingFixTimestamp != f?.recordedAtMillis) {
                             lastChargingFixTimestamp = f?.recordedAtMillis
@@ -186,7 +219,19 @@ class EyaCarNavigationScreen(
                             summary = newSummary
                             invalidate()
                         }
+                        maybeRefreshWeather(r, f, now)
+                        if (!weatherMapPointsExpired && weatherState.points.isNotEmpty() &&
+                            weatherState.ageMinutes(now)?.let { it > 45L } == true
+                        ) {
+                            surface.updateWeatherPoints(emptyList())
+                            weatherMapPointsExpired = true // offline forecast text remains available
+                        }
                         updateActiveNavigation(r, f, fresh, now)
+                        maybeAnnounceWeather(r, f, now)
+                        if (weatherVisible && lastWeatherPageMinute != now / 60_000L) {
+                            lastWeatherPageMinute = now / 60_000L
+                            invalidate() // "X dk önce" updates once per minute
+                        }
                     }
                 }
             }
@@ -196,6 +241,10 @@ class EyaCarNavigationScreen(
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
                 detourVerificationKey = null
+                weatherJob?.cancel(); weatherJob = null
+                dismissWeatherAlert()
+                weatherJob?.cancel(); weatherJob = null
+                dismissWeatherAlert()
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
@@ -251,6 +300,8 @@ class EyaCarNavigationScreen(
         matchPolicy.reset()
         routeMatch = CarRouteMatch.NO_VALID_FIX
         offRouteAnnouncementSent = false
+        pendingWeatherSpeech = null
+        dismissWeatherAlert()
         if (wasActive) {
             // Old Screen must never end a newer Session's host navigation.
             if (wasOwner) {
@@ -349,6 +400,217 @@ class EyaCarNavigationScreen(
         } else if (!voicePrefs.enabled) voice.stop()
     }
 
+
+    private fun resetWeatherForRoute(nextRouteId: String?) {
+        if (weatherRouteId == nextRouteId) return
+        weatherJob?.cancel()
+        weatherJob = null
+        weatherRouteId = nextRouteId
+        weatherState = RouteWeatherState(routeId = nextRouteId)
+        surface.updateWeatherPoints(emptyList())
+        weatherMapPointsExpired = false
+        weatherRefreshGate.reset()
+        weatherAlertGate = WeatherChangeAlertGate()
+        pendingWeatherSpeech = null
+        weatherSpeechUntilMs = 0L
+        dismissWeatherAlert()
+        if (weatherVisible) invalidate()
+    }
+
+    /**
+     * Only the active Car Screen can request forecasts. A valid, actual GPS
+     * projection and a real route are prerequisites. No background worker.
+     */
+    private fun maybeRefreshWeather(
+        currentRoute: RouteSnapshot?,
+        currentFix: GpsFix?,
+        nowMs: Long,
+        manual: Boolean = false
+    ) {
+        val scope = work ?: return
+        val routeId = currentRoute?.routeId?.takeIf { it.isNotBlank() } ?: return
+        val fix = currentFix?.takeIf {
+            it.usable(nowMs) && it.accuracyMeters <= 35f
+        } ?: return
+        val projected = progress.enrich(currentRoute, fix, nowMs)
+        val valid = projected?.validProgress() != null &&
+            routeMatch == CarRouteMatch.ON_ROUTE
+        if (!weatherRefreshGate.shouldRefresh(routeId, valid, nowMs, manual)) return
+        if (weatherJob?.isActive == true) return
+        weatherRefreshGate.markAttempt(routeId, nowMs)
+        val matched = requireNotNull(projected)
+        if (weatherState.points.isEmpty()) {
+            weatherState = RouteWeatherState(routeId = routeId, loading = true)
+            if (weatherVisible) invalidate()
+        }
+        weatherJob = scope.launch {
+            val result = weather.routeWeather(matched)
+            if (routes.currentRoute.value?.routeId != routeId || weatherRouteId != routeId)
+                return@launch
+            weatherState = result.fold(
+                onSuccess = { it },
+                onFailure = {
+                    val message = "Open-Meteo yenilenemedi. Son tahmin korunuyor."
+                    if (weatherState.points.isNotEmpty()) weatherState.copy(
+                        loading = false, error = message
+                    ) else RouteWeatherState(routeId = routeId, error = message)
+                }
+            )
+            val mapAge = weatherState.ageMinutes(System.currentTimeMillis())
+            weatherMapPointsExpired = mapAge == null || mapAge > 45L
+            surface.updateWeatherPoints(
+                weatherState.points.takeUnless { weatherMapPointsExpired } ?: emptyList()
+            )
+            if (weatherVisible) invalidate()
+        }
+    }
+
+    /** Notify only a newly increased severe forecast risk, never every tick. */
+    private fun maybeAnnounceWeather(
+        currentRoute: RouteSnapshot?,
+        currentFix: GpsFix?,
+        nowMs: Long
+    ) {
+        val started = activeRouteId ?: return
+        if (chargingVisible || weatherVisible || !CarNavigationOwnership.owns(navigationSessionToken) ||
+            routeMatch != CarRouteMatch.ON_ROUTE || weatherRouteId != started ||
+            currentRoute?.routeId != started
+        ) return
+        val enriched = progress.enrich(currentRoute, currentFix, nowMs)
+        val hazard = weatherAlertGate.increasedWarning(
+            weatherState, nowMs, enriched?.validProgress()
+        )
+        if (hazard != null) {
+            val message = CarWeatherPresentationPolicy.warningText(hazard)
+            weatherAlertMessage = message
+            weatherAlertUntilMs = nowMs + WEATHER_ALERT_DURATION_MS
+            pendingWeatherSpeech = message
+            weatherSpeechUntilMs = nowMs + 2L * 60_000L
+            if (carContext.carAppApiLevel >= 5) {
+                val alert = Alert.Builder(
+                    WEATHER_ALERT_ID, CarText.create("Rota hava tahmini"),
+                    WEATHER_ALERT_DURATION_MS
+                ).setSubtitle(CarText.create(message.take(110))).build()
+                try {
+                    carContext.getCarService(AppManager::class.java).showAlert(alert)
+                } catch (error: RuntimeException) {
+                    Log.w("EyaCarNavigation", "Weather Alert host rejected", error)
+                }
+            } else {
+                // Car API 1-4 cannot show Alert. OnGetTemplate uses MessageInfo
+                // in a short-lived NavigationTemplate while the map remains live.
+                invalidate()
+            }
+        }
+        maybeSpeakPendingWeather(currentFix, nowMs)
+        if (weatherAlertUntilMs != 0L && nowMs >= weatherAlertUntilMs) {
+            weatherAlertUntilMs = 0L
+            weatherAlertMessage = null
+            if (carContext.carAppApiLevel < 5) invalidate()
+        }
+    }
+
+    private fun maybeSpeakPendingWeather(fix: GpsFix?, nowMs: Long) {
+        val phrase = pendingWeatherSpeech ?: return
+        if (nowMs > weatherSpeechUntilMs) {
+            pendingWeatherSpeech = null
+            return
+        }
+        if (!voicePrefs.enabled || voice.status != NativeVoiceGuide.Status.READY ||
+            fix?.usable(nowMs) != true || routeMatch != CarRouteMatch.ON_ROUTE ||
+            (guidance?.nextMeters?.let { it <= 650.0 } == true)
+        ) return // maneuver speech always has precedence; no audio interruption
+        if (voice.speakIfIdle(phrase, voicePrefs.volume)) {
+            pendingWeatherSpeech = null
+        }
+    }
+
+    private fun dismissWeatherAlert() {
+        weatherAlertMessage = null
+        weatherAlertUntilMs = 0L
+        if (carContext.carAppApiLevel >= 5) {
+            runCatching {
+                carContext.getCarService(AppManager::class.java)
+                    .dismissAlert(WEATHER_ALERT_ID)
+            }
+        }
+    }
+
+    private fun showWeather() {
+        if (route?.routeId.isNullOrBlank()) return
+        chargingVisible = false
+        selectedChargingStationId = null
+        chargingModelJob?.cancel()
+        detourVerificationJob?.cancel()
+        detourVerificationJob = null
+        detourVerificationKey = null
+        surface.updateChargingStations(emptyList())
+        weatherVisible = true
+        maybeRefreshWeather(route, fix, System.currentTimeMillis())
+        invalidate()
+    }
+
+    private fun hideWeather() {
+        weatherVisible = false
+        invalidate()
+    }
+
+    private fun weatherTemplate(): Template {
+        val now = System.currentTimeMillis()
+        val limit = if (carContext.carAppApiLevel >= 2) runCatching {
+            carContext.getCarService(ConstraintManager::class.java)
+                .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_PANE)
+                .coerceIn(1, 4)
+        }.getOrDefault(2) else 2
+        val content = CarWeatherPresentationPolicy.display(
+            weatherState, route?.routeId, now, (limit - 1).coerceAtLeast(0)
+        )
+        val pane = Pane.Builder().addRow(
+            Row.Builder().setTitle("Open-Meteo · saatlik TAHMİN")
+                .addText(content.provenance.take(130)).build()
+        )
+        if (content.rows.isEmpty()) {
+            if (limit >= 2) pane.addRow(
+                Row.Builder().setTitle("Veri durumu")
+                    .addText((content.message ?: "Tahmin kullanılamıyor").take(130)).build()
+            )
+        } else {
+            content.rows.forEach { item ->
+                pane.addRow(Row.Builder().setTitle(item.title.take(80))
+                    .addText(item.description.take(150)).build())
+            }
+        }
+        if (!route?.routeId.isNullOrBlank()) {
+            pane.addAction(Action.Builder().setTitle("Rota şarjları")
+                .setOnClickListener {
+                    weatherVisible = false
+                    showChargingList()
+                }.build())
+        }
+        pane.addAction(Action.Builder().setTitle("Rotaya dön")
+            .setOnClickListener { hideWeather() }.build())
+        val template = PaneTemplate.Builder(pane.build())
+        if (carContext.carAppApiLevel < 7) {
+            @Suppress("DEPRECATION")
+            return template.setTitle("Rota hava tahmini").build()
+        }
+        return navigationMapContent(template.setHeader(
+            Header.Builder().setTitle("Rota hava tahmini").build()
+        ).build())
+    }
+
+    private fun legacyWeatherWarningTemplate(message: String): Template {
+        val close = Action.Builder().setTitle("Kapat")
+            .setOnClickListener {
+                weatherAlertUntilMs = 0L
+                weatherAlertMessage = null
+                invalidate()
+            }.build()
+        return NavigationTemplate.Builder()
+            .setActionStrip(ActionStrip.Builder().addAction(close).build())
+            .setNavigationInfo(MessageInfo.Builder(message.take(130)).build())
+            .build()
+    }
 
     private fun showChargingList() {
         if (route == null || !validRouteGeometry(route!!.routePoints)) return
@@ -563,6 +825,12 @@ class EyaCarNavigationScreen(
 
     override fun onGetTemplate(): Template {
         if (chargingVisible) return chargerTemplate()
+        if (weatherVisible) return weatherTemplate()
+        val activeWeatherWarning = weatherAlertMessage
+        if (carContext.carAppApiLevel < 5 && activeRouteId != null &&
+            activeWeatherWarning != null &&
+            System.currentTimeMillis() < weatherAlertUntilMs
+        ) return legacyWeatherWarningTemplate(activeWeatherWarning)
         val active = activeRouteId != null &&
             CarNavigationOwnership.owns(navigationSessionToken)
         val now = System.currentTimeMillis()
@@ -622,8 +890,8 @@ class EyaCarNavigationScreen(
                 .setOnClickListener { beginNavigation() }.build())
         }
         if (route?.routeId != null && route?.routePoints?.let(::validRouteGeometry) == true) {
-            pane.addAction(Action.Builder().setTitle("Rota şarjları")
-                .setOnClickListener { showChargingList() }.build())
+            pane.addAction(Action.Builder().setTitle("Hava / Şarj")
+                .setOnClickListener { showWeather() }.build())
         }
         val content = PaneTemplate.Builder(pane.build())
         if (carContext.carAppApiLevel < 7) {
