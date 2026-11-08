@@ -312,17 +312,15 @@ fun CockpitScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 TelemetryLeftPanel(
-                    displayState,
-                    obdConnection.phase == ObdPhase.CONNECTED,
-                    engineering = engineering,
-                    metrics = engineeringMetrics,
+                    data = displayState,
+                    connected = obdConnection.phase == ObdPhase.CONNECTED,
                     onConnect = { settings = true; onObdRefresh() },
                     onEngineering = { engineeringOpen = true },
                     onSoundSettings = onOpenSoundSettings,
-                    modifier = Modifier.weight(.32f).fillMaxHeight()
+                    modifier = Modifier.weight(.36f).fillMaxHeight()
                 )
                 Box(
-                    Modifier.weight(.68f).fillMaxHeight()
+                    Modifier.weight(.64f).fillMaxHeight()
                         .background(Navy, RoundedCornerShape(14.dp))
                 ) {
                     // The route is always visible on the driving page.
@@ -349,36 +347,47 @@ fun CockpitScreen(
                         modifier = Modifier.align(Alignment.TopCenter)
                             .fillMaxWidth(.87f).padding(top = 10.dp)
                     )
-                    Row(
-                        Modifier.align(Alignment.BottomStart).padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Weather and GPS/voice badges share one stacked edge group.
+                    // Previously the weather pill was an unaligned Box child and
+                    // could overlap the navigation card and other controls.
+                    Column(
+                        modifier = Modifier.align(Alignment.BottomStart)
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        AssistPill(
-                            if (state.gpsFix == null) stringResource(R.string.ux_gps_waiting)
-                            else "GPS aktif",
-                            onGpsClick
-                        )
-                        AssistPill(
-                            if (voiceEnabled) "Ses açık" else "Ses kapalı",
-                            onVoiceToggle
-                        )
+                        if (route?.routeId != null) {
+                            val age = if (weatherUi.routeId == route.routeId)
+                                weatherUi.ageMinutes(System.currentTimeMillis()) else null
+                            val title = when {
+                                weatherUi.loading -> "Hava yükleniyor"
+                                age == null -> "Hava verisi yok"
+                                age > 30L -> "Hava eski · " + age + " dk"
+                                else -> "Hava · " + age + " dk önce"
+                            }
+                            AssistPill(
+                                "$title · Yenile",
+                                onRefreshWeather,
+                                modifier = Modifier.widthIn(max = 220.dp)
+                            )
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            AssistPill(
+                                if (state.gpsFix == null)
+                                    stringResource(R.string.ux_gps_waiting)
+                                else "GPS aktif",
+                                onGpsClick
+                            )
+                            AssistPill(
+                                if (voiceEnabled) "Ses açık" else "Ses kapalı",
+                                onVoiceToggle
+                            )
+                        }
                         if (soundUnavailable) AssistPill(
                             "Motor sesi kullanılamıyor",
-                            onOpenSoundSettings
-                        )
-                    }
-                    if (route?.routeId != null) {
-                        val age = if (weatherUi.routeId == route.routeId)
-                            weatherUi.ageMinutes(System.currentTimeMillis()) else null
-                        val title = when {
-                            weatherUi.loading -> "Hava tahmini yükleniyor"
-                            age == null -> "Hava tahmini yok"
-                            age > 30L -> "Eski tahmin · ${age} dk önce"
-                            else -> "Open-Meteo tahmini · ${age} dk önce"
-                        }
-                        AssistPill(
-                            "$title · Yenile",
-                            onRefreshWeather
+                            onOpenSoundSettings,
+                            modifier = Modifier.widthIn(max = 220.dp)
                         )
                     }
                 }
@@ -674,143 +683,145 @@ private fun HardwareNotice(title: String, detail: String, onClick: () -> Unit) {
 /** Live OBD results only. Experimental MEB PID scales stay labelled and
  * NEVER become validated BMS SoC or charging-plan inputs automatically.
  */
+/**
+ * Compact landscape summary. A confirmed BMS SoC is NOT interchangeable with
+ * experimental community UDS scaling, and a route estimate is not live range.
+ * All engineering/experimental values remain on the separate diagnostic sheet.
+ */
 @Composable
 private fun TelemetryLeftPanel(
     data: CockpitUiState,
     connected: Boolean,
-    engineering: EngineeringSnapshot,
-    metrics: EngineeringMetrics,
     onConnect: () -> Unit,
     onEngineering: () -> Unit,
     onSoundSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val now = System.currentTimeMillis()
-    fun reading(value: String?): String =
-        if (!connected) "Bağlantı Bekleniyor" else value ?: "ECU yanıtı bekleniyor"
-
-    // The following BMS values are parsed from actual UDS frames.
-    // Their community PID scaling must be confirmed against the vehicle.
-    val candidateSoc = engineering.socPercent.current(now, 120_000L)
-    val candidateVoltage = engineering.packVoltageV.current(now, 120_000L)
-    val candidateCurrent = engineering.packCurrentA.current(now, 120_000L)
-    val candidateMaxTemp = engineering.temperatureMaxC.current(now, 120_000L)
-    val candidateMinTemp = engineering.temperatureMinC.current(now, 120_000L)
-    val candidateCapacity = engineering.capacityParameterKwh.current(now, 900_000L)
-    val candidateCellMax = engineering.cellMaxV.current(now, 120_000L)
-    val candidateCellMin = engineering.cellMinV.current(now, 120_000L)
-
-    Column(modifier.verticalScroll(rememberScrollState())) {
-        Text("EV COCKPIT · CANLI OBD", color = NeonGreen,
-            style = MaterialTheme.typography.titleSmall)
+    Column(
+        modifier.background(Ink)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         Text(
-            if (connected) "ELM327 bağlı · yalnızca gerçek ECU yanıtları"
-            else "Adaptör bağlantısı bekleniyor",
+            "ARAÇ · SÜRÜŞ ÖZETİ",
+            color = NeonGreen,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            if (connected) "ELM327 bağlı · geçerli okumalar"
+            else "OBD bağlı değil · ölçümler kullanılamıyor",
             color = SoftText,
-            style = MaterialTheme.typography.labelSmall
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 2
         )
-        Spacer(Modifier.height(12.dp))
-        TelemetryTile(
-            if (candidateSoc != null) "BATARYA SoC · DENEYSEL BMS"
-            else "BATARYA SoC",
-            reading(data.socPercent?.let(CockpitFormat::percent)
-                ?: candidateSoc?.let(CockpitFormat::percent))
+        SummaryMetricRow(
+            title = "HIZ",
+            value = CockpitFormat.speed(if (connected) data.speedKmh else null),
+            provenance = "OBD PID 010D · gerçek ölçüm",
+            prominent = true
         )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "MENZİL · OBD SoC + MODEL",
-            reading(if (candidateSoc != null)
-                metrics.estimatedSummerRangeKm?.let(CockpitFormat::distance)
-            else null)
+        SummaryMetricRow(
+            title = "BATARYA DOLULUĞU",
+            value = CockpitFormat.percent(if (connected) data.socPercent else null),
+            provenance = "Yalnız doğrulanmış BMS SoC"
         )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "BATARYA SAĞLIĞI · SoH",
-            if (connected) "OBD ile doğrulanmadı" else "Bağlantı Bekleniyor"
+        SummaryMetricRow(
+            title = "BATARYA GÜCÜ",
+            value = CockpitFormat.power(if (connected) data.powerKw else null),
+            provenance = "OBD ölçümü · mevcutsa"
         )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "BATARYA SICAKLIĞI · DENEYSEL BMS",
-            reading(data.batteryTemperatureC?.let(CockpitFormat::temperature)
-                ?: candidateMaxTemp?.let(CockpitFormat::temperature))
+        SummaryMetricRow(
+            title = "TAHMİNİ MENZİL",
+            value = CockpitFormat.distance(
+                if (connected && data.socPercent != null) data.estimatedRangeKm else null
+            ),
+            provenance = "Model tahmini · canlı menzil değil"
         )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "ANLIK GÜÇ · DENEYSEL BMS",
-            reading(data.powerKw?.let(CockpitFormat::power)
-                ?: if (candidateVoltage != null && candidateCurrent != null)
-                    metrics.batteryPowerKw?.let(CockpitFormat::power) else null)
-        )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "ARAÇ HIZI · OBD 010D",
-            reading(data.speedKmh?.let(CockpitFormat::speed))
-        )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "PAKET GERİLİMİ · DENEYSEL",
-            reading(candidateVoltage?.let { "%.1f V".format(it) })
-        )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "PAKET AKIMI · DENEYSEL",
-            reading(candidateCurrent?.let { "%.1f A".format(it) })
-        )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "BATARYA SICAKLIK ARALIĞI",
-            reading(if (candidateMinTemp != null && candidateMaxTemp != null)
-                "%.1f – %.1f °C".format(candidateMinTemp, candidateMaxTemp) else null)
-        )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "HÜCRE GERİLİM ARALIĞI",
-            reading(if (candidateCellMin != null && candidateCellMax != null)
-                "%.3f – %.3f V".format(candidateCellMin, candidateCellMax) else null)
-        )
-        Spacer(Modifier.height(16.dp))
-        TelemetryTile(
-            "KAPASİTE PARAMETRESİ · SoH DEĞİL",
-            reading(candidateCapacity?.let { "%.2f kWh".format(it) })
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Deneysel MEB PID ölçekleri araç göstergesi veya ODIS ile " +
-                "doğrulanmadan menzil/şarj kararlarında kullanılmaz. " +
-                "SoH için onaylı BMS kapasite testi gerekir.",
-            style = MaterialTheme.typography.labelSmall, color = SoftText
-        )
-        TextButton(onClick = onEngineering, modifier = Modifier.fillMaxWidth()) {
-            Text("Tüm teknik ölçümler ve ham OBD yanıtları")
-        }
-        TextButton(onClick = onSoundSettings, modifier = Modifier.fillMaxWidth()) {
-            Text("Ses ve motor sesi ayarları")
+        OutlinedButton(
+            onClick = onEngineering,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.Analytics, contentDescription = null,
+                modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Teknik ölçümler", maxLines = 1)
         }
         if (!connected) {
-            Text(stringResource(R.string.ux_obd_unavailable),
-                style = MaterialTheme.typography.labelSmall, color = SoftText)
-            OutlinedButton(onClick = onConnect, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = onConnect,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text("OBD'ye bağlan")
             }
         }
+        TextButton(
+            onClick = onSoundSettings,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Ses ayarları", maxLines = 1)
+        }
+        Text(
+            "SoH ve deneysel MEB PID değerleri ana ekranda canlı BMS " +
+                "ölçümü olarak gösterilmez. Ayrıntılar Teknik ölçümler bölümünde.",
+            color = SoftText,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 4
+        )
     }
 }
 
+/** Fixed label/value rows prevent long diagnostics from competing with driving data. */
 @Composable
-private fun TelemetryTile(label: String, value: String) {
+private fun SummaryMetricRow(
+    title: String,
+    value: String,
+    provenance: String,
+    prominent: Boolean = false
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Navy)
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = 11.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            Text(label, color = SoftText, fontSize = 10.sp, maxLines = 1)
-            Text(value, color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f),
+                    color = SoftText,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    value,
+                    color = if (value.startsWith("—")) SoftText else Color.White,
+                    fontSize = if (prominent) 23.sp else 19.sp,
+                    lineHeight = if (prominent) 29.sp else 25.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
+            Text(
+                provenance,
+                color = SoftText,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -847,13 +858,18 @@ private fun NavigationGlassCard(
 }
 
 @Composable
-private fun AssistPill(text: String, onClick: () -> Unit) {
+private fun AssistPill(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Surface(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         color = Color(0xD90A1728), shape = RoundedCornerShape(10.dp)
     ) {
         Text(text, color = SoftText,
             style = MaterialTheme.typography.labelSmall,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp))
     }
 }
