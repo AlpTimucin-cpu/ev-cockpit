@@ -1,10 +1,17 @@
 package com.evcockpit.car
 
 import android.util.Log
+import android.text.SpannableString
+import android.text.Spanned
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.Distance
+import androidx.car.app.model.DistanceSpan
+import androidx.car.app.model.ItemList
+import androidx.car.app.model.ListTemplate
 import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
@@ -14,11 +21,15 @@ import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.MapWithContentTemplate
+import androidx.car.app.navigation.model.PlaceListNavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
@@ -26,9 +37,19 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.evcockpit.domain.model.GpsFix
+import com.evcockpit.domain.model.ChargingCatalog
+import com.evcockpit.domain.model.RoadDetourCatalog
+import com.evcockpit.domain.model.VehicleProfileConfig
+import com.evcockpit.domain.model.VehicleTelemetry
+import com.evcockpit.domain.model.AppConfiguration
+import com.evcockpit.domain.usecase.DCCorridorCandidate
+import com.evcockpit.data.settings.AppConfigRepository
+import com.evcockpit.data.repository.OsrmRoadDetourRepository
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
 import com.evcockpit.domain.repository.RouteRepository
+import com.evcockpit.domain.repository.ChargingRepository
+import com.evcockpit.domain.repository.VehicleRepository
 import com.evcockpit.domain.usecase.ManeuverGuidancePolicy
 import com.evcockpit.domain.usecase.RouteProgressTracker
 import com.evcockpit.presentation.voice.NativeVoiceGuide
@@ -41,6 +62,10 @@ import kotlin.math.roundToInt
 class EyaCarNavigationScreen(
     context: CarContext,
     private val routes: RouteRepository,
+    private val charging: ChargingRepository,
+    private val vehicle: VehicleRepository,
+    private val config: AppConfigRepository,
+    private val detours: OsrmRoadDetourRepository,
     ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
@@ -66,6 +91,16 @@ class EyaCarNavigationScreen(
     private var activeRouteId: String? = null
     private var withoutGpsSinceMs: Long = 0L
     private var closed = false
+    private var chargingVisible = false
+    private var selectedChargingStationId: String? = null
+    private var chargingLoadStarted = false
+    private var chargingCatalog = charging.catalog.value
+    private var chargingCandidates: List<DCCorridorCandidate> = emptyList()
+    private var roadDetours = RoadDetourCatalog()
+    private var vehicleTelemetry = VehicleTelemetry()
+    private var vehicleProfile = VehicleProfileConfig()
+    private var chargingDisplay = CarChargeList()
+    private var chargingModelJob: Job? = null
 
     private val callbacks = object : NavigationManagerCallback {
         override fun onStopNavigation() {
@@ -94,12 +129,43 @@ class EyaCarNavigationScreen(
                     }
                 }
                 scope.launch {
+                    combine(routes.currentRoute, charging.catalog) { current, catalog ->
+                        current to catalog
+                    }.collectLatest { (current, catalog) ->
+                        chargingCatalog = catalog
+                        chargingCandidates = withContext(Dispatchers.Default) {
+                            CarChargingListPolicy.candidates(current, catalog)
+                        }
+                        roadDetours = RoadDetourCatalog()
+                        refreshChargingModel()
+                        // No per-station requests against the shared public OSRM demo.
+                        // Only the existing private-HTTPS verifier may provide evidence.
+                        if (chargingVisible && current != null &&
+                            !catalog.loading && !catalog.staleCache &&
+                            chargingCandidates.isNotEmpty()
+                        ) {
+                            roadDetours = detours.inspect(current, chargingCandidates)
+                            refreshChargingModel()
+                        }
+                    }
+                }
+                scope.launch {
+                    combine(tracker.gpsFix, vehicle.telemetry, config.configuration) {
+                        measured, telemetry, settings -> Triple(measured, telemetry, settings)
+                    }.collect { (_, telemetry, settings) ->
+                        vehicleTelemetry = telemetry
+                        vehicleProfile = settings.vehicle
+                        if (chargingVisible) refreshChargingModel()
+                    }
+                }
+                scope.launch {
                     combine(routes.currentRoute, tracker.gpsFix, ticker) { r, f, now ->
                         Triple(r, f?.takeIf { it.usable(now) }, now)
                     }.collect { (r, f, now) ->
                         route = r
                         fix = f
                         surface.update(r, f)
+                        if (chargingVisible) refreshChargingModel()
                         val fresh = guidancePolicy.snapshot(r, f, now)
                         guidance = fresh
                         val previousMatch = routeMatch
@@ -119,6 +185,7 @@ class EyaCarNavigationScreen(
             override fun onStop(owner: LifecycleOwner) {
                 // No foreground service yet: stop rather than claim background navigation.
                 endNavigation()
+                chargingModelJob?.cancel(); chargingModelJob = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
@@ -126,6 +193,7 @@ class EyaCarNavigationScreen(
             }
             override fun onDestroy(owner: LifecycleOwner) {
                 endNavigation()
+                chargingModelJob?.cancel(); chargingModelJob = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
