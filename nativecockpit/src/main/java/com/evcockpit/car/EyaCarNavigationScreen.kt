@@ -8,6 +8,8 @@ import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.Alert
+import androidx.car.app.model.CarText
 import androidx.car.app.model.Distance
 import androidx.car.app.model.DistanceSpan
 import androidx.car.app.model.ItemList
@@ -22,6 +24,8 @@ import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.car.app.navigation.model.PlaceListNavigationTemplate
+import androidx.car.app.navigation.model.NavigationTemplate
+import androidx.car.app.navigation.model.MessageInfo
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +41,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.evcockpit.domain.model.GpsFix
+import com.evcockpit.domain.model.RouteWeatherState
 import com.evcockpit.domain.model.ChargingCatalog
 import com.evcockpit.domain.model.RoadDetourCatalog
 import com.evcockpit.domain.model.VehicleProfileConfig
@@ -44,6 +49,8 @@ import com.evcockpit.domain.model.VehicleTelemetry
 import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.repository.OsrmRoadDetourRepository
+import com.evcockpit.data.weather.OpenMeteoWeatherRepository
+import com.evcockpit.domain.usecase.WeatherChangeAlertGate
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
 import com.evcockpit.domain.repository.RouteRepository
@@ -65,6 +72,7 @@ class EyaCarNavigationScreen(
     private val vehicle: VehicleRepository,
     private val config: AppConfigRepository,
     private val detours: OsrmRoadDetourRepository,
+    private val weather: OpenMeteoWeatherRepository,
     ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
@@ -104,6 +112,24 @@ class EyaCarNavigationScreen(
     private var detourVerificationJob: Job? = null
     private var detourVerificationKey: String? = null
     private var lastChargingFixTimestamp: Long? = null
+
+    // Foreground-only ETA forecasts: one refresh per 30 minutes per route.
+    private val weatherRefreshGate = CarWeatherRefreshGate()
+    private var weatherAlertGate = WeatherChangeAlertGate()
+    private var weatherRouteId: String? = null
+    private var weatherState = RouteWeatherState()
+    private var weatherJob: Job? = null
+    private var weatherVisible = false
+    private var weatherAlertUntilMs: Long = 0L
+    private var weatherAlertMessage: String? = null
+    private var pendingWeatherSpeech: String? = null
+    private var weatherSpeechUntilMs: Long = 0L
+    private var lastWeatherPageMinute: Long = -1L
+
+    private companion object {
+        const val WEATHER_ALERT_ID = 0xEA12
+        const val WEATHER_ALERT_DURATION_MS = 10_000L
+    }
 
     private val callbacks = object : NavigationManagerCallback {
         override fun onStopNavigation() {
@@ -196,6 +222,10 @@ class EyaCarNavigationScreen(
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
                 detourVerificationKey = null
+                weatherJob?.cancel(); weatherJob = null
+                dismissWeatherAlert()
+                weatherJob?.cancel(); weatherJob = null
+                dismissWeatherAlert()
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
