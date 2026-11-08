@@ -43,6 +43,11 @@ import com.evcockpit.data.settings.UserSettingsRepository
 import com.evcockpit.domain.model.ObdPhase
 import com.evcockpit.domain.repository.ObdConnectionController
 import com.evcockpit.domain.repository.VehicleRepository
+import com.evcockpit.domain.repository.RouteRepository
+import com.evcockpit.domain.model.validRouteGeometry
+import com.evcockpit.car.CarNavigationContinuity
+import com.evcockpit.car.CarContinuityPhase
+import com.evcockpit.car.NavigationLocationService
 import com.evcockpit.presentation.charging.ChargingViewModel
 import com.evcockpit.presentation.charging.RouteChargePlanViewModel
 import com.evcockpit.presentation.cockpit.CockpitScreen
@@ -87,6 +92,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var activeSound: ActiveSoundManager
     @Inject lateinit var audioDucking: AppAudioDucking
     @Inject lateinit var welcome: WelcomeGreetingManager
+    @Inject lateinit var routes: RouteRepository
+    @Inject lateinit var continuity: CarNavigationContinuity
 
     private data class SoundFrame(
         val settings: UserSettings,
@@ -131,6 +138,49 @@ class MainActivity : ComponentActivity() {
                 Toast.LENGTH_LONG
             ).show()
         }
+    }
+
+    /** Retry the location FGS ONLY from a visible, user-tapped phone screen. */
+    private fun retryCarNavigationTracking() {
+        val pending = continuity.state.value
+        val routeId = pending.routeId
+        if (pending.phase != CarContinuityPhase.PHONE_ACTION_REQUIRED ||
+            routeId.isNullOrBlank() || routes.currentRoute.value?.routeId != routeId ||
+            routes.currentRoute.value?.routePoints?.let(::validRouteGeometry) != true
+        ) {
+            Toast.makeText(this, "Onaylı Android Auto rotası bulunamadı.",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        val allowed = listOf(Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION).any {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+        val location = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        if (!allowed || !location.isLocationEnabled) {
+            Toast.makeText(this, "Önce konum iznini ve cihaz GPS'ini açın.",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!continuity.retryFromPhone(routeId)) return
+        try {
+            ContextCompat.startForegroundService(
+                this, Intent(this, NavigationLocationService::class.java)
+                    .setAction(NavigationLocationService.ACTION_START)
+                    .putExtra(NavigationLocationService.EXTRA_ROUTE_ID, routeId)
+            )
+        } catch (error: RuntimeException) {
+            continuity.launchRestricted(routeId)
+            Log.w(TAG, "User-initiated location FGS denied", error)
+            Toast.makeText(this, "Android konum servisini başlatmayı engelledi.",
+                Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun stopCarNavigationTracking() {
+        val routeId = continuity.state.value.routeId
+        continuity.endRoute(routeId)
+        stopService(Intent(this, NavigationLocationService::class.java))
     }
 
     private fun disconnectObd() {
@@ -282,6 +332,7 @@ class MainActivity : ComponentActivity() {
             val soundSettings by settingsViewModel.settings.collectAsStateWithLifecycle()
             val soundUnavailable by activeSound.audioUnavailable.collectAsStateWithLifecycle()
             val welcomeWarning by welcome.warning.collectAsStateWithLifecycle()
+            val carNavigationState by continuity.state.collectAsStateWithLifecycle()
             var audioSettingsOpen by remember { mutableStateOf(false) }
             var ttsWarningDismissed by rememberSaveable { mutableStateOf(false) }
 
@@ -350,6 +401,9 @@ class MainActivity : ComponentActivity() {
                             SettingsScreen(
                                 viewModel = settingsViewModel,
                                 activeSound = activeSound,
+                                carNavigationState = carNavigationState,
+                                onRetryCarNavigation = ::retryCarNavigationTracking,
+                                onStopCarNavigation = ::stopCarNavigationTracking,
                                 onClose = { audioSettingsOpen = false }
                             )
                         }
