@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
+import androidx.car.app.model.Action
+import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
@@ -51,6 +53,10 @@ class EyaCarNavigationScreen(
     private val progress = RouteProgressTracker()
     private val guidancePolicy = CarGuidancePolicy()
     private val gate = CarTripUpdateGate()
+    private val loadingGate = CarHostLoadingGate()
+    private val matchPolicy = CarRouteMatchPolicy()
+    private var routeMatch = CarRouteMatch.NO_VALID_FIX
+    private var offRouteAnnouncementSent = false
     private val navigationSessionToken = Any()
     private var work: CoroutineScope? = null
     private var route: RouteSnapshot? = routes.currentRoute.value
@@ -96,8 +102,13 @@ class EyaCarNavigationScreen(
                         surface.update(r, f)
                         val fresh = guidancePolicy.snapshot(r, f, now)
                         guidance = fresh
+                        val previousMatch = routeMatch
+                        routeMatch = matchPolicy.observe(r, f, now)
+                        if (routeMatch != CarRouteMatch.CONFIRMED_OFF_ROUTE) {
+                            offRouteAnnouncementSent = false
+                        }
                         val newSummary = CarRouteSummary.from(r, f, now)
-                        if (newSummary != summary) {
+                        if (newSummary != summary || previousMatch != routeMatch) {
                             summary = newSummary
                             invalidate()
                         }
@@ -138,6 +149,7 @@ class EyaCarNavigationScreen(
             CarNavigationOwnership.claim(navigationSessionToken)
             withoutGpsSinceMs = 0L
             gate.clear()
+            loadingGate.clear()
             speechPolicy.reset()
             updateActiveNavigation(route, fix, current, System.currentTimeMillis())
             invalidate()
@@ -155,6 +167,10 @@ class EyaCarNavigationScreen(
         voice.stop()
         speechPolicy.reset()
         gate.clear()
+        loadingGate.clear()
+        matchPolicy.reset()
+        routeMatch = CarRouteMatch.NO_VALID_FIX
+        offRouteAnnouncementSent = false
         if (wasActive) {
             // Old Screen must never end a newer Session's host navigation.
             if (wasOwner) {
@@ -178,17 +194,52 @@ class EyaCarNavigationScreen(
             endNavigation() // new alternative means a new explicit trip
             return
         }
-        if (current == null || current.routeId != started) {
-            if (withoutGpsSinceMs == 0L) withoutGpsSinceMs = now
-            voice.stop()
-            if (now - withoutGpsSinceMs >= 15_000L) endNavigation()
-            return // never publish stale maneuver or estimated distance
+        if (current == null || current.routeId != started ||
+            routeMatch != CarRouteMatch.ON_ROUTE
+        ) {
+            // A recent accurate GPS fix OUTSIDE the route is not a GPS outage.
+            // Do not end a trip because the user took a different road.
+            val measured = currentFix?.takeIf {
+                it.usable(now) && it.accuracyMeters <= 35f
+            }
+            if (measured == null) {
+                if (withoutGpsSinceMs == 0L) withoutGpsSinceMs = now
+            } else withoutGpsSinceMs = 0L
+
+            if (loadingGate.shouldPublish(now)) {
+                try {
+                    // Never retain the last turn or ETA while route match is lost.
+                    manager.updateTrip(CarTripFactory.loading())
+                    loadingGate.onPublished()
+                    gate.clear() // next valid maneuver must replace the loading Trip
+                } catch (error: RuntimeException) {
+                    loadingGate.onFailed(now)
+                    Log.w("EyaCarNavigation", "Host loading trip rejected", error)
+                }
+            }
+            if (routeMatch == CarRouteMatch.CONFIRMED_OFF_ROUTE) {
+                if (!offRouteAnnouncementSent && voicePrefs.enabled &&
+                    voice.status == NativeVoiceGuide.Status.READY) {
+                    voice.stop()
+                    offRouteAnnouncementSent = voice.speak(
+                        "Rotadan çıktınız. Güvenli yerde telefondan rotayı yeniden planlayın. " +
+                            "Şarj duraklarınızı kontrol edin.", voicePrefs.volume
+                    )
+                }
+            } else {
+                voice.stop()
+            }
+            if (withoutGpsSinceMs != 0L && now - withoutGpsSinceMs >= 15_000L) {
+                endNavigation()
+            }
+            return
         }
         withoutGpsSinceMs = 0L
         if (gate.shouldPublish(current, now)) {
             try {
                 manager.updateTrip(CarTripFactory.trip(current))
                 gate.onPublished(current, now)
+                loadingGate.clear()
                 invalidate()
             } catch (e: RuntimeException) {
                 gate.onPublishFailed(now)
@@ -200,16 +251,20 @@ class EyaCarNavigationScreen(
             val enriched = progress.enrich(currentRoute, currentFix, now)
             val announcement = speechPolicy.nextAnnouncement(enriched, currentFix, now)
             if (announcement != null) {
-                // An enqueue is not proof that the speech engine started.
+                // Delayed TTS callbacks must never acknowledge a later maneuver.
+                val cueToken = speechPolicy.pendingCueToken
                 val queued = voice.speak(
                     announcement, voicePrefs.volume,
                     onUtteranceStarted = {
-                        // NativeVoiceGuide marshals this callback onto the main thread.
-                        speechPolicy.confirmSpoken(System.currentTimeMillis())
+                        speechPolicy.confirmSpoken(
+                            System.currentTimeMillis(), cueToken
+                        )
                     },
-                    onUtteranceFailed = { speechPolicy.cancelPending() }
+                    onUtteranceFailed = {
+                        speechPolicy.cancelPending(cueToken)
+                    }
                 )
-                if (!queued) speechPolicy.cancelPending()
+                if (!queued) speechPolicy.cancelPending(cueToken)
             }
         } else if (!voicePrefs.enabled) voice.stop()
     }
@@ -217,32 +272,61 @@ class EyaCarNavigationScreen(
     override fun onGetTemplate(): Template {
         val active = activeRouteId != null &&
             CarNavigationOwnership.owns(navigationSessionToken)
-        val g = guidance?.takeIf { it.routeId == activeRouteId }
-        val pane = Pane.Builder()
-            .addRow(Row.Builder().setTitle(summary.title).addText(summary.detail).build())
-            .addRow(Row.Builder().setTitle("GPS").addText(summary.locationStatus).build())
-
-        if (active) {
-            val step = g?.nextCue
-            val meters = g?.nextMeters
-            pane.addRow(Row.Builder().setTitle("Sıradaki manevra")
-                .addText(if (step != null && meters != null) {
-                    "$step · ${meters.roundToInt()} m"
-                } else "Güncel GPS ve dönüş bilgisi bekleniyor").build())
-            pane.addRow(Row.Builder().setTitle("Navigasyonu bitir")
-                .setOnClickListener { endNavigation() }.build())
-        } else if (guidance?.let { current ->
-            val now = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        val current = guidance
+        val canBegin = !active && current != null &&
             current.gpsRecordedAtMs <= now &&
-                now - current.gpsRecordedAtMs <= 5_000L &&
-                fix?.usable(now) == true &&
-                route?.routeId == current.routeId
-        } == true) {
-            pane.addRow(Row.Builder().setTitle("Navigasyonu başlat")
+            now - current.gpsRecordedAtMs <= 5_000L &&
+            fix?.usable(now) == true &&
+            route?.routeId == current.routeId &&
+            routeMatch == CarRouteMatch.ON_ROUTE
+
+        // Car App API 1 has no ConstraintManager. Query the actual host's pane
+        // limit; the physical screen diagonal cannot determine safe row count.
+        val maxRows = if (carContext.carAppApiLevel >= 2) {
+            runCatching {
+                carContext.getCarService(ConstraintManager::class.java)
+                    .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_PANE)
+                    .coerceIn(1, 4)
+            }.getOrDefault(2)
+        } else 2
+
+        val detail = when {
+            !active -> if (canBegin) "Rota ve GPS doğrulandı. Başlatabilirsiniz."
+                else "Telefondan rota seçin ve hassas GPS izni verin."
+            routeMatch == CarRouteMatch.CONFIRMED_OFF_ROUTE ->
+                "Rotadan çıkıldı. Telefonda yeni rota planlayın; şarj duraklarını kontrol edin."
+            routeMatch == CarRouteMatch.VERIFYING ->
+                "Konum güzergâhla eşleşmiyor. Doğrulanıyor."
+            routeMatch == CarRouteMatch.NO_VALID_FIX ->
+                "Güncel ve hassas GPS bekleniyor. Yönlendirme duraklatıldı."
+            else -> {
+                val g = current?.takeIf { it.routeId == activeRouteId }
+                if (g?.nextCue != null && g.nextMeters != null) {
+                    g.nextCue + " · " + g.nextMeters.roundToInt() + " m"
+                } else "Güncel manevra bilgisi bekleniyor."
+            }
+        }
+        // Stable row titles help the host recognize a content refresh.
+        val rows = listOf(
+            Row.Builder().setTitle("Rota")
+                .addText(summary.title.take(90))
+                .addText(summary.detail.take(130)).build(),
+            Row.Builder().setTitle("Yönlendirme").addText(detail.take(160)).build(),
+            Row.Builder().setTitle("GPS")
+                .addText(summary.locationStatus.take(110)).build()
+        )
+        val pane = Pane.Builder()
+        rows.take(maxRows).forEach { pane.addRow(it) }
+
+        // Pane rows must not contain an OnClickListener in Car App 1.7.
+        // Host-rendered Pane Actions are the legal start/stop controls.
+        if (active) {
+            pane.addAction(Action.Builder().setTitle("Navigasyonu bitir")
+                .setOnClickListener { endNavigation() }.build())
+        } else if (canBegin) {
+            pane.addAction(Action.Builder().setTitle("Navigasyonu başlat")
                 .setOnClickListener { beginNavigation() }.build())
-        } else {
-            pane.addRow(Row.Builder().setTitle("Başlamak için")
-                .addText("Telefondan rota seçin ve konuma izin verin").build())
         }
         val content = PaneTemplate.Builder(pane.build())
         if (carContext.carAppApiLevel < 7) {

@@ -68,12 +68,12 @@ jobs:
           # Keep the checked-in Wrapper unchanged; only use a temporary
           # mirror when the official Gradle distribution redirects to a 5xx.
           if ! ./gradlew --version --no-daemon > "$RUNNER_TEMP/gradle-wrapper.log" 2>&1; then
-            if ! grep -Eq 'HTTP response code: 50[234]|Server returned HTTP response code: 50[234]' \
+            if ! grep -Eq 'HTTP response code: 50[234]|Server returned HTTP response code: 50[234]|failed: timeout|timed out' \
                 "$RUNNER_TEMP/gradle-wrapper.log"; then
               cat "$RUNNER_TEMP/gradle-wrapper.log"
               exit 1
             fi
-            echo "::warning::Official Gradle distribution returned HTTP 5xx; trying SHA-256-pinned mirror."
+            echo "::warning::Official Gradle distribution timed out or returned HTTP 5xx; trying SHA-256-pinned mirror."
             archive="$RUNNER_TEMP/gradle-8.14.3-bin.zip"
             expected="$(sed -n 's/^distributionSha256Sum=//p' gradle/wrapper/gradle-wrapper.properties)"
             test "$expected" = 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
