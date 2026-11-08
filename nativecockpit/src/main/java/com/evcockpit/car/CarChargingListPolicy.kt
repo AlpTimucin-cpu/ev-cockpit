@@ -13,7 +13,6 @@ import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.domain.usecase.RouteProgressTracker
 import com.evcockpit.domain.usecase.VerifiedBatterySocPolicy
 import java.time.Duration
-import java.time.Instant
 import java.util.Locale
 import kotlin.math.asin
 import kotlin.math.cos
@@ -96,9 +95,10 @@ internal object CarChargingListPolicy {
         val routeId = route.routeId
         val selected = candidates.asSequence()
             .filter { it.station.hasDcCcs && it.distanceFromStartKm.isFinite() }
-            // When the user has already progressed, don't offer passed stations.
+            // Exclude passed stations; keep valid chargers within the first
+            // kilometre of an actual route rather than hiding them outright.
             .filter { fraction == null || it.distanceFromStartKm >
-                (route.totalKm ?: 0.0) * fraction + 1.0 }
+                (route.totalKm ?: 0.0) * fraction + 0.25 }
             .take(hostLimit)
             .map { candidate ->
                 val station = candidate.station
