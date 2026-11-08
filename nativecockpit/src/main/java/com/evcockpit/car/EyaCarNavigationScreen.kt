@@ -149,6 +149,12 @@ class EyaCarNavigationScreen(
                 manager.setNavigationManagerCallback(callbacks)
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(surface)
                 tracker.start()
+                surface.updateWeatherPoints(
+                    weatherState.points.takeIf {
+                        weatherState.ageMinutes(System.currentTimeMillis())
+                            ?.let { age -> age <= 45L } == true
+                    } ?: emptyList()
+                )
                 val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
                 work = scope
                 val ticker = flow {
@@ -395,6 +401,7 @@ class EyaCarNavigationScreen(
         weatherJob = null
         weatherRouteId = nextRouteId
         weatherState = RouteWeatherState(routeId = nextRouteId)
+        surface.updateWeatherPoints(emptyList())
         weatherRefreshGate.reset()
         weatherAlertGate = WeatherChangeAlertGate()
         pendingWeatherSpeech = null
@@ -441,6 +448,12 @@ class EyaCarNavigationScreen(
                         loading = false, error = message
                     ) else RouteWeatherState(routeId = routeId, error = message)
                 }
+            )
+            surface.updateWeatherPoints(
+                weatherState.points.takeIf {
+                    weatherState.ageMinutes(System.currentTimeMillis())
+                        ?.let { age -> age <= 45L } == true
+                } ?: emptyList()
             )
             if (weatherVisible) invalidate()
         }
