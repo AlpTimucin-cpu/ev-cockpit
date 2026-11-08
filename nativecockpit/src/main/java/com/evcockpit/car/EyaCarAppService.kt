@@ -27,6 +27,7 @@ class EyaCarAppService : CarAppService() {
     @Inject lateinit var config: AppConfigRepository
     @Inject lateinit var detours: OsrmRoadDetourRepository
     @Inject lateinit var weather: OpenMeteoWeatherRepository
+    @Inject lateinit var continuity: CarNavigationContinuity
     @Inject lateinit var welcome: WelcomeGreetingManager
     @Inject lateinit var ducking: AppAudioDucking
 
@@ -39,12 +40,12 @@ class EyaCarAppService : CarAppService() {
     override fun onCreateSession(): Session {
         // Shared singleton gate prevents duplicates if OBD connects as well.
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, charging, vehicle, config, detours, weather, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, ducking, welcome)
     }
 
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, charging, vehicle, config, detours, weather, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, ducking, welcome)
     }
 }
 
@@ -55,9 +56,10 @@ private class EyaCarSession(
     private val config: AppConfigRepository,
     private val detours: OsrmRoadDetourRepository,
     private val weather: OpenMeteoWeatherRepository,
+    private val continuity: CarNavigationContinuity,
     private val ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Session() {
     override fun onCreateScreen(intent: Intent): Screen =
-        EyaCarNavigationScreen(carContext, routes, charging, vehicle, config, detours, weather, ducking, welcome)
+        EyaCarNavigationScreen(carContext, routes, charging, vehicle, config, detours, weather, continuity, ducking, welcome)
 }

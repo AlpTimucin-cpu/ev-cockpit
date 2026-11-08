@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
 
@@ -59,6 +60,12 @@
             android:name=".ObdForegroundService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+        <service
+            android:name=".car.NavigationLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+        <!-- Only explicit user action can start the location FGS.
+             Do NOT add ACCESS_BACKGROUND_LOCATION or boot receivers. -->
         <!-- Only an explicit user-initiated Bluetooth connection starts this service.
              No background auto-connect, no unrestricted background location service. -->
     </application>

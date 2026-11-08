@@ -1,6 +1,8 @@
 package com.evcockpit.car
 
 import android.util.Log
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import android.text.SpannableString
 import android.text.Spanned
 import androidx.car.app.AppManager
@@ -73,6 +75,7 @@ class EyaCarNavigationScreen(
     private val config: AppConfigRepository,
     private val detours: OsrmRoadDetourRepository,
     private val weather: OpenMeteoWeatherRepository,
+    private val continuity: CarNavigationContinuity,
     ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
@@ -96,6 +99,8 @@ class EyaCarNavigationScreen(
     private var guidance: CarGuidance? = null
     private var summary = CarRouteSummary.from(route, null, System.currentTimeMillis())
     private var activeRouteId: String? = null
+    private var lastResumeAttemptAtMs: Long = 0L
+    private var continuityMessage: String? = null
     private var withoutGpsSinceMs: Long = 0L
     private var closed = false
     private var chargingVisible = false
@@ -226,6 +231,26 @@ class EyaCarNavigationScreen(
                             surface.updateWeatherPoints(emptyList())
                             weatherMapPointsExpired = true // offline forecast text remains available
                         }
+                        maybeReattachNavigation(r, f, fresh, now)
+                        val continuation = continuity.state.value
+                        if (activeRouteId != null && continuation.phase == CarContinuityPhase.OFF) {
+                            endNavigation() // explicit notification stop or terminated service
+                        }
+                        val message = when (continuation.phase) {
+                            CarContinuityPhase.PHONE_ACTION_REQUIRED ->
+                                "Arka plan GPS Android tarafından engellendi; telefondaki Ayarlar'dan başlatın."
+                            CarContinuityPhase.GPS_UNAVAILABLE ->
+                                "Arka plan GPS sinyali bekleniyor."
+                            CarContinuityPhase.ACTIVE ->
+                                "Arka plan GPS hizmeti etkin."
+                            CarContinuityPhase.STARTING ->
+                                "Arka plan GPS hizmeti başlatılıyor."
+                            CarContinuityPhase.OFF -> null
+                        }
+                        if (continuityMessage != message) {
+                            continuityMessage = message
+                            invalidate()
+                        }
                         updateActiveNavigation(r, f, fresh, now)
                         maybeAnnounceWeather(r, f, now)
                         if (weatherVisible && lastWeatherPageMinute != now / 60_000L) {
@@ -236,31 +261,95 @@ class EyaCarNavigationScreen(
                 }
             }
             override fun onStop(owner: LifecycleOwner) {
-                // No foreground service yet: stop rather than claim background navigation.
-                endNavigation()
+                // The host may disconnect or replace its Session. Keep only the
+                // user-started location service; host IPC and voice stop here.
+                detachForHost()
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
                 detourVerificationKey = null
-                weatherJob?.cancel(); weatherJob = null
-                dismissWeatherAlert()
                 weatherJob?.cancel(); weatherJob = null
                 dismissWeatherAlert()
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
-                manager.clearNavigationManagerCallback()
+                runCatching { manager.clearNavigationManagerCallback() }
             }
             override fun onDestroy(owner: LifecycleOwner) {
-                endNavigation()
+                detachForHost()
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
-                detourVerificationKey = null
+                weatherJob?.cancel(); weatherJob = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
                 if (!closed) { closed = true; voice.close() }
             }
         })
+    }
+
+    /**
+     * The old host Screen has gone away. Stop its NavigationManager IPC and
+     * voice, but retain a separately user-authorized location FGS.
+     */
+    private fun detachForHost() {
+        val previous = activeRouteId ?: return
+        val phase = continuity.state.value
+        if (phase.routeId != previous || phase.phase == CarContinuityPhase.OFF) {
+            endNavigation()
+            return
+        }
+        activeRouteId = null
+        withoutGpsSinceMs = 0L
+        val wasOwner = CarNavigationOwnership.release(navigationSessionToken)
+        voice.stop()
+        speechPolicy.reset()
+        gate.clear()
+        loadingGate.clear()
+        matchPolicy.reset()
+        routeMatch = CarRouteMatch.NO_VALID_FIX
+        pendingWeatherSpeech = null
+        dismissWeatherAlert()
+        if (wasOwner) {
+            runCatching { manager.navigationEnded() }
+                .onFailure { Log.w("EyaCarNavigation", "Host detach navigation end", it) }
+        }
+    }
+
+    /**
+     * A newly connected host can resume only a previously explicit user trip,
+     * only while the same route's location service remains active, and only
+     * with this new host's own fresh measured GPS+OSRM route evidence.
+     *
+     * No persisted coordinates, simulated route or silent process restart.
+     */
+    private fun maybeReattachNavigation(
+        currentRoute: RouteSnapshot?, currentFix: GpsFix?,
+        freshGuidance: CarGuidance?, now: Long
+    ) {
+        if (activeRouteId != null || CarNavigationOwnership.navigating.value ||
+            closed || now - lastResumeAttemptAtMs < 5_000L
+        ) return
+        val id = currentRoute?.routeId ?: return
+        if (!validRouteGeometry(currentRoute.routePoints) ||
+            routeMatch != CarRouteMatch.ON_ROUTE ||
+            freshGuidance?.routeId != id ||
+            !continuity.canResume(id, currentFix, now)
+        ) return
+        lastResumeAttemptAtMs = now
+        try {
+            manager.navigationStarted()
+            welcome.stopForNavigation()
+            activeRouteId = id
+            CarNavigationOwnership.claim(navigationSessionToken)
+            withoutGpsSinceMs = 0L
+            gate.clear()
+            loadingGate.clear()
+            speechPolicy.reset()
+            Log.i("EyaCarNavigation", "Navigation host reattached to verified route")
+            invalidate()
+        } catch (error: RuntimeException) {
+            Log.w("EyaCarNavigation", "Host reattachment rejected; bounded retry", error)
+        }
     }
 
     private fun beginNavigation() {
@@ -280,6 +369,21 @@ class EyaCarNavigationScreen(
             gate.clear()
             loadingGate.clear()
             speechPolicy.reset()
+            if (continuity.hostStarted(current.routeId)) {
+                try {
+                    ContextCompat.startForegroundService(
+                        carContext,
+                        Intent(carContext, NavigationLocationService::class.java)
+                            .setAction(NavigationLocationService.ACTION_START)
+                            .putExtra(NavigationLocationService.EXTRA_ROUTE_ID, current.routeId)
+                    )
+                } catch (error: RuntimeException) {
+                    // Android 14+ can deny a location FGS from a projected host.
+                    // Keep foreground navigation; offer a visible-phone retry.
+                    continuity.launchRestricted(current.routeId)
+                    Log.w("EyaCarNavigation", "Location FGS requires visible phone", error)
+                }
+            }
             updateActiveNavigation(route, fix, current, System.currentTimeMillis())
             invalidate()
         } catch (e: RuntimeException) {
@@ -289,10 +393,19 @@ class EyaCarNavigationScreen(
     }
 
     private fun endNavigation() {
-        val wasActive = activeRouteId != null
+        val startedRouteId = activeRouteId
+        val wasActive = startedRouteId != null
         activeRouteId = null
         withoutGpsSinceMs = 0L
         val wasOwner = CarNavigationOwnership.release(navigationSessionToken)
+        if (wasActive && wasOwner) {
+            continuity.endRoute(startedRouteId)
+            runCatching {
+                carContext.stopService(
+                    Intent(carContext, NavigationLocationService::class.java)
+                )
+            }
+        }
         voice.stop()
         speechPolicy.reset()
         gate.clear()
@@ -360,7 +473,14 @@ class EyaCarNavigationScreen(
             } else {
                 voice.stop()
             }
-            if (withoutGpsSinceMs != 0L && now - withoutGpsSinceMs >= 15_000L) {
+            // The live FGS owns real GPS continuity through a temporary
+            // outage. If absent, retain the original 15-second fail-closed stop.
+            val surviving = continuity.state.value.let {
+                it.routeId == started && it.hasRunningService
+            }
+            if (!surviving && withoutGpsSinceMs != 0L &&
+                now - withoutGpsSinceMs >= 15_000L
+            ) {
                 endNavigation()
             }
             return
@@ -872,7 +992,9 @@ class EyaCarNavigationScreen(
         val rows = listOf(
             Row.Builder().setTitle("Rota")
                 .addText(summary.title.take(90))
-                .addText(summary.detail.take(130)).build(),
+                .addText((continuityMessage?.takeIf {
+                    continuity.state.value.phase == CarContinuityPhase.PHONE_ACTION_REQUIRED
+                } ?: summary.detail).take(130)).build(),
             Row.Builder().setTitle("Yönlendirme").addText(detail.take(160)).build(),
             Row.Builder().setTitle("GPS")
                 .addText(summary.locationStatus.take(110)).build()
