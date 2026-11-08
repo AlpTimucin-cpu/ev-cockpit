@@ -28,6 +28,7 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import com.evcockpit.domain.model.ChargingStation
+import com.evcockpit.domain.model.WeatherWaypoint
 import com.evcockpit.domain.model.GpsFix
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
@@ -47,6 +48,8 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
     private var pendingGps: GpsFix? = null
     private var pendingChargingStations: List<ChargingStation> = emptyList()
     private var appliedChargingSignature: String? = null
+    private var pendingWeatherPoints: List<WeatherWaypoint> = emptyList()
+    private var appliedWeatherSignature: String? = null
     private var appliedRoute: String? = null
     private var appliedGpsAt: Long? = null
     private var centeredOnGps = false
@@ -140,6 +143,7 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
                     appliedRoute = null
                     appliedGpsAt = null
                     appliedChargingSignature = null
+                    appliedWeatherSignature = null
                     lastPadding = null
                     render()
                     fitCamera()
@@ -216,9 +220,48 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
         appliedChargingSignature = signature
     }
 
+    /** Only time-matched Open-Meteo forecast coordinates, not actual weather observations. */
+    fun updateWeatherPoints(points: List<WeatherWaypoint>) {
+        pendingWeatherPoints = points.filter {
+            it.coordinate.valid() && it.forecastEtaEpochMs != null &&
+                it.observedAt.isNotBlank() &&
+                it.temperatureC.isFinite() && it.windSpeedKmh.isFinite()
+        }.take(8)
+        renderWeather()
+    }
+
+    private fun renderWeather() {
+        val ready = style ?: return
+        val signature = pendingWeatherPoints.joinToString("|") {
+            it.coordinate.latitude.toString() + ":" + it.coordinate.longitude.toString() +
+                ":" + it.weatherCode + ":" + it.forecastEtaEpochMs
+        }
+        if (appliedWeatherSignature == signature) return
+        val collection = FeatureCollection.fromFeatures(
+            pendingWeatherPoints.map { p ->
+                Feature.fromGeometry(Point.fromLngLat(
+                    p.coordinate.longitude, p.coordinate.latitude
+                ))
+            }.toTypedArray()
+        )
+        val source = ready.getSourceAs<GeoJsonSource>("eya-car-weather")
+        if (source == null) {
+            ready.addSource(GeoJsonSource("eya-car-weather", collection))
+            ready.addLayer(CircleLayer("eya-car-weather-pins", "eya-car-weather")
+                .withProperties(
+                    circleColor(android.graphics.Color.rgb(23, 200, 211)),
+                    circleRadius(viewport?.stylePixels(4f) ?: 4f),
+                    circleStrokeWidth(viewport?.stylePixels(1.5f) ?: 1.5f),
+                    circleStrokeColor(android.graphics.Color.WHITE)
+                ))
+        } else source.setGeoJson(collection)
+        appliedWeatherSignature = signature
+    }
+
     private fun render() {
         val ready = style ?: return
         renderCharging()
+        renderWeather()
         val route = pendingRoute?.routePoints?.takeIf(::validRouteGeometry)
         val signature = pendingRoute?.routeId ?: route?.hashCode()?.toString() ?: "empty"
         if (appliedRoute != signature) {
@@ -271,6 +314,10 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
             circleRadius(v.stylePixels(6f)),
             circleStrokeWidth(v.stylePixels(2f))
         )
+        ready.getLayerAs<CircleLayer>("eya-car-weather-pins")?.setProperties(
+            circleRadius(v.stylePixels(4f)),
+            circleStrokeWidth(v.stylePixels(1.5f))
+        )
     }
 
     /** Reframe only valid route geometry or fresh measured GPS in the host-safe area. */
@@ -316,6 +363,8 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
         appliedRoute = null
         appliedChargingSignature = null
         pendingChargingStations = emptyList()
+        pendingWeatherPoints = emptyList()
+        appliedWeatherSignature = null
         centeredOnGps = false
         lastPadding = null
         viewport = null
