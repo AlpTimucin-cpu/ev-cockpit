@@ -211,6 +211,7 @@ class EyaCarNavigationScreen(
                     // Never retain the last turn or ETA while route match is lost.
                     manager.updateTrip(CarTripFactory.loading())
                     loadingGate.onPublished()
+                    gate.clear() // next valid maneuver must replace the loading Trip
                 } catch (error: RuntimeException) {
                     loadingGate.onFailed(now)
                     Log.w("EyaCarNavigation", "Host loading trip rejected", error)
@@ -234,10 +235,6 @@ class EyaCarNavigationScreen(
             return
         }
         withoutGpsSinceMs = 0L
-        if (loadingGate.wasPublished()) {
-            // A valid cue must replace the host loading state immediately.
-            gate.clear()
-        }
         if (gate.shouldPublish(current, now)) {
             try {
                 manager.updateTrip(CarTripFactory.trip(current))
