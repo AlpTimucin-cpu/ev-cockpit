@@ -195,6 +195,7 @@ class EyaCarNavigationScreen(
                     }.collect { (r, f, now) ->
                         route = r
                         fix = f
+                        resetWeatherForRoute(r?.routeId)
                         surface.update(r, f)
                         if (chargingVisible && lastChargingFixTimestamp != f?.recordedAtMillis) {
                             lastChargingFixTimestamp = f?.recordedAtMillis
@@ -212,7 +213,13 @@ class EyaCarNavigationScreen(
                             summary = newSummary
                             invalidate()
                         }
+                        maybeRefreshWeather(r, f, now)
                         updateActiveNavigation(r, f, fresh, now)
+                        maybeAnnounceWeather(r, f, now)
+                        if (weatherVisible && lastWeatherPageMinute != now / 60_000L) {
+                            lastWeatherPageMinute = now / 60_000L
+                            invalidate() // "X dk önce" updates once per minute
+                        }
                     }
                 }
             }
@@ -281,6 +288,8 @@ class EyaCarNavigationScreen(
         matchPolicy.reset()
         routeMatch = CarRouteMatch.NO_VALID_FIX
         offRouteAnnouncementSent = false
+        pendingWeatherSpeech = null
+        dismissWeatherAlert()
         if (wasActive) {
             // Old Screen must never end a newer Session's host navigation.
             if (wasOwner) {
@@ -797,6 +806,12 @@ class EyaCarNavigationScreen(
 
     override fun onGetTemplate(): Template {
         if (chargingVisible) return chargerTemplate()
+        if (weatherVisible) return weatherTemplate()
+        val activeWeatherWarning = weatherAlertMessage
+        if (carContext.carAppApiLevel < 5 && activeRouteId != null &&
+            activeWeatherWarning != null &&
+            System.currentTimeMillis() < weatherAlertUntilMs
+        ) return legacyWeatherWarningTemplate(activeWeatherWarning)
         val active = activeRouteId != null &&
             CarNavigationOwnership.owns(navigationSessionToken)
         val now = System.currentTimeMillis()
@@ -856,8 +871,8 @@ class EyaCarNavigationScreen(
                 .setOnClickListener { beginNavigation() }.build())
         }
         if (route?.routeId != null && route?.routePoints?.let(::validRouteGeometry) == true) {
-            pane.addAction(Action.Builder().setTitle("Rota şarjları")
-                .setOnClickListener { showChargingList() }.build())
+            pane.addAction(Action.Builder().setTitle("Hava / Şarj")
+                .setOnClickListener { showWeather() }.build())
         }
         val content = PaneTemplate.Builder(pane.build())
         if (carContext.carAppApiLevel < 7) {
