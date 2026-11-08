@@ -992,7 +992,9 @@ class EyaCarNavigationScreen(
         val rows = listOf(
             Row.Builder().setTitle("Rota")
                 .addText(summary.title.take(90))
-                .addText(summary.detail.take(130)).build(),
+                .addText((continuityMessage?.takeIf {
+                    continuity.state.value.phase == CarContinuityPhase.PHONE_ACTION_REQUIRED
+                } ?: summary.detail).take(130)).build(),
             Row.Builder().setTitle("Yönlendirme").addText(detail.take(160)).build(),
             Row.Builder().setTitle("GPS")
                 .addText(summary.locationStatus.take(110)).build()
