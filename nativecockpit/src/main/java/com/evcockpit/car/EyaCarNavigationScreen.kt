@@ -194,17 +194,55 @@ class EyaCarNavigationScreen(
             endNavigation() // new alternative means a new explicit trip
             return
         }
-        if (current == null || current.routeId != started) {
-            if (withoutGpsSinceMs == 0L) withoutGpsSinceMs = now
-            voice.stop()
-            if (now - withoutGpsSinceMs >= 15_000L) endNavigation()
-            return // never publish stale maneuver or estimated distance
+        if (current == null || current.routeId != started ||
+            routeMatch != CarRouteMatch.ON_ROUTE
+        ) {
+            // A recent accurate GPS fix OUTSIDE the route is not a GPS outage.
+            // Do not end a trip because the user took a different road.
+            val measured = currentFix?.takeIf {
+                it.usable(now) && it.accuracyMeters <= 35f
+            }
+            if (measured == null) {
+                if (withoutGpsSinceMs == 0L) withoutGpsSinceMs = now
+            } else withoutGpsSinceMs = 0L
+
+            if (loadingGate.shouldPublish(now)) {
+                try {
+                    // Never retain the last turn or ETA while route match is lost.
+                    manager.updateTrip(CarTripFactory.loading())
+                    loadingGate.onPublished()
+                } catch (error: RuntimeException) {
+                    loadingGate.onFailed(now)
+                    Log.w("EyaCarNavigation", "Host loading trip rejected", error)
+                }
+            }
+            if (routeMatch == CarRouteMatch.CONFIRMED_OFF_ROUTE) {
+                if (!offRouteAnnouncementSent && voicePrefs.enabled &&
+                    voice.status == NativeVoiceGuide.Status.READY) {
+                    voice.stop()
+                    offRouteAnnouncementSent = voice.speak(
+                        "Rotadan çıktınız. Güvenli yerde telefondan rotayı yeniden planlayın. " +
+                            "Şarj duraklarınızı kontrol edin.", voicePrefs.volume
+                    )
+                }
+            } else {
+                voice.stop()
+            }
+            if (withoutGpsSinceMs != 0L && now - withoutGpsSinceMs >= 15_000L) {
+                endNavigation()
+            }
+            return
         }
         withoutGpsSinceMs = 0L
+        if (loadingGate.wasPublished()) {
+            // A valid cue must replace the host loading state immediately.
+            gate.clear()
+        }
         if (gate.shouldPublish(current, now)) {
             try {
                 manager.updateTrip(CarTripFactory.trip(current))
                 gate.onPublished(current, now)
+                loadingGate.clear()
                 invalidate()
             } catch (e: RuntimeException) {
                 gate.onPublishFailed(now)
@@ -216,16 +254,20 @@ class EyaCarNavigationScreen(
             val enriched = progress.enrich(currentRoute, currentFix, now)
             val announcement = speechPolicy.nextAnnouncement(enriched, currentFix, now)
             if (announcement != null) {
-                // An enqueue is not proof that the speech engine started.
+                // Delayed TTS callbacks must never acknowledge a later maneuver.
+                val cueToken = speechPolicy.pendingCueToken
                 val queued = voice.speak(
                     announcement, voicePrefs.volume,
                     onUtteranceStarted = {
-                        // NativeVoiceGuide marshals this callback onto the main thread.
-                        speechPolicy.confirmSpoken(System.currentTimeMillis())
+                        speechPolicy.confirmSpoken(
+                            System.currentTimeMillis(), cueToken
+                        )
                     },
-                    onUtteranceFailed = { speechPolicy.cancelPending() }
+                    onUtteranceFailed = {
+                        speechPolicy.cancelPending(cueToken)
+                    }
                 )
-                if (!queued) speechPolicy.cancelPending()
+                if (!queued) speechPolicy.cancelPending(cueToken)
             }
         } else if (!voicePrefs.enabled) voice.stop()
     }
