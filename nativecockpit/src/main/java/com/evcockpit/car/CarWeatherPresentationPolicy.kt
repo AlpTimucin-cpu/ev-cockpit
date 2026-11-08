@@ -100,3 +100,39 @@ internal object CarWeatherPresentationPolicy {
         return "${point.summaryTr} · ${temp} · rüzgâr ${wind}${precip}"
     }
 }
+
+/** Foreground-only cadence. No Doze-exempt alarms or background location. */
+internal class CarWeatherRefreshGate {
+    private var activeRouteId: String? = null
+    private var lastAttemptAtMs: Long? = null
+
+    fun reset() {
+        activeRouteId = null
+        lastAttemptAtMs = null
+    }
+
+    fun shouldRefresh(
+        routeId: String?,
+        hasVerifiedGpsRouteProgress: Boolean,
+        nowMs: Long,
+        manual: Boolean = false
+    ): Boolean {
+        if (routeId.isNullOrBlank() || nowMs <= 0L) {
+            reset()
+            return false
+        }
+        if (activeRouteId != routeId) {
+            activeRouteId = routeId
+            lastAttemptAtMs = null
+        }
+        if (!hasVerifiedGpsRouteProgress) return false
+        val previous = lastAttemptAtMs ?: return true
+        val interval = if (manual) 60_000L else 30L * 60_000L
+        return nowMs >= previous && nowMs - previous >= interval
+    }
+
+    fun markAttempt(routeId: String, nowMs: Long) {
+        if (routeId != activeRouteId || nowMs <= 0L) return
+        lastAttemptAtMs = nowMs
+    }
+}
