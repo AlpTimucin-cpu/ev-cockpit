@@ -31,6 +31,7 @@ class AppConfigRepository @Inject constructor(@ApplicationContext context: Conte
         val RESERVE = stringPreferencesKey("arrival_reserve_pct")
         val CONFIRMED = booleanPreferencesKey("vehicle_user_confirmed")
         val OSRM = stringPreferencesKey("osrm_https_root")
+        val DEBUG_ROUTING_DEMO = booleanPreferencesKey("debug_routing_demo_optin")
         val GEOCODER = stringPreferencesKey("geocoder_https_root")
         val WEATHER = stringPreferencesKey("weather_https_root")
     }
@@ -53,7 +54,8 @@ class AppConfigRepository @Inject constructor(@ApplicationContext context: Conte
             val endpoints = ServiceEndpointConfig(
                 osrmBaseUrl = p[Keys.OSRM]?.takeIf(String::isNotBlank),
                 geocodingBaseUrl = p[Keys.GEOCODER] ?: "https://nominatim.openstreetmap.org/",
-                weatherBaseUrl = p[Keys.WEATHER] ?: "https://api.open-meteo.com/"
+                weatherBaseUrl = p[Keys.WEATHER] ?: "https://api.open-meteo.com/",
+                debugDemoRoutingEnabled = p[Keys.DEBUG_ROUTING_DEMO] == true
             )
             AppConfiguration(
                 vehicle = vehicle.takeIf { it.valid() } ?: VehicleProfileConfig(),
@@ -76,6 +78,11 @@ class AppConfigRepository @Inject constructor(@ApplicationContext context: Conte
             set(Keys.RESERVE, profile.arrivalReservePercent)
             p[Keys.CONFIRMED] = profile.userConfirmed
         }
+    }
+
+    /** Opt-in is a separate setting. Production builds ignore this switch. */
+    suspend fun setDebugDemoRoutingEnabled(enabled: Boolean) {
+        store.edit { p -> p[Keys.DEBUG_ROUTING_DEMO] = enabled }
     }
 
     suspend fun saveEndpoints(endpoints: ServiceEndpointConfig) {

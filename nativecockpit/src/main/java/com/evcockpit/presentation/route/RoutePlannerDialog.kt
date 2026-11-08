@@ -39,6 +39,7 @@ fun RoutePlannerDialog(
     onPlan: () -> Unit,
     onChooseAlternative: (Int) -> Unit,
     onClear: () -> Unit,
+    onOpenRoutingSettings: () -> Unit,
     measuredSocPercent: Double? = null
 ) {
     val scrollState = rememberScrollState()
@@ -118,7 +119,9 @@ fun RoutePlannerDialog(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Text(
-                                text = "Başlangıç ve varış için gerçek OSRM rotası hesaplanır. " +
+                                text = "Yol rotası batarya veya OBD doğrulaması gerektirmez. " +
+                                    "Rota servisi OSRM; yol verisi OpenStreetMap " +
+                                    "(Open Database License — ODbL). " +
                                     "Batarya şarjı yalnızca doğrulanmış OBD ölçümünden okunur.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = muted
@@ -249,6 +252,17 @@ fun RoutePlannerDialog(
                                     color = Color(0xFFFFB17C),
                                     style = MaterialTheme.typography.bodySmall
                                 )
+                                if (error.contains("Rota servisi", ignoreCase = true) ||
+                                    error.contains("OSRM", ignoreCase = true)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = onOpenRoutingSettings,
+                                        modifier = Modifier.fillMaxWidth()
+                                            .heightIn(min = 48.dp)
+                                    ) {
+                                        Text("Rota hizmeti ayarlarını aç")
+                                    }
+                                }
                             }
 
                             if (state.options.isNotEmpty()) {

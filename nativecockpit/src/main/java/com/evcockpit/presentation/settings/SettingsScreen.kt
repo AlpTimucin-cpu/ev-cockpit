@@ -1,5 +1,7 @@
 package com.evcockpit.presentation.settings
 
+import com.evcockpit.BuildConfig
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -98,6 +100,20 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Text("Araç ve Servis Ayarları", style = MaterialTheme.typography.titleLarge)
+                if (BuildConfig.DEBUG) {
+                    SettingToggle(
+                        "TEST: OSRM deneme rotasını aç",
+                        configuration.endpoints.debugDemoRoutingEnabled,
+                        viewModel::setDebugDemoRoutingEnabled
+                    )
+                    Text(
+                        "Rota çizmek için BMS/araç profili onayı gerekmez. " +
+                            "OSRM denemesi geçici ve sınırlıdır; navigasyon " +
+                            "güvenliği için üretimde özel servis gerekir.",
+                        color = Color(0xFFFFCA80),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 Text(
                     "VW ID.4 Pure için 52 kWh net batarya bilgisi kullanıcı beyanıdır. " +
                         "DC tepe gücü doğrulanmadı. Bunlar otomatik ölçüm değildir; " +
@@ -224,10 +240,29 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 Text(
-                    "OSRM herkese açık demo sunucusu üretimde kullanılmaz. " +
-                        "Adres yoksa rota isteği yapılmaz.",
+                    "Özel HTTPS OSRM adresi varsa rota bununla hesaplanır. " +
+                        "Rota çizmek için BMS bağlantısı veya araç batarya onayı gerekmez.",
                     style = MaterialTheme.typography.bodySmall
                 )
+                if (BuildConfig.DEBUG) {
+                    Text(
+                        "Yalnızca TEST APK'da açık kullanıcı tercihiyle çalışır. " +
+                            "Bu ortak demo servisi yoğun olabilir, rota geçici olarak " +
+                            "çalışmayabilir ve gerçek sürüşte güvenilir navigasyon " +
+                            "hizmeti olarak kullanılmamalıdır. " +
+                            "En fazla 15 saniyede bir rota isteği yapılır; " +
+                            "otomatik şarj durağı sapma sorguları devre dışıdır. " +
+                            "Üretim sürümünde bu seçenek etkisizdir.",
+                        color = Color(0xFFFFCA80),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        if (configuration.endpoints.debugDemoRoutingEnabled)
+                            "Deneme OSRM tercihi açık. Rota ekranına dönüp yeniden hesapla."
+                        else "Özel OSRM adresin yoksa TEST yönlendirmesini burada açabilirsin.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 OutlinedTextField(
                     value = geocodingEntry, onValueChange = { geocodingEntry = it },
                     label = { Text("Adres arama (Nominatim/Photon) HTTPS adresi") },

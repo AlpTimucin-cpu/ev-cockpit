@@ -29,7 +29,9 @@ data class VehicleProfileConfig(
 data class ServiceEndpointConfig(
     val osrmBaseUrl: String? = null,
     val geocodingBaseUrl: String = "https://nominatim.openstreetmap.org/",
-    val weatherBaseUrl: String = "https://api.open-meteo.com/"
+    val weatherBaseUrl: String = "https://api.open-meteo.com/",
+    /** Explicit test-only switch. Release builds MUST ignore this value. */
+    val debugDemoRoutingEnabled: Boolean = false
 ) {
     fun validated(): Boolean =
         (osrmBaseUrl == null || checkedHttpsRoot(osrmBaseUrl, osrm = true) != null) &&

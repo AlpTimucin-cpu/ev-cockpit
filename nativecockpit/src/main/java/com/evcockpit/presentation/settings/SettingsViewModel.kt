@@ -79,6 +79,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** Only the native Debug build honors this opt-in on the routing layer. */
+    fun setDebugDemoRoutingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                appConfigRepository.setDebugDemoRoutingEnabled(enabled)
+                configErrorState.value = null
+            } catch (_: Exception) {
+                configErrorState.value = "Deneme rota servisi ayarı kaydedilemedi."
+            }
+        }
+    }
+
     fun saveServiceUrls(osrm: String, geocoding: String, weather: String) {
         val endpoints = ServiceEndpointConfig(
             osrmBaseUrl = osrm.trim().ifEmpty { null },

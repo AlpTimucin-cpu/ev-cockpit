@@ -1,5 +1,7 @@
 package com.evcockpit.data.repository
 
+import com.evcockpit.BuildConfig
+
 import com.evcockpit.data.routing.OsrmDetourResponseParser
 import com.evcockpit.data.routing.OsrmRequestFormat
 import com.evcockpit.data.routing.OsrmService
@@ -50,12 +52,17 @@ class OsrmRoadDetourRepository @Inject constructor(
         if (chosen.isEmpty()) return@withContext RoadDetourCatalog(
             routeId = routeId, message = "Rotaya 5 km yakın doğrulanabilir DC/CCS adayı yok"
         )
-        val root = configuration.configuration.first().endpoints.osrmBaseUrl
-            ?: return@withContext RoadDetourCatalog(
-                routeId = routeId,
-                candidates = chosen.map { it.station },
-                message = "Gerçek sapma için kendi HTTPS OSRM sunucusu ayarlanmalı"
-            )
+        val endpoint = OsrmEndpointSelector.choose(
+            configuration.configuration.first().endpoints, BuildConfig.DEBUG
+        )
+        // Shared public demo is intentionally excluded from automated
+        // per-charger detours: it would multiply requests (up to six).
+        if (endpoint == null || endpoint.demo) return@withContext RoadDetourCatalog(
+            routeId = routeId,
+            candidates = chosen.map { it.station },
+            message = "Şarj sapması doğrulanamadı. Özel HTTPS rota servisi gereklidir."
+        )
+        val root = endpoint.baseUrl
         val api = Retrofit.Builder().baseUrl(root).client(http).build()
             .create(OsrmService::class.java)
         val results = mutableListOf<RoadDetour>()

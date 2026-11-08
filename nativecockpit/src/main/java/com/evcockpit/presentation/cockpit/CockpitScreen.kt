@@ -163,6 +163,10 @@ fun CockpitScreen(
         onOriginSelected = onRouteOriginSelected, onDestinationSelected = onRouteDestinationSelected,
         onGps = onRouteFromGps, onPlan = onRoutePlan,
         onChooseAlternative = onRouteAlternative, onClear = onRouteClear,
+        onOpenRoutingSettings = {
+            routePlanner = false
+            onOpenSoundSettings()
+        },
         measuredSocPercent = displayState.socPercent
     )
     if (engineeringOpen) TechnicalAnalysisSheet(
@@ -392,7 +396,9 @@ fun CockpitScreen(
             },
             onCharging = { selectedPage = 0; charging = true },
             onMedia = { selectedPage = 1 },
-            onSettings = { settings = true; onObdRefresh() }
+            // Dock "Ayarlar" must open the actual vehicle/service settings,
+            // not the unrelated Bluetooth OBD diagnostic dialog.
+            onSettings = onOpenSoundSettings
         )
     }
 }
