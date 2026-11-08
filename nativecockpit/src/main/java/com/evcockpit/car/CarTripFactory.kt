@@ -11,6 +11,9 @@ import java.util.TimeZone
 
 /** Android for Cars models built ONLY from validated CarGuidance. */
 internal object CarTripFactory {
+    /** Avoid publishing an old maneuver while route match is uncertain. */
+    fun loading(): Trip = Trip.Builder().setLoading(true).build()
+
     fun destinationEstimate(g: CarGuidance): TravelEstimate =
         TravelEstimate.Builder(
             Distance.create(g.remainingMeters, Distance.UNIT_METERS),
