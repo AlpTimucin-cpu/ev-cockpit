@@ -712,7 +712,7 @@ private fun TelemetryLeftPanel(
         )
         Text(
             if (connected) "ELM327 bağlı · geçerli okumalar"
-            else "OBD bağlı değil · ölçümler kullanılamıyor",
+            else stringResource(R.string.ux_obd_unavailable),
             color = SoftText,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 2
