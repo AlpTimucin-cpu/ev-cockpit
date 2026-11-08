@@ -29,6 +29,17 @@ class OsrmRouteRepository @Inject constructor(
     private val appConfig: AppConfigRepository
 ) : RouteRepository {
     private val http = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val request = chain.request()
+            // The shared demo requires an identifying User-Agent.
+            val outgoing = if (request.url.host == "router.project-osrm.org")
+                request.newBuilder().header(
+                    "User-Agent",
+                    "EV-Cockpit-DebugRouting/1.0 (github.com/AlpTimucin-cpu/ev-cockpit)"
+                ).build()
+            else request
+            chain.proceed(outgoing)
+        }
         .connectTimeout(9, TimeUnit.SECONDS)
         .readTimeout(17, TimeUnit.SECONDS)
         .callTimeout(22, TimeUnit.SECONDS)
@@ -102,9 +113,13 @@ class OsrmRouteRepository @Inject constructor(
         }
         try {
             // Shared public demo: exactly one request, no automatic retries.
+            val relativeUrl = if (endpoint.demo)
+                url.replace("alternatives=true", "alternatives=false")
+                    .replace("&annotations=speed", "")
+            else url
             val response = BoundedNetworkRetry.io(
                 maxAttempts = if (endpoint.demo) 1 else 2
-            ) { osrm(root).route(url) }
+            ) { osrm(root).route(relativeUrl) }
             if (!response.isSuccessful) {
                 val info = response.errorBody()?.use { body ->
                     val bytes = body.bytes()
@@ -118,7 +133,14 @@ class OsrmRouteRepository @Inject constructor(
             val body = response.body()
                 ?: return@withContext RouteCalculationResult.Failure(null, "OSRM boş yanıt döndürdü")
             val alternatives = try {
-                body.use { OsrmResponseParser.parse(it.string(), destination.label) }
+                body.use { payload ->
+                    val source = payload.source()
+                    // Reject unbounded responses before converting bytes to String.
+                    if (source.request(6_000_001L)) {
+                        throw IOException("OSRM yanıtı güvenli boyut sınırını aştı.")
+                    }
+                    OsrmResponseParser.parse(source.readUtf8(), destination.label)
+                }
             } catch (error: RuntimeException) {
                 return@withContext RouteCalculationResult.Failure(null,
                     "OSRM rota verileri okunamadı: ${error.message?.take(80) ?: "geçersiz JSON"}")
