@@ -988,42 +988,21 @@ class EyaCarNavigationScreen(
                 } else "Güncel manevra bilgisi bekleniyor."
             }
         }
-        // Stable row titles help the host recognize a content refresh.
-        val rows = listOf(
-            Row.Builder().setTitle("Rota")
-                .addText(summary.title.take(90))
-                .addText((continuityMessage?.takeIf {
-                    continuity.state.value.phase == CarContinuityPhase.PHONE_ACTION_REQUIRED
-                } ?: summary.detail).take(130)).build(),
-            Row.Builder().setTitle("Yönlendirme").addText(detail.take(160)).build(),
-            Row.Builder().setTitle("GPS")
-                .addText(summary.locationStatus.take(110)).build()
+        return CarHostOverviewTemplate.render(
+            apiLevel = carContext.carAppApiLevel,
+            hostPaneLimit = maxRows,
+            summary = summary,
+            detail = detail,
+            active = active,
+            canBegin = canBegin,
+            hasRealRoute = route?.routeId != null &&
+                route?.routePoints?.let(::validRouteGeometry) == true,
+            connectionIssue = continuityMessage?.takeIf {
+                continuity.state.value.phase == CarContinuityPhase.PHONE_ACTION_REQUIRED
+            },
+            onBegin = ::beginNavigation,
+            onEnd = ::endNavigation,
+            onWeatherAndCharging = ::showWeather
         )
-        val pane = Pane.Builder()
-        rows.take(maxRows).forEach { pane.addRow(it) }
-
-        // Pane rows must not contain an OnClickListener in Car App 1.7.
-        // Host-rendered Pane Actions are the legal start/stop controls.
-        if (active) {
-            pane.addAction(Action.Builder().setTitle("Navigasyonu bitir")
-                .setOnClickListener { endNavigation() }.build())
-        } else if (canBegin) {
-            pane.addAction(Action.Builder().setTitle("Navigasyonu başlat")
-                .setOnClickListener { beginNavigation() }.build())
-        }
-        if (route?.routeId != null && route?.routePoints?.let(::validRouteGeometry) == true) {
-            pane.addAction(Action.Builder().setTitle("Hava / Şarj")
-                .setOnClickListener { showWeather() }.build())
-        }
-        val content = PaneTemplate.Builder(pane.build())
-        if (carContext.carAppApiLevel < 7) {
-            @Suppress("DEPRECATION")
-            return content.setTitle("EV Cockpit").build()
-        }
-        return MapWithContentTemplate.Builder()
-            .setContentTemplate(content.setHeader(
-                Header.Builder().setTitle("EV Cockpit").build()
-            ).build())
-            .build()
     }
 }
