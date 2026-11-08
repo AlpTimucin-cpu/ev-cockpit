@@ -337,7 +337,186 @@ class EyaCarNavigationScreen(
         } else if (!voicePrefs.enabled) voice.stop()
     }
 
+
+    private fun showChargingList() {
+        if (route == null || !validRouteGeometry(route!!.routePoints)) return
+        chargingVisible = true
+        selectedChargingStationId = null
+        if (!chargingLoadStarted) {
+            chargingLoadStarted = true
+            work?.launch { charging.refreshResult() }
+        }
+        // The user explicitly opened the charging page. Rebuild the evidence
+        // and verify private-OSRM road detours only when usable data exists.
+        refreshChargingModel()
+        work?.launch {
+            val current = route ?: return@launch
+            val candidates = chargingCandidates
+            if (!chargingCatalog.loading && !chargingCatalog.staleCache &&
+                candidates.isNotEmpty()
+            ) {
+                roadDetours = detours.inspect(current, candidates)
+                refreshChargingModel()
+            }
+        }
+        invalidate()
+    }
+
+    private fun hideChargingList() {
+        chargingVisible = false
+        selectedChargingStationId = null
+        chargingModelJob?.cancel()
+        surface.updateChargingStations(emptyList())
+        invalidate()
+    }
+
+    private fun refreshChargingModel() {
+        if (!chargingVisible) return
+        val scope = work ?: return
+        chargingModelJob?.cancel()
+        val r = route
+        val source = chargingCatalog
+        val candidates = chargingCandidates
+        val currentFix = fix
+        val telemetry = vehicleTelemetry
+        val profile = vehicleProfile
+        val roads = roadDetours
+        val now = System.currentTimeMillis()
+        val cap = chargingHostLimit()
+        chargingModelJob = scope.launch {
+            val generated = withContext(Dispatchers.Default) {
+                CarChargingListPolicy.build(
+                    r, source, candidates, currentFix, telemetry, profile, roads,
+                    now, cap
+                )
+            }
+            // A cancelled calculation cannot publish a model for an older route.
+            if (routes.currentRoute.value?.routeId != r?.routeId) return@launch
+            chargingDisplay = generated
+            surface.updateChargingStations(generated.items.map { it.station })
+            if (selectedChargingStationId != null &&
+                generated.items.none { it.station.id == selectedChargingStationId }
+            ) selectedChargingStationId = null
+            invalidate()
+        }
+    }
+
+    private fun chargingHostLimit(): Int {
+        if (carContext.carAppApiLevel < 2) return 6
+        val kind = if (carContext.carAppApiLevel >= 7)
+            ConstraintManager.CONTENT_LIMIT_TYPE_LIST
+        else ConstraintManager.CONTENT_LIMIT_TYPE_PLACE_LIST
+        return runCatching {
+            carContext.getCarService(ConstraintManager::class.java)
+                .getContentLimit(kind).coerceIn(0, 12)
+        }.getOrDefault(0) // Fail closed on host IPC failures.
+    }
+
+    private fun navigationMapContent(content: Template): Template {
+        if (carContext.carAppApiLevel < 7) return content
+        return MapWithContentTemplate.Builder()
+            .setContentTemplate(content)
+            .build()
+    }
+
+    private fun chargingPane(text: String, backToList: Boolean = false): Template {
+        val pane = Pane.Builder()
+            .addRow(Row.Builder().setTitle("Şarj bilgisi")
+                .addText(text.take(180)).build())
+            .addAction(Action.Builder().setTitle("Geri")
+                .setOnClickListener {
+                    if (backToList) {
+                        selectedChargingStationId = null
+                        invalidate()
+                    } else hideChargingList()
+                }.build())
+        val content = PaneTemplate.Builder(pane.build())
+        if (carContext.carAppApiLevel < 7) {
+            @Suppress("DEPRECATION")
+            return content.setTitle("Rota şarjları").build()
+        }
+        return navigationMapContent(content.setHeader(
+            Header.Builder().setTitle("Rota şarjları").build()
+        ).build())
+    }
+
+    private fun chargerTemplate(): Template {
+        val selected = chargingDisplay.items.firstOrNull {
+            it.station.id == selectedChargingStationId
+        }
+        if (selected != null) {
+            val stationName = selected.station.name.trim()
+                .replace("\n", " ").take(90)
+            val details = stationName + " · " +
+                CarChargingListPolicy.summary(selected) + " · " +
+                CarChargingListPolicy.detail(selected) +
+                " · EPDK: " + chargingDisplay.catalogLabel
+            return chargingPane(details, backToList = true)
+        }
+        val items = chargingDisplay.items
+        if (items.isEmpty()) return chargingPane(
+            chargingDisplay.message ?: "İstasyon bilgisi kullanılamıyor."
+        )
+        // Legacy navigation-place lists require an actual current-location
+        // DistanceSpan; never manufacture distance when GPS is absent.
+        if (carContext.carAppApiLevel < 7 &&
+            items.any { it.directDistanceMeters == null }
+        ) return chargingPane(
+            "Hassas GPS kullanılamıyor. Eski Android Auto hostu mesafe istiyor."
+        )
+        val builder = ItemList.Builder()
+        for (item in items.take(chargingHostLimit())) {
+            val base = CarChargingListPolicy.summary(item)
+            val firstLine = if (item.directDistanceMeters != null) {
+                val label = base + " · Kuş uçuşu: "
+                val decorated = SpannableString(label + "mesafe")
+                decorated.setSpan(
+                    DistanceSpan.create(Distance.create(
+                        item.directDistanceMeters, Distance.UNIT_METERS
+                    )),
+                    label.length, decorated.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                decorated
+            } else SpannableString(base + " · GPS kullanılamıyor")
+            val row = Row.Builder()
+                .setTitle(item.station.name.trim().replace("\n", " ").take(75))
+                .addText(firstLine)
+                .addText(CarChargingListPolicy.detail(item).take(140))
+                .setBrowsable(true)
+                .setOnClickListener {
+                    selectedChargingStationId = item.station.id
+                    invalidate()
+                }.build()
+            builder.addItem(row)
+        }
+        val itemList = builder.build()
+        val goBack = ActionStrip.Builder().addAction(
+            Action.Builder().setTitle("Rotaya dön")
+                .setOnClickListener { hideChargingList() }.build()
+        ).build()
+        if (carContext.carAppApiLevel < 7) {
+            @Suppress("DEPRECATION")
+            return PlaceListNavigationTemplate.Builder()
+                .setTitle("EPDK rota DC/CCS")
+                .setItemList(itemList)
+                .setActionStrip(goBack)
+                .build()
+        }
+        return MapWithContentTemplate.Builder()
+            .setContentTemplate(
+                ListTemplate.Builder()
+                    .setSingleList(itemList)
+                    .setHeader(Header.Builder()
+                        .setTitle("EPDK rota DC/CCS").build())
+                    .build()
+            )
+            .setActionStrip(goBack)
+            .build()
+    }
+
     override fun onGetTemplate(): Template {
+        if (chargingVisible) return chargerTemplate()
         val active = activeRouteId != null &&
             CarNavigationOwnership.owns(navigationSessionToken)
         val now = System.currentTimeMillis()
@@ -395,6 +574,10 @@ class EyaCarNavigationScreen(
         } else if (canBegin) {
             pane.addAction(Action.Builder().setTitle("Navigasyonu başlat")
                 .setOnClickListener { beginNavigation() }.build())
+        }
+        if (route?.routeId != null && route?.routePoints?.let(::validRouteGeometry) == true) {
+            pane.addAction(Action.Builder().setTitle("Rota şarjları")
+                .setOnClickListener { showChargingList() }.build())
         }
         val content = PaneTemplate.Builder(pane.build())
         if (carContext.carAppApiLevel < 7) {
