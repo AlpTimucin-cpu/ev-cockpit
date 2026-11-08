@@ -27,6 +27,7 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+import com.evcockpit.domain.model.ChargingStation
 import com.evcockpit.domain.model.GpsFix
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
@@ -44,6 +45,8 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
     private var style: Style? = null
     private var pendingRoute: RouteSnapshot? = null
     private var pendingGps: GpsFix? = null
+    private var pendingChargingStations: List<ChargingStation> = emptyList()
+    private var appliedChargingSignature: String? = null
     private var appliedRoute: String? = null
     private var appliedGpsAt: Long? = null
     private var centeredOnGps = false
@@ -136,6 +139,7 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
                     style = loaded
                     appliedRoute = null
                     appliedGpsAt = null
+                    appliedChargingSignature = null
                     lastPadding = null
                     render()
                     fitCamera()
@@ -179,8 +183,42 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
         render()
     }
 
+    /** Draw only EPDK-proven DC/CCS coordinates; never an invented POI pin. */
+    fun updateChargingStations(stations: List<ChargingStation>) {
+        pendingChargingStations = stations.filter { it.hasDcCcs && it.coordinate.valid() }
+            .take(12)
+        renderCharging()
+    }
+
+    private fun renderCharging() {
+        val ready = style ?: return
+        val signature = pendingChargingStations.joinToString("|") { station ->
+            station.id + ":" + station.coordinate.latitude + ":" + station.coordinate.longitude
+        }
+        if (appliedChargingSignature == signature) return
+        val features = pendingChargingStations.map { station ->
+            Feature.fromGeometry(Point.fromLngLat(
+                station.coordinate.longitude, station.coordinate.latitude
+            ))
+        }.toTypedArray()
+        val collection = FeatureCollection.fromFeatures(features)
+        val src = ready.getSourceAs<GeoJsonSource>("eya-car-chargers")
+        if (src == null) {
+            ready.addSource(GeoJsonSource("eya-car-chargers", collection))
+            ready.addLayer(CircleLayer("eya-car-charger-pins", "eya-car-chargers")
+                .withProperties(
+                    circleColor(android.graphics.Color.rgb(255, 193, 7)),
+                    circleRadius(viewport?.stylePixels(6f) ?: 6f),
+                    circleStrokeWidth(viewport?.stylePixels(2f) ?: 2f),
+                    circleStrokeColor(android.graphics.Color.WHITE)
+                ))
+        } else src.setGeoJson(collection)
+        appliedChargingSignature = signature
+    }
+
     private fun render() {
         val ready = style ?: return
+        renderCharging()
         val route = pendingRoute?.routePoints?.takeIf(::validRouteGeometry)
         val signature = pendingRoute?.routeId ?: route?.hashCode()?.toString() ?: "empty"
         if (appliedRoute != signature) {
@@ -229,6 +267,10 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
             circleRadius(v.stylePixels(9f)),
             circleStrokeWidth(v.stylePixels(3f))
         )
+        ready.getLayerAs<CircleLayer>("eya-car-charger-pins")?.setProperties(
+            circleRadius(v.stylePixels(6f)),
+            circleStrokeWidth(v.stylePixels(2f))
+        )
     }
 
     /** Reframe only valid route geometry or fresh measured GPS in the host-safe area. */
@@ -272,6 +314,8 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
         map = null
         appliedGpsAt = null
         appliedRoute = null
+        appliedChargingSignature = null
+        pendingChargingStations = emptyList()
         centeredOnGps = false
         lastPadding = null
         viewport = null
