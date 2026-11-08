@@ -39,7 +39,7 @@ internal class CarRouteMatchPolicy(
 
     fun observe(route: RouteSnapshot?, fix: GpsFix?, nowMs: Long): CarRouteMatch {
         val id = route?.routeId?.takeIf { it.isNotBlank() }
-        if (id == null || !validRouteGeometry(route.routePoints)) {
+        if (route == null || id == null || !validRouteGeometry(route.routePoints)) {
             reset()
             return state
         }
