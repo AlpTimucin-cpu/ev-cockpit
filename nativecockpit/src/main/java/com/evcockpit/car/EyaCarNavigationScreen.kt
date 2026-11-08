@@ -275,32 +275,61 @@ class EyaCarNavigationScreen(
     override fun onGetTemplate(): Template {
         val active = activeRouteId != null &&
             CarNavigationOwnership.owns(navigationSessionToken)
-        val g = guidance?.takeIf { it.routeId == activeRouteId }
-        val pane = Pane.Builder()
-            .addRow(Row.Builder().setTitle(summary.title).addText(summary.detail).build())
-            .addRow(Row.Builder().setTitle("GPS").addText(summary.locationStatus).build())
-
-        if (active) {
-            val step = g?.nextCue
-            val meters = g?.nextMeters
-            pane.addRow(Row.Builder().setTitle("Sıradaki manevra")
-                .addText(if (step != null && meters != null) {
-                    "$step · ${meters.roundToInt()} m"
-                } else "Güncel GPS ve dönüş bilgisi bekleniyor").build())
-            pane.addRow(Row.Builder().setTitle("Navigasyonu bitir")
-                .setOnClickListener { endNavigation() }.build())
-        } else if (guidance?.let { current ->
-            val now = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        val current = guidance
+        val canBegin = !active && current != null &&
             current.gpsRecordedAtMs <= now &&
-                now - current.gpsRecordedAtMs <= 5_000L &&
-                fix?.usable(now) == true &&
-                route?.routeId == current.routeId
-        } == true) {
-            pane.addRow(Row.Builder().setTitle("Navigasyonu başlat")
+            now - current.gpsRecordedAtMs <= 5_000L &&
+            fix?.usable(now) == true &&
+            route?.routeId == current.routeId &&
+            routeMatch == CarRouteMatch.ON_ROUTE
+
+        // Car App API 1 has no ConstraintManager. Query the actual host's pane
+        // limit; the physical screen diagonal cannot determine safe row count.
+        val maxRows = if (carContext.carAppApiLevel >= 2) {
+            runCatching {
+                carContext.getCarService(ConstraintManager::class.java)
+                    .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_PANE)
+                    .coerceIn(1, 4)
+            }.getOrDefault(2)
+        } else 2
+
+        val detail = when {
+            !active -> if (canBegin) "Rota ve GPS doğrulandı. Başlatabilirsiniz."
+                else "Telefondan rota seçin ve hassas GPS izni verin."
+            routeMatch == CarRouteMatch.CONFIRMED_OFF_ROUTE ->
+                "Rotadan çıkıldı. Telefonda yeni rota planlayın; şarj duraklarını kontrol edin."
+            routeMatch == CarRouteMatch.VERIFYING ->
+                "Konum güzergâhla eşleşmiyor. Doğrulanıyor."
+            routeMatch == CarRouteMatch.NO_VALID_FIX ->
+                "Güncel ve hassas GPS bekleniyor. Yönlendirme duraklatıldı."
+            else -> {
+                val g = current?.takeIf { it.routeId == activeRouteId }
+                if (g?.nextCue != null && g.nextMeters != null) {
+                    g.nextCue + " · " + g.nextMeters.roundToInt() + " m"
+                } else "Güncel manevra bilgisi bekleniyor."
+            }
+        }
+        // Stable row titles help the host recognize a content refresh.
+        val rows = listOf(
+            Row.Builder().setTitle("Rota")
+                .addText(summary.title.take(90))
+                .addText(summary.detail.take(130)).build(),
+            Row.Builder().setTitle("Yönlendirme").addText(detail.take(160)).build(),
+            Row.Builder().setTitle("GPS")
+                .addText(summary.locationStatus.take(110)).build()
+        )
+        val pane = Pane.Builder()
+        rows.take(maxRows).forEach(pane::addRow)
+
+        // Pane rows must not contain an OnClickListener in Car App 1.7.
+        // Host-rendered Pane Actions are the legal start/stop controls.
+        if (active) {
+            pane.addAction(Action.Builder().setTitle("Navigasyonu bitir")
+                .setOnClickListener { endNavigation() }.build())
+        } else if (canBegin) {
+            pane.addAction(Action.Builder().setTitle("Navigasyonu başlat")
                 .setOnClickListener { beginNavigation() }.build())
-        } else {
-            pane.addRow(Row.Builder().setTitle("Başlamak için")
-                .addText("Telefondan rota seçin ve konuma izin verin").build())
         }
         val content = PaneTemplate.Builder(pane.build())
         if (carContext.carAppApiLevel < 7) {
