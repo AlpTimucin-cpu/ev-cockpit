@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
+import androidx.car.app.model.Action
+import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
@@ -51,6 +53,10 @@ class EyaCarNavigationScreen(
     private val progress = RouteProgressTracker()
     private val guidancePolicy = CarGuidancePolicy()
     private val gate = CarTripUpdateGate()
+    private val loadingGate = CarHostLoadingGate()
+    private val matchPolicy = CarRouteMatchPolicy()
+    private var routeMatch = CarRouteMatch.NO_VALID_FIX
+    private var offRouteAnnouncementSent = false
     private val navigationSessionToken = Any()
     private var work: CoroutineScope? = null
     private var route: RouteSnapshot? = routes.currentRoute.value
@@ -96,8 +102,13 @@ class EyaCarNavigationScreen(
                         surface.update(r, f)
                         val fresh = guidancePolicy.snapshot(r, f, now)
                         guidance = fresh
+                        val previousMatch = routeMatch
+                        routeMatch = matchPolicy.observe(r, f, now)
+                        if (routeMatch != CarRouteMatch.CONFIRMED_OFF_ROUTE) {
+                            offRouteAnnouncementSent = false
+                        }
                         val newSummary = CarRouteSummary.from(r, f, now)
-                        if (newSummary != summary) {
+                        if (newSummary != summary || previousMatch != routeMatch) {
                             summary = newSummary
                             invalidate()
                         }
@@ -138,6 +149,7 @@ class EyaCarNavigationScreen(
             CarNavigationOwnership.claim(navigationSessionToken)
             withoutGpsSinceMs = 0L
             gate.clear()
+            loadingGate.clear()
             speechPolicy.reset()
             updateActiveNavigation(route, fix, current, System.currentTimeMillis())
             invalidate()
@@ -155,6 +167,10 @@ class EyaCarNavigationScreen(
         voice.stop()
         speechPolicy.reset()
         gate.clear()
+        loadingGate.clear()
+        matchPolicy.reset()
+        routeMatch = CarRouteMatch.NO_VALID_FIX
+        offRouteAnnouncementSent = false
         if (wasActive) {
             // Old Screen must never end a newer Session's host navigation.
             if (wasOwner) {
