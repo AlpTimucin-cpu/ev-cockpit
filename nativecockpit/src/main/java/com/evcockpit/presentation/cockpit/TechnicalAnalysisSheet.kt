@@ -51,7 +51,9 @@ fun TechnicalAnalysisSheet(
             delay(2_000)
         }
     }
-    val result = if (connectedCheck(obdPhase, snapshot, now)) metrics else EngineeringMetrics()
+    val hasFreshSession = connectedCheck(obdPhase, snapshot, now)
+    val visibleSnapshot = if (hasFreshSession) snapshot else EngineeringSnapshot()
+    val result = if (hasFreshSession) metrics else EngineeringMetrics()
     val connected = obdPhase == ObdPhase.CONNECTED
     val recent = snapshot.lastValidResponseAtMs?.let { now - it in 0..120_000L } == true
 
@@ -70,24 +72,29 @@ fun TechnicalAnalysisSheet(
                 when {
                     !connected -> "OBD bağlı değil · bağlanınca salt-okunur ölçümler otomatik başlar."
                     !recent -> "OBD bağlı · henüz geçerli MEB ölçümü gelmedi veya veriler eski."
-                    else -> "OBD bağlı · güncel MEB sensör verileri alınıyor."
+                    else -> "OBD bağlı · MEB aday ölçümleri alınıyor (ölçekler teyitsiz)."
                 },
                 style = MaterialTheme.typography.bodyMedium
             )
             if (connected) {
-                Text("Başarısız/eksik ardışık okuma: ${snapshot.unsuccessfulReads}",
+                Text("Başarısız/eksik ardışık okuma: ${visibleSnapshot.unsuccessfulReads}",
                     style = MaterialTheme.typography.labelSmall)
             }
+            Text(
+                "Deneysel MEB DID çözümlemeleri doğrulanmış BMS SoC/SoH değildir. " +
+                    "Bu sayfadaki hesaplar yalnızca teknik inceleme içindir.",
+                style = MaterialTheme.typography.bodySmall
+            )
             HorizontalDivider()
             Text("Anlık batarya", style = MaterialTheme.typography.titleLarge)
-            Metric("BMS doluluk", snapshot.socPercent.valueIfFresh(now), "%", 1)
-            Metric("Paket gerilimi", snapshot.packVoltageV.valueIfFresh(now), "V", 2)
-            Metric("Batarya akımı (+ şarj / − tüketim)", snapshot.packCurrentA.valueIfFresh(now), "A", 2)
-            Metric("Gerilim × akım", result.batteryPowerKw, "kW", 2)
+            Metric("SoC · deneysel DID", visibleSnapshot.socPercent.valueIfFresh(now), "%", 1)
+            Metric("Paket gerilimi", visibleSnapshot.packVoltageV.valueIfFresh(now), "V", 2)
+            Metric("Batarya akımı (+ şarj / − tüketim)", visibleSnapshot.packCurrentA.valueIfFresh(now), "A", 2)
+            Metric("Gerilim × akım · deneysel", result.batteryPowerKw, "kW", 2)
             Metric("Batarya C-rate", result.absoluteCrate, "C", 2)
-            Metric("OBD araç hızı", snapshot.speedKmh.valueIfFresh(now), "km/sa", 1)
+            Metric("OBD araç hızı", visibleSnapshot.speedKmh.valueIfFresh(now), "km/sa", 1)
             Metric("Anlık enerji / 100 km", result.instantaneousConsumptionKwh100Km, "kWh/100 km", 1)
-            Metric("Dinamik şarj akım sınırı", snapshot.chargeCurrentLimitA.valueIfFresh(now), "A", 1)
+            Metric("Dinamik şarj akım sınırı", visibleSnapshot.chargeCurrentLimitA.valueIfFresh(now), "A", 1)
             Text(
                 "Güç = U×I/1000; C-rate = |P|/52. Anlık tüketim yalnızca OBD hızı 20 km/sa üzerindeyse gösterilir. " +
                     "Bu değer yolculuk ortalaması değildir; rejenerasyonda negatif olabilir.",
@@ -95,19 +102,19 @@ fun TechnicalAnalysisSheet(
             )
             HorizontalDivider()
             Text("Hücre ve termal yönetim", style = MaterialTheme.typography.titleLarge)
-            Metric("En yüksek hücre", snapshot.cellMaxV.valueIfFresh(now), "V", 4)
-            Metric("En düşük hücre", snapshot.cellMinV.valueIfFresh(now), "V", 4)
+            Metric("En yüksek hücre", visibleSnapshot.cellMaxV.valueIfFresh(now), "V", 4)
+            Metric("En düşük hücre", visibleSnapshot.cellMinV.valueIfFresh(now), "V", 4)
             Metric("Hücre farkı", result.batteryCellSpreadMv, "mV", 2)
-            Metric("En yüksek sensör", snapshot.temperatureMaxC.valueIfFresh(now), "°C", 2)
-            Metric("En düşük sensör", snapshot.temperatureMinC.valueIfFresh(now), "°C", 2)
+            Metric("En yüksek sensör", visibleSnapshot.temperatureMaxC.valueIfFresh(now), "°C", 2)
+            Metric("En düşük sensör", visibleSnapshot.temperatureMinC.valueIfFresh(now), "°C", 2)
             Metric("Sıcaklık farkı", result.batteryTemperatureSpreadC, "°C", 2)
             Text("Hücre ve sıcaklık farkları eşleştirilmiş, zamanca yakın okumalardan hesaplanır.",
                 style = MaterialTheme.typography.bodySmall)
             HorizontalDivider()
             Text("Batarya ömrü ve enerji sayaçları", style = MaterialTheme.typography.titleLarge)
-            Metric("BMS kapasite parametresi", snapshot.capacityParameterKwh.valueIfFresh(now, 900_000L), "kWh", 2)
-            Metric("Birikimli şarj enerjisi", snapshot.accumulatedChargedKwh.valueIfFresh(now, 900_000L), "kWh", 1)
-            Metric("Birikimli deşarj enerjisi", snapshot.accumulatedDischargedKwh.valueIfFresh(now, 900_000L), "kWh", 1)
+            Metric("BMS kapasite parametresi", visibleSnapshot.capacityParameterKwh.valueIfFresh(now, 900_000L), "kWh", 2)
+            Metric("Birikimli şarj enerjisi", visibleSnapshot.accumulatedChargedKwh.valueIfFresh(now, 900_000L), "kWh", 1)
+            Metric("Birikimli deşarj enerjisi", visibleSnapshot.accumulatedDischargedKwh.valueIfFresh(now, 900_000L), "kWh", 1)
             Metric("Eşdeğer tam deşarj çevrimi", result.dischargeEquivalentFullCycles, "FEC", 1)
             Text("FEC = birikimli deşarj (kWh) / 52 kWh. Başlangıçtan beri sayaçların sıfırlanmadığı varsayılır.",
                 style = MaterialTheme.typography.bodySmall)
