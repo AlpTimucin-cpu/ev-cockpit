@@ -317,7 +317,7 @@ class EyaCarNavigationScreen(
                 .addText(summary.locationStatus.take(110)).build()
         )
         val pane = Pane.Builder()
-        rows.take(maxRows).forEach(pane::addRow)
+        rows.take(maxRows).forEach { pane.addRow(it) }
 
         // Pane rows must not contain an OnClickListener in Car App 1.7.
         // Host-rendered Pane Actions are the legal start/stop controls.
