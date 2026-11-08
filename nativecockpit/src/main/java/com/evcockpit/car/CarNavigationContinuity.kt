@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * No GPS coordinates, OBD values, or stale maneuvers are persisted to disk.
  * A killed process cannot silently resurrect a journey.
  */
-internal enum class CarContinuityPhase {
+enum class CarContinuityPhase {
     OFF,
     STARTING,
     ACTIVE,
@@ -20,7 +20,7 @@ internal enum class CarContinuityPhase {
     PHONE_ACTION_REQUIRED
 }
 
-internal data class CarContinuityState(
+data class CarContinuityState(
     val routeId: String? = null,
     val phase: CarContinuityPhase = CarContinuityPhase.OFF,
     val lastGpsAtMs: Long? = null
@@ -35,7 +35,7 @@ internal data class CarContinuityState(
  * service can never cancel its replacement, even for the same routeId.
  */
 @Singleton
-internal class CarNavigationContinuity @Inject constructor() {
+class CarNavigationContinuity @Inject constructor() {
     private val mutable = MutableStateFlow(CarContinuityState())
     val state: StateFlow<CarContinuityState> = mutable.asStateFlow()
     private var serviceOwner: Any? = null
