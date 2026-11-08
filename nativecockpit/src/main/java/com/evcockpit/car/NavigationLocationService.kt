@@ -76,12 +76,27 @@ class NavigationLocationService : Service() {
             return START_NOT_STICKY
         }
         val routeId = intent.getStringExtra(EXTRA_ROUTE_ID)?.takeIf { it.isNotBlank() }
-        if (routeId == null || !canMonitor(routeId) ||
-            (trackedRouteId != null && trackedRouteId != routeId)
+        if (routeId == null || routes.currentRoute.value?.routeId != routeId ||
+            routes.currentRoute.value?.routePoints?.let(::validRouteGeometry) != true
         ) {
-            // Never adopt a different route or resurrect a service from a null Intent.
+            // A non-sticky restart or route change is never an authorized trip.
+            routeId?.let(continuity::endRoute)
             stopSelf(startId)
             return START_NOT_STICKY
+        }
+        if (!locationAvailable()) {
+            continuity.launchRestricted(routeId)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        if (trackedRouteId != null && trackedRouteId != routeId) {
+            // A different explicitly started route replaces the old GPS job.
+            trackJob?.cancel()
+            trackJob = null
+            tracker?.stop()
+            tracker = null
+            trackedRouteId = null
+            lastNotificationState = null
         }
 
         try {
@@ -105,6 +120,7 @@ class NavigationLocationService : Service() {
         trackedRouteId = routeId
         val gps = CarGpsTracker(applicationContext)
         tracker = gps
+        lastGpsRetryAtMs = System.currentTimeMillis()
         gps.start()
         val ticker = flow {
             while (kotlin.coroutines.coroutineContext.isActive) {
@@ -143,12 +159,6 @@ class NavigationLocationService : Service() {
             }
         }
         return START_NOT_STICKY
-    }
-
-    private fun canMonitor(routeId: String): Boolean {
-        val route = routes.currentRoute.value
-        return route?.routeId == routeId &&
-            validRouteGeometry(route.routePoints) && locationAvailable()
     }
 
     private fun locationAvailable(): Boolean {
