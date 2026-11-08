@@ -1,6 +1,8 @@
 package com.evcockpit.presentation.settings
 
 import com.evcockpit.BuildConfig
+import com.evcockpit.car.CarContinuityPhase
+import com.evcockpit.car.CarContinuityState
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,6 +51,9 @@ import java.util.Locale
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     activeSound: ActiveSoundManager,
+    carNavigationState: CarContinuityState,
+    onRetryCarNavigation: () -> Unit,
+    onStopCarNavigation: () -> Unit,
     onClose: () -> Unit
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -100,6 +105,39 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Text("Araç ve Servis Ayarları", style = MaterialTheme.typography.titleLarge)
+                HorizontalDivider()
+                Text("Android Auto · Arka plan GPS", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Yalnız sizin başlattığınız Android Auto navigasyonu için konum foreground " +
+                        "servisi kullanılır. Bildirimden istediğiniz zaman kapatabilirsiniz. " +
+                        "Uygulama tamamen öldürülürse oturum kendiliğinden yeniden açılmaz.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    when (carNavigationState.phase) {
+                        CarContinuityPhase.OFF -> "Etkin arka plan navigasyonu yok."
+                        CarContinuityPhase.STARTING -> "Konum hizmeti başlatılıyor."
+                        CarContinuityPhase.ACTIVE -> "Konum hizmeti etkin; gerçek GPS güncel."
+                        CarContinuityPhase.GPS_UNAVAILABLE ->
+                            "Konum hizmeti açık; GPS geçici olarak kullanılamıyor."
+                        CarContinuityPhase.PHONE_ACTION_REQUIRED ->
+                            "Android Auto konum servisini arka plandan başlatmayı engelledi. " +
+                                "Bu ekrandaki düğmeyle telefon görünürken yeniden deneyin."
+                    }, style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFAEC4D6)
+                )
+                if (carNavigationState.phase == CarContinuityPhase.PHONE_ACTION_REQUIRED) {
+                    Button(onClick = onRetryCarNavigation, modifier = Modifier.fillMaxWidth()) {
+                        Text("Telefon üzerinden arka plan GPS'i başlat")
+                    }
+                }
+                if (carNavigationState.phase != CarContinuityPhase.OFF) {
+                    OutlinedButton(
+                        onClick = onStopCarNavigation,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Arka plan navigasyonunu durdur") }
+                }
+                HorizontalDivider()
                 if (BuildConfig.DEBUG) {
                     SettingToggle(
                         "TEST: OSRM deneme rotasını aç",
