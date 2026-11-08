@@ -95,10 +95,10 @@ internal object CarChargingListPolicy {
         val routeId = route.routeId
         val selected = candidates.asSequence()
             .filter { it.station.hasDcCcs && it.distanceFromStartKm.isFinite() }
-            // Exclude passed stations; keep valid chargers within the first
-            // kilometre of an actual route rather than hiding them outright.
+            // Do not hide a charger immediately ahead of current GPS
+            // progress. Any station already passed along this route is omitted.
             .filter { fraction == null || it.distanceFromStartKm >
-                (route.totalKm ?: 0.0) * fraction + 0.25 }
+                (route.totalKm ?: 0.0) * fraction }
             .take(hostLimit)
             .map { candidate ->
                 val station = candidate.station
