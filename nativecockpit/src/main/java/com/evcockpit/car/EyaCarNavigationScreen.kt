@@ -1,6 +1,8 @@
 package com.evcockpit.car
 
 import android.util.Log
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import android.text.SpannableString
 import android.text.Spanned
 import androidx.car.app.AppManager
@@ -73,6 +75,7 @@ class EyaCarNavigationScreen(
     private val config: AppConfigRepository,
     private val detours: OsrmRoadDetourRepository,
     private val weather: OpenMeteoWeatherRepository,
+    private val continuity: CarNavigationContinuity,
     ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
@@ -96,6 +99,8 @@ class EyaCarNavigationScreen(
     private var guidance: CarGuidance? = null
     private var summary = CarRouteSummary.from(route, null, System.currentTimeMillis())
     private var activeRouteId: String? = null
+    private var lastResumeAttemptAtMs: Long = 0L
+    private var continuityMessage: String? = null
     private var withoutGpsSinceMs: Long = 0L
     private var closed = false
     private var chargingVisible = false
