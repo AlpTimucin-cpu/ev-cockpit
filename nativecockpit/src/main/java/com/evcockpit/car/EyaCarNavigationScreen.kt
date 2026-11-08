@@ -101,6 +101,9 @@ class EyaCarNavigationScreen(
     private var vehicleProfile = VehicleProfileConfig()
     private var chargingDisplay = CarChargeList()
     private var chargingModelJob: Job? = null
+    private var detourVerificationJob: Job? = null
+    private var detourVerificationKey: String? = null
+    private var lastChargingFixTimestamp: Long? = null
 
     private val callbacks = object : NavigationManagerCallback {
         override fun onStopNavigation() {
@@ -138,15 +141,7 @@ class EyaCarNavigationScreen(
                         }
                         roadDetours = RoadDetourCatalog()
                         refreshChargingModel()
-                        // No per-station requests against the shared public OSRM demo.
-                        // Only the existing private-HTTPS verifier may provide evidence.
-                        if (chargingVisible && current != null &&
-                            !catalog.loading && !catalog.staleCache &&
-                            chargingCandidates.isNotEmpty()
-                        ) {
-                            roadDetours = detours.inspect(current, chargingCandidates)
-                            refreshChargingModel()
-                        }
+                        requestDetourVerification()
                     }
                 }
                 scope.launch {
@@ -165,7 +160,10 @@ class EyaCarNavigationScreen(
                         route = r
                         fix = f
                         surface.update(r, f)
-                        if (chargingVisible) refreshChargingModel()
+                        if (chargingVisible && lastChargingFixTimestamp != f?.recordedAtMillis) {
+                            lastChargingFixTimestamp = f?.recordedAtMillis
+                            refreshChargingModel()
+                        }
                         val fresh = guidancePolicy.snapshot(r, f, now)
                         guidance = fresh
                         val previousMatch = routeMatch
@@ -186,6 +184,8 @@ class EyaCarNavigationScreen(
                 // No foreground service yet: stop rather than claim background navigation.
                 endNavigation()
                 chargingModelJob?.cancel(); chargingModelJob = null
+                detourVerificationJob?.cancel(); detourVerificationJob = null
+                detourVerificationKey = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
@@ -194,6 +194,8 @@ class EyaCarNavigationScreen(
             override fun onDestroy(owner: LifecycleOwner) {
                 endNavigation()
                 chargingModelJob?.cancel(); chargingModelJob = null
+                detourVerificationJob?.cancel(); detourVerificationJob = null
+                detourVerificationKey = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
@@ -346,20 +348,33 @@ class EyaCarNavigationScreen(
             chargingLoadStarted = true
             work?.launch { charging.refreshResult() }
         }
-        // The user explicitly opened the charging page. Rebuild the evidence
-        // and verify private-OSRM road detours only when usable data exists.
         refreshChargingModel()
-        work?.launch {
-            val current = route ?: return@launch
-            val candidates = chargingCandidates
-            if (!chargingCatalog.loading && !chargingCatalog.staleCache &&
-                candidates.isNotEmpty()
-            ) {
-                roadDetours = detours.inspect(current, candidates)
-                refreshChargingModel()
-            }
-        }
+        requestDetourVerification()
         invalidate()
+    }
+
+    /**
+     * One request per unique route+catalog+candidate set. Do not multiply
+     * network requests when GPS emits or the host rerenders a template.
+     * The underlying verifier disallows the shared public OSRM demo.
+     */
+    private fun requestDetourVerification() {
+        val current = route ?: return
+        if (!chargingVisible || chargingCatalog.loading || chargingCatalog.staleCache ||
+            chargingCandidates.isEmpty() || current.routeId.isNullOrBlank()
+        ) return
+        val key = current.routeId + "|" + chargingCatalog.verifiedAtUtc + "|" +
+            chargingCandidates.joinToString(",") { it.station.id }
+        if (detourVerificationKey == key) return
+        detourVerificationKey = key
+        detourVerificationJob?.cancel()
+        val currentCandidates = chargingCandidates
+        detourVerificationJob = work?.launch {
+            val verified = detours.inspect(current, currentCandidates)
+            if (route?.routeId != current.routeId || !chargingVisible) return@launch
+            roadDetours = verified
+            refreshChargingModel()
+        }
     }
 
     private fun hideChargingList() {
