@@ -301,14 +301,6 @@ class EyaCarNavigationScreen(
         activeRouteId = null
         withoutGpsSinceMs = 0L
         val wasOwner = CarNavigationOwnership.release(navigationSessionToken)
-        if (wasActive && wasOwner) {
-            continuity.endRoute(startedRouteId)
-            runCatching {
-                carContext.stopService(
-                    Intent(carContext, NavigationLocationService::class.java)
-                )
-            }
-        }
         voice.stop()
         speechPolicy.reset()
         gate.clear()
@@ -406,6 +398,14 @@ class EyaCarNavigationScreen(
         activeRouteId = null
         withoutGpsSinceMs = 0L
         val wasOwner = CarNavigationOwnership.release(navigationSessionToken)
+        if (wasActive && wasOwner) {
+            continuity.endRoute(startedRouteId)
+            runCatching {
+                carContext.stopService(
+                    Intent(carContext, NavigationLocationService::class.java)
+                )
+            }
+        }
         voice.stop()
         speechPolicy.reset()
         gate.clear()
