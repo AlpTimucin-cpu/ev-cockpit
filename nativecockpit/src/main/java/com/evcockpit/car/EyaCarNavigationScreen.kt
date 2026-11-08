@@ -1,10 +1,17 @@
 package com.evcockpit.car
 
 import android.util.Log
+import android.text.SpannableString
+import android.text.Spanned
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.Distance
+import androidx.car.app.model.DistanceSpan
+import androidx.car.app.model.ItemList
+import androidx.car.app.model.ListTemplate
 import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
@@ -14,11 +21,15 @@ import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.MapWithContentTemplate
+import androidx.car.app.navigation.model.PlaceListNavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
@@ -26,9 +37,18 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.evcockpit.domain.model.GpsFix
+import com.evcockpit.domain.model.ChargingCatalog
+import com.evcockpit.domain.model.RoadDetourCatalog
+import com.evcockpit.domain.model.VehicleProfileConfig
+import com.evcockpit.domain.model.VehicleTelemetry
+import com.evcockpit.domain.usecase.DCCorridorCandidate
+import com.evcockpit.data.settings.AppConfigRepository
+import com.evcockpit.data.repository.OsrmRoadDetourRepository
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
 import com.evcockpit.domain.repository.RouteRepository
+import com.evcockpit.domain.repository.ChargingRepository
+import com.evcockpit.domain.repository.VehicleRepository
 import com.evcockpit.domain.usecase.ManeuverGuidancePolicy
 import com.evcockpit.domain.usecase.RouteProgressTracker
 import com.evcockpit.presentation.voice.NativeVoiceGuide
@@ -41,6 +61,10 @@ import kotlin.math.roundToInt
 class EyaCarNavigationScreen(
     context: CarContext,
     private val routes: RouteRepository,
+    private val charging: ChargingRepository,
+    private val vehicle: VehicleRepository,
+    private val config: AppConfigRepository,
+    private val detours: OsrmRoadDetourRepository,
     ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
@@ -66,6 +90,20 @@ class EyaCarNavigationScreen(
     private var activeRouteId: String? = null
     private var withoutGpsSinceMs: Long = 0L
     private var closed = false
+    private var chargingVisible = false
+    private var selectedChargingStationId: String? = null
+    private var chargingLoadStarted = false
+    private var chargingCatalog = charging.catalog.value
+    private var chargingCandidates: List<DCCorridorCandidate> = emptyList()
+    private var preparedChargingRouteId: String? = null
+    private var roadDetours = RoadDetourCatalog()
+    private var vehicleTelemetry = VehicleTelemetry()
+    private var vehicleProfile = VehicleProfileConfig()
+    private var chargingDisplay = CarChargeList()
+    private var chargingModelJob: Job? = null
+    private var detourVerificationJob: Job? = null
+    private var detourVerificationKey: String? = null
+    private var lastChargingFixTimestamp: Long? = null
 
     private val callbacks = object : NavigationManagerCallback {
         override fun onStopNavigation() {
@@ -94,12 +132,48 @@ class EyaCarNavigationScreen(
                     }
                 }
                 scope.launch {
+                    combine(routes.currentRoute, charging.catalog) { current, catalog ->
+                        current to catalog
+                    }.collectLatest { (current, catalog) ->
+                        val filtered = withContext(Dispatchers.Default) {
+                            CarChargingListPolicy.candidates(current, catalog)
+                        }
+                        // Publish catalog/candidates atomically after the matching
+                        // route's indexing work. Never render old-route chargers.
+                        val changedEvidenceScope =
+                            preparedChargingRouteId != current?.routeId ||
+                                chargingCatalog.verifiedAtUtc != catalog.verifiedAtUtc
+                        chargingCatalog = catalog
+                        chargingCandidates = filtered
+                        preparedChargingRouteId = current?.routeId
+                        if (changedEvidenceScope) {
+                            roadDetours = RoadDetourCatalog()
+                            detourVerificationKey = null
+                        }
+                        refreshChargingModel()
+                        requestDetourVerification()
+                    }
+                }
+                scope.launch {
+                    combine(tracker.gpsFix, vehicle.telemetry, config.configuration) {
+                        measured, telemetry, settings -> Triple(measured, telemetry, settings)
+                    }.collect { (_, telemetry, settings) ->
+                        vehicleTelemetry = telemetry
+                        vehicleProfile = settings.vehicle
+                        if (chargingVisible) refreshChargingModel()
+                    }
+                }
+                scope.launch {
                     combine(routes.currentRoute, tracker.gpsFix, ticker) { r, f, now ->
                         Triple(r, f?.takeIf { it.usable(now) }, now)
                     }.collect { (r, f, now) ->
                         route = r
                         fix = f
                         surface.update(r, f)
+                        if (chargingVisible && lastChargingFixTimestamp != f?.recordedAtMillis) {
+                            lastChargingFixTimestamp = f?.recordedAtMillis
+                            refreshChargingModel()
+                        }
                         val fresh = guidancePolicy.snapshot(r, f, now)
                         guidance = fresh
                         val previousMatch = routeMatch
@@ -119,6 +193,9 @@ class EyaCarNavigationScreen(
             override fun onStop(owner: LifecycleOwner) {
                 // No foreground service yet: stop rather than claim background navigation.
                 endNavigation()
+                chargingModelJob?.cancel(); chargingModelJob = null
+                detourVerificationJob?.cancel(); detourVerificationJob = null
+                detourVerificationKey = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
@@ -126,6 +203,9 @@ class EyaCarNavigationScreen(
             }
             override fun onDestroy(owner: LifecycleOwner) {
                 endNavigation()
+                chargingModelJob?.cancel(); chargingModelJob = null
+                detourVerificationJob?.cancel(); detourVerificationJob = null
+                detourVerificationKey = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
@@ -269,7 +349,220 @@ class EyaCarNavigationScreen(
         } else if (!voicePrefs.enabled) voice.stop()
     }
 
+
+    private fun showChargingList() {
+        if (route == null || !validRouteGeometry(route!!.routePoints)) return
+        chargingVisible = true
+        selectedChargingStationId = null
+        if (!chargingLoadStarted || chargingCatalog.error != null) {
+            chargingLoadStarted = true
+            work?.launch { charging.refreshResult() }
+        }
+        refreshChargingModel()
+        requestDetourVerification()
+        invalidate()
+    }
+
+    /**
+     * One request per unique route+catalog+candidate set. Do not multiply
+     * network requests when GPS emits or the host rerenders a template.
+     * The underlying verifier disallows the shared public OSRM demo.
+     */
+    private fun requestDetourVerification() {
+        val current = route ?: return
+        if (!chargingVisible || chargingCatalog.loading || chargingCatalog.staleCache ||
+            chargingCandidates.isEmpty() || current.routeId.isNullOrBlank() ||
+            preparedChargingRouteId != current.routeId
+        ) return
+        val key = current.routeId + "|" + chargingCatalog.verifiedAtUtc + "|" +
+            chargingCandidates.joinToString(",") { it.station.id }
+        if (detourVerificationKey == key) return
+        detourVerificationKey = key
+        detourVerificationJob?.cancel()
+        val currentCandidates = chargingCandidates
+        detourVerificationJob = work?.launch {
+            val verified = detours.inspect(current, currentCandidates)
+            if (route?.routeId != current.routeId || !chargingVisible) return@launch
+            roadDetours = verified
+            refreshChargingModel()
+        }
+    }
+
+    private fun hideChargingList() {
+        chargingVisible = false
+        selectedChargingStationId = null
+        chargingModelJob?.cancel()
+        detourVerificationJob?.cancel()
+        detourVerificationJob = null
+        detourVerificationKey = null
+        surface.updateChargingStations(emptyList())
+        invalidate()
+    }
+
+    private fun refreshChargingModel() {
+        if (!chargingVisible) return
+        val scope = work ?: return
+        chargingModelJob?.cancel()
+        val r = route
+        val source = chargingCatalog
+        val candidates = chargingCandidates.takeIf {
+            preparedChargingRouteId == r?.routeId
+        } ?: emptyList()
+        val currentFix = fix
+        val telemetry = vehicleTelemetry
+        val profile = vehicleProfile
+        val roads = roadDetours
+        val now = System.currentTimeMillis()
+        val cap = chargingHostLimit()
+        chargingModelJob = scope.launch {
+            val generated = withContext(Dispatchers.Default) {
+                CarChargingListPolicy.build(
+                    r, source, candidates, currentFix, telemetry, profile, roads,
+                    now, cap
+                )
+            }
+            // A cancelled calculation cannot publish a model for an older route.
+            if (routes.currentRoute.value?.routeId != r?.routeId) return@launch
+            chargingDisplay = generated
+            surface.updateChargingStations(generated.items.map { it.station })
+            if (selectedChargingStationId != null &&
+                generated.items.none { it.station.id == selectedChargingStationId }
+            ) selectedChargingStationId = null
+            invalidate()
+        }
+    }
+
+    private fun chargingHostLimit(): Int {
+        if (carContext.carAppApiLevel < 2) return 6
+        val kind = if (carContext.carAppApiLevel >= 7)
+            ConstraintManager.CONTENT_LIMIT_TYPE_LIST
+        else ConstraintManager.CONTENT_LIMIT_TYPE_PLACE_LIST
+        return runCatching {
+            carContext.getCarService(ConstraintManager::class.java)
+                .getContentLimit(kind).coerceIn(0, 12)
+        }.getOrDefault(0) // Fail closed on host IPC failures.
+    }
+
+    private fun navigationMapContent(content: Template): Template {
+        if (carContext.carAppApiLevel < 7) return content
+        return MapWithContentTemplate.Builder()
+            .setContentTemplate(content)
+            .build()
+    }
+
+    private fun chargingPane(text: String, backToList: Boolean = false): Template {
+        val pane = Pane.Builder()
+            .addRow(Row.Builder().setTitle("Şarj bilgisi")
+                .addText(text.take(180)).build())
+            .addAction(Action.Builder().setTitle("Geri")
+                .setOnClickListener {
+                    if (backToList) {
+                        selectedChargingStationId = null
+                        invalidate()
+                    } else hideChargingList()
+                }.build())
+        val content = PaneTemplate.Builder(pane.build())
+        if (carContext.carAppApiLevel < 7) {
+            @Suppress("DEPRECATION")
+            return content.setTitle("Rota şarjları").build()
+        }
+        return navigationMapContent(content.setHeader(
+            Header.Builder().setTitle("Rota şarjları").build()
+        ).build())
+    }
+
+    private fun chargerTemplate(): Template {
+        val selected = chargingDisplay.items.firstOrNull {
+            it.station.id == selectedChargingStationId
+        }
+        if (selected != null) {
+            val pane = Pane.Builder()
+                .addRow(Row.Builder()
+                    .setTitle(selected.station.name.trim().replace("\n", " ").take(75))
+                    .addText(CarChargingListPolicy.summary(selected))
+                    .addText(chargingDisplay.catalogLabel.take(100))
+                    .build())
+                .addRow(Row.Builder().setTitle("Fiyat ve batarya")
+                    .addText(CarChargingListPolicy.detail(selected).take(150))
+                    .build())
+                .addAction(Action.Builder().setTitle("Listeye dön")
+                    .setOnClickListener {
+                        selectedChargingStationId = null
+                        invalidate()
+                    }.build())
+            val detailTemplate = PaneTemplate.Builder(pane.build())
+            if (carContext.carAppApiLevel < 7) {
+                @Suppress("DEPRECATION")
+                return detailTemplate.setTitle("EPDK istasyon").build()
+            }
+            return navigationMapContent(detailTemplate.setHeader(
+                Header.Builder().setTitle("EPDK istasyon").build()
+            ).build())
+        }
+        val items = chargingDisplay.items
+        if (items.isEmpty()) return chargingPane(
+            chargingDisplay.message ?: "İstasyon bilgisi kullanılamıyor."
+        )
+        // Legacy navigation-place lists require an actual current-location
+        // DistanceSpan; never manufacture distance when GPS is absent.
+        if (carContext.carAppApiLevel < 7 &&
+            items.any { it.directDistanceMeters == null }
+        ) return chargingPane(
+            "Hassas GPS kullanılamıyor. Eski Android Auto hostu mesafe istiyor."
+        )
+        val builder = ItemList.Builder()
+        for (item in items.take(chargingHostLimit())) {
+            val base = CarChargingListPolicy.summary(item)
+            val firstLine = if (item.directDistanceMeters != null) {
+                val label = base + " · Kuş uçuşu: "
+                val decorated = SpannableString(label + "mesafe")
+                decorated.setSpan(
+                    DistanceSpan.create(Distance.create(
+                        item.directDistanceMeters, Distance.UNIT_METERS
+                    )),
+                    label.length, decorated.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                decorated
+            } else SpannableString(base + " · GPS kullanılamıyor")
+            val row = Row.Builder()
+                .setTitle(item.station.name.trim().replace("\n", " ").take(75))
+                .addText(firstLine)
+                .addText(CarChargingListPolicy.detail(item).take(140))
+                .setBrowsable(true)
+                .setOnClickListener {
+                    selectedChargingStationId = item.station.id
+                    invalidate()
+                }.build()
+            builder.addItem(row)
+        }
+        val itemList = builder.build()
+        val goBack = ActionStrip.Builder().addAction(
+            Action.Builder().setTitle("Rotaya dön")
+                .setOnClickListener { hideChargingList() }.build()
+        ).build()
+        if (carContext.carAppApiLevel < 7) {
+            @Suppress("DEPRECATION")
+            return PlaceListNavigationTemplate.Builder()
+                .setTitle("EPDK rota DC/CCS")
+                .setItemList(itemList)
+                .setActionStrip(goBack)
+                .build()
+        }
+        return MapWithContentTemplate.Builder()
+            .setContentTemplate(
+                ListTemplate.Builder()
+                    .setSingleList(itemList)
+                    .setHeader(Header.Builder()
+                        .setTitle("EPDK rota DC/CCS").build())
+                    .build()
+            )
+            .setActionStrip(goBack)
+            .build()
+    }
+
     override fun onGetTemplate(): Template {
+        if (chargingVisible) return chargerTemplate()
         val active = activeRouteId != null &&
             CarNavigationOwnership.owns(navigationSessionToken)
         val now = System.currentTimeMillis()
@@ -327,6 +620,10 @@ class EyaCarNavigationScreen(
         } else if (canBegin) {
             pane.addAction(Action.Builder().setTitle("Navigasyonu başlat")
                 .setOnClickListener { beginNavigation() }.build())
+        }
+        if (route?.routeId != null && route?.routePoints?.let(::validRouteGeometry) == true) {
+            pane.addAction(Action.Builder().setTitle("Rota şarjları")
+                .setOnClickListener { showChargingList() }.build())
         }
         val content = PaneTemplate.Builder(pane.build())
         if (carContext.carAppApiLevel < 7) {

@@ -10,6 +10,10 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.evcockpit.BuildConfig
 import com.evcockpit.domain.repository.RouteRepository
+import com.evcockpit.domain.repository.ChargingRepository
+import com.evcockpit.domain.repository.VehicleRepository
+import com.evcockpit.data.settings.AppConfigRepository
+import com.evcockpit.data.repository.OsrmRoadDetourRepository
 import com.evcockpit.presentation.voice.WelcomeGreetingManager
 import com.evcockpit.presentation.voice.AppAudioDucking
 
@@ -17,6 +21,10 @@ import com.evcockpit.presentation.voice.AppAudioDucking
 @AndroidEntryPoint
 class EyaCarAppService : CarAppService() {
     @Inject lateinit var routes: RouteRepository
+    @Inject lateinit var charging: ChargingRepository
+    @Inject lateinit var vehicle: VehicleRepository
+    @Inject lateinit var config: AppConfigRepository
+    @Inject lateinit var detours: OsrmRoadDetourRepository
     @Inject lateinit var welcome: WelcomeGreetingManager
     @Inject lateinit var ducking: AppAudioDucking
 
@@ -29,20 +37,24 @@ class EyaCarAppService : CarAppService() {
     override fun onCreateSession(): Session {
         // Shared singleton gate prevents duplicates if OBD connects as well.
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, ducking, welcome)
     }
 
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, ducking, welcome)
     }
 }
 
 private class EyaCarSession(
     private val routes: RouteRepository,
+    private val charging: ChargingRepository,
+    private val vehicle: VehicleRepository,
+    private val config: AppConfigRepository,
+    private val detours: OsrmRoadDetourRepository,
     private val ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Session() {
     override fun onCreateScreen(intent: Intent): Screen =
-        EyaCarNavigationScreen(carContext, routes, ducking, welcome)
+        EyaCarNavigationScreen(carContext, routes, charging, vehicle, config, detours, ducking, welcome)
 }
