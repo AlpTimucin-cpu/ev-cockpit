@@ -100,6 +100,20 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Text("Araç ve Servis Ayarları", style = MaterialTheme.typography.titleLarge)
+                if (BuildConfig.DEBUG) {
+                    SettingToggle(
+                        "TEST: OSRM deneme rotasını aç",
+                        configuration.endpoints.debugDemoRoutingEnabled,
+                        viewModel::setDebugDemoRoutingEnabled
+                    )
+                    Text(
+                        "Rota çizmek için BMS/araç profili onayı gerekmez. " +
+                            "OSRM denemesi geçici ve sınırlıdır; navigasyon " +
+                            "güvenliği için üretimde özel servis gerekir.",
+                        color = Color(0xFFFFCA80),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 Text(
                     "VW ID.4 Pure için 52 kWh net batarya bilgisi kullanıcı beyanıdır. " +
                         "DC tepe gücü doğrulanmadı. Bunlar otomatik ölçüm değildir; " +
@@ -231,11 +245,6 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall
                 )
                 if (BuildConfig.DEBUG) {
-                    SettingToggle(
-                        "TEST: Herkese açık OSRM deneme yönlendirmesini kullan",
-                        configuration.endpoints.debugDemoRoutingEnabled,
-                        viewModel::setDebugDemoRoutingEnabled
-                    )
                     Text(
                         "Yalnızca TEST APK'da açık kullanıcı tercihiyle çalışır. " +
                             "Bu ortak demo servisi yoğun olabilir, rota geçici olarak " +
