@@ -125,6 +125,7 @@ class EyaCarNavigationScreen(
     private var pendingWeatherSpeech: String? = null
     private var weatherSpeechUntilMs: Long = 0L
     private var lastWeatherPageMinute: Long = -1L
+    private var weatherMapPointsExpired = false
 
     private companion object {
         const val WEATHER_ALERT_ID = 0xEA12
@@ -149,11 +150,10 @@ class EyaCarNavigationScreen(
                 manager.setNavigationManagerCallback(callbacks)
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(surface)
                 tracker.start()
+                val cachedForecastAge = weatherState.ageMinutes(System.currentTimeMillis())
+                weatherMapPointsExpired = cachedForecastAge == null || cachedForecastAge > 45L
                 surface.updateWeatherPoints(
-                    weatherState.points.takeIf {
-                        weatherState.ageMinutes(System.currentTimeMillis())
-                            ?.let { age -> age <= 45L } == true
-                    } ?: emptyList()
+                    weatherState.points.takeUnless { weatherMapPointsExpired } ?: emptyList()
                 )
                 val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
                 work = scope
@@ -220,6 +220,12 @@ class EyaCarNavigationScreen(
                             invalidate()
                         }
                         maybeRefreshWeather(r, f, now)
+                        if (!weatherMapPointsExpired && weatherState.points.isNotEmpty() &&
+                            weatherState.ageMinutes(now)?.let { it > 45L } == true
+                        ) {
+                            surface.updateWeatherPoints(emptyList())
+                            weatherMapPointsExpired = true // offline forecast text remains available
+                        }
                         updateActiveNavigation(r, f, fresh, now)
                         maybeAnnounceWeather(r, f, now)
                         if (weatherVisible && lastWeatherPageMinute != now / 60_000L) {
@@ -402,6 +408,7 @@ class EyaCarNavigationScreen(
         weatherRouteId = nextRouteId
         weatherState = RouteWeatherState(routeId = nextRouteId)
         surface.updateWeatherPoints(emptyList())
+        weatherMapPointsExpired = false
         weatherRefreshGate.reset()
         weatherAlertGate = WeatherChangeAlertGate()
         pendingWeatherSpeech = null
@@ -449,11 +456,10 @@ class EyaCarNavigationScreen(
                     ) else RouteWeatherState(routeId = routeId, error = message)
                 }
             )
+            val mapAge = weatherState.ageMinutes(System.currentTimeMillis())
+            weatherMapPointsExpired = mapAge == null || mapAge > 45L
             surface.updateWeatherPoints(
-                weatherState.points.takeIf {
-                    weatherState.ageMinutes(System.currentTimeMillis())
-                        ?.let { age -> age <= 45L } == true
-                } ?: emptyList()
+                weatherState.points.takeUnless { weatherMapPointsExpired } ?: emptyList()
             )
             if (weatherVisible) invalidate()
         }
@@ -512,7 +518,7 @@ class EyaCarNavigationScreen(
         }
         if (!voicePrefs.enabled || voice.status != NativeVoiceGuide.Status.READY ||
             fix?.usable(nowMs) != true || routeMatch != CarRouteMatch.ON_ROUTE ||
-            (guidance?.nextMeters ?: 0.0) <= 650.0
+            (guidance?.nextMeters?.let { it <= 650.0 } == true)
         ) return // maneuver speech always has precedence; no audio interruption
         if (voice.speakIfIdle(phrase, voicePrefs.volume)) {
             pendingWeatherSpeech = null
