@@ -140,10 +140,16 @@ class EyaCarNavigationScreen(
                         }
                         // Publish catalog/candidates atomically after the matching
                         // route's indexing work. Never render old-route chargers.
+                        val changedEvidenceScope =
+                            preparedChargingRouteId != current?.routeId ||
+                                chargingCatalog.verifiedAtUtc != catalog.verifiedAtUtc
                         chargingCatalog = catalog
                         chargingCandidates = filtered
                         preparedChargingRouteId = current?.routeId
-                        roadDetours = RoadDetourCatalog()
+                        if (changedEvidenceScope) {
+                            roadDetours = RoadDetourCatalog()
+                            detourVerificationKey = null
+                        }
                         refreshChargingModel()
                         requestDetourVerification()
                     }
@@ -348,7 +354,7 @@ class EyaCarNavigationScreen(
         if (route == null || !validRouteGeometry(route!!.routePoints)) return
         chargingVisible = true
         selectedChargingStationId = null
-        if (!chargingLoadStarted) {
+        if (!chargingLoadStarted || chargingCatalog.error != null) {
             chargingLoadStarted = true
             work?.launch { charging.refreshResult() }
         }
@@ -386,6 +392,9 @@ class EyaCarNavigationScreen(
         chargingVisible = false
         selectedChargingStationId = null
         chargingModelJob?.cancel()
+        detourVerificationJob?.cancel()
+        detourVerificationJob = null
+        detourVerificationKey = null
         surface.updateChargingStations(emptyList())
         invalidate()
     }
@@ -467,13 +476,28 @@ class EyaCarNavigationScreen(
             it.station.id == selectedChargingStationId
         }
         if (selected != null) {
-            val stationName = selected.station.name.trim()
-                .replace("\n", " ").take(90)
-            val details = stationName + " · " +
-                CarChargingListPolicy.summary(selected) + " · " +
-                CarChargingListPolicy.detail(selected) +
-                " · EPDK: " + chargingDisplay.catalogLabel
-            return chargingPane(details, backToList = true)
+            val pane = Pane.Builder()
+                .addRow(Row.Builder()
+                    .setTitle(selected.station.name.trim().replace("\n", " ").take(75))
+                    .addText(CarChargingListPolicy.summary(selected))
+                    .addText(chargingDisplay.catalogLabel.take(100))
+                    .build())
+                .addRow(Row.Builder().setTitle("Fiyat ve batarya")
+                    .addText(CarChargingListPolicy.detail(selected).take(150))
+                    .build())
+                .addAction(Action.Builder().setTitle("Listeye dön")
+                    .setOnClickListener {
+                        selectedChargingStationId = null
+                        invalidate()
+                    }.build())
+            val detailTemplate = PaneTemplate.Builder(pane.build())
+            if (carContext.carAppApiLevel < 7) {
+                @Suppress("DEPRECATION")
+                return detailTemplate.setTitle("EPDK istasyon").build()
+            }
+            return navigationMapContent(detailTemplate.setHeader(
+                Header.Builder().setTitle("EPDK istasyon").build()
+            ).build())
         }
         val items = chargingDisplay.items
         if (items.isEmpty()) return chargingPane(
