@@ -287,6 +287,79 @@ class EyaCarNavigationScreen(
         })
     }
 
+    /**
+     * The old host Screen has gone away. Stop its NavigationManager IPC and
+     * voice, but retain a separately user-authorized location FGS.
+     */
+    private fun detachForHost() {
+        val previous = activeRouteId ?: return
+        val phase = continuity.state.value
+        if (phase.routeId != previous || phase.phase == CarContinuityPhase.OFF) {
+            endNavigation()
+            return
+        }
+        activeRouteId = null
+        withoutGpsSinceMs = 0L
+        val wasOwner = CarNavigationOwnership.release(navigationSessionToken)
+        if (wasActive && wasOwner) {
+            continuity.endRoute(startedRouteId)
+            runCatching {
+                carContext.stopService(
+                    Intent(carContext, NavigationLocationService::class.java)
+                )
+            }
+        }
+        voice.stop()
+        speechPolicy.reset()
+        gate.clear()
+        loadingGate.clear()
+        matchPolicy.reset()
+        routeMatch = CarRouteMatch.NO_VALID_FIX
+        pendingWeatherSpeech = null
+        dismissWeatherAlert()
+        if (wasOwner) {
+            runCatching { manager.navigationEnded() }
+                .onFailure { Log.w("EyaCarNavigation", "Host detach navigation end", it) }
+        }
+    }
+
+    /**
+     * A newly connected host can resume only a previously explicit user trip,
+     * only while the same route's location service remains active, and only
+     * with this new host's own fresh measured GPS+OSRM route evidence.
+     *
+     * No persisted coordinates, simulated route or silent process restart.
+     */
+    private fun maybeReattachNavigation(
+        currentRoute: RouteSnapshot?, currentFix: GpsFix?,
+        freshGuidance: CarGuidance?, now: Long
+    ) {
+        if (activeRouteId != null || CarNavigationOwnership.navigating.value ||
+            closed || now - lastResumeAttemptAtMs < 5_000L
+        ) return
+        val id = currentRoute?.routeId ?: return
+        if (!validRouteGeometry(currentRoute.routePoints) ||
+            routeMatch != CarRouteMatch.ON_ROUTE ||
+            freshGuidance?.routeId != id ||
+            !continuity.canResume(id, currentFix, now)
+        ) return
+        lastResumeAttemptAtMs = now
+        try {
+            manager.navigationStarted()
+            welcome.stopForNavigation()
+            activeRouteId = id
+            CarNavigationOwnership.claim(navigationSessionToken)
+            withoutGpsSinceMs = 0L
+            gate.clear()
+            loadingGate.clear()
+            speechPolicy.reset()
+            Log.i("EyaCarNavigation", "Navigation host reattached to verified route")
+            invalidate()
+        } catch (error: RuntimeException) {
+            Log.w("EyaCarNavigation", "Host reattachment rejected; bounded retry", error)
+        }
+    }
+
     private fun beginNavigation() {
         if (activeRouteId != null) return
         val now = System.currentTimeMillis()
@@ -304,6 +377,21 @@ class EyaCarNavigationScreen(
             gate.clear()
             loadingGate.clear()
             speechPolicy.reset()
+            if (continuity.hostStarted(current.routeId)) {
+                try {
+                    ContextCompat.startForegroundService(
+                        carContext,
+                        Intent(carContext, NavigationLocationService::class.java)
+                            .setAction(NavigationLocationService.ACTION_START)
+                            .putExtra(NavigationLocationService.EXTRA_ROUTE_ID, current.routeId)
+                    )
+                } catch (error: RuntimeException) {
+                    // Android 14+ can deny a location FGS from a projected host.
+                    // Keep foreground navigation; offer a visible-phone retry.
+                    continuity.launchRestricted(current.routeId)
+                    Log.w("EyaCarNavigation", "Location FGS requires visible phone", error)
+                }
+            }
             updateActiveNavigation(route, fix, current, System.currentTimeMillis())
             invalidate()
         } catch (e: RuntimeException) {
@@ -313,7 +401,8 @@ class EyaCarNavigationScreen(
     }
 
     private fun endNavigation() {
-        val wasActive = activeRouteId != null
+        val startedRouteId = activeRouteId
+        val wasActive = startedRouteId != null
         activeRouteId = null
         withoutGpsSinceMs = 0L
         val wasOwner = CarNavigationOwnership.release(navigationSessionToken)
@@ -384,7 +473,14 @@ class EyaCarNavigationScreen(
             } else {
                 voice.stop()
             }
-            if (withoutGpsSinceMs != 0L && now - withoutGpsSinceMs >= 15_000L) {
+            // The live FGS owns real GPS continuity through a temporary
+            // outage. If absent, retain the original 15-second fail-closed stop.
+            val surviving = continuity.state.value.let {
+                it.routeId == started && it.hasRunningService
+            }
+            if (!surviving && withoutGpsSinceMs != 0L &&
+                now - withoutGpsSinceMs >= 15_000L
+            ) {
                 endNavigation()
             }
             return
