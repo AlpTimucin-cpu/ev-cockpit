@@ -1,5 +1,7 @@
 package com.evcockpit.presentation.settings
 
+import com.evcockpit.BuildConfig
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -224,10 +226,34 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 Text(
-                    "OSRM herkese açık demo sunucusu üretimde kullanılmaz. " +
-                        "Adres yoksa rota isteği yapılmaz.",
+                    "Özel HTTPS OSRM adresi varsa rota bununla hesaplanır. " +
+                        "Rota çizmek için BMS bağlantısı veya araç batarya onayı gerekmez.",
                     style = MaterialTheme.typography.bodySmall
                 )
+                if (BuildConfig.DEBUG) {
+                    SettingToggle(
+                        "TEST: Herkese açık OSRM deneme yönlendirmesini kullan",
+                        configuration.endpoints.debugDemoRoutingEnabled,
+                        viewModel::setDebugDemoRoutingEnabled
+                    )
+                    Text(
+                        "Yalnızca TEST APK'da açık kullanıcı tercihiyle çalışır. " +
+                            "Bu ortak demo servisi yoğun olabilir, rota geçici olarak " +
+                            "çalışmayabilir ve gerçek sürüşte güvenilir navigasyon " +
+                            "hizmeti olarak kullanılmamalıdır. " +
+                            "En fazla 15 saniyede bir rota isteği yapılır; " +
+                            "otomatik şarj durağı sapma sorguları devre dışıdır. " +
+                            "Üretim sürümünde bu seçenek etkisizdir.",
+                        color = Color(0xFFFFCA80),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        if (configuration.endpoints.debugDemoRoutingEnabled)
+                            "Deneme OSRM tercihi açık. Rota ekranına dönüp yeniden hesapla."
+                        else "Özel OSRM adresin yoksa TEST yönlendirmesini burada açabilirsin.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 OutlinedTextField(
                     value = geocodingEntry, onValueChange = { geocodingEntry = it },
                     label = { Text("Adres arama (Nominatim/Photon) HTTPS adresi") },
