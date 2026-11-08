@@ -85,6 +85,8 @@ internal class CarHostLoadingGate {
         return nowMs >= failure && nowMs - failure >= 2_000L
     }
 
+    fun wasPublished(): Boolean = delivered
+
     fun onPublished() {
         delivered = true
         lastFailureAtMs = null
