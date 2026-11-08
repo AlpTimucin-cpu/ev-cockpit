@@ -41,7 +41,6 @@ import com.evcockpit.domain.model.ChargingCatalog
 import com.evcockpit.domain.model.RoadDetourCatalog
 import com.evcockpit.domain.model.VehicleProfileConfig
 import com.evcockpit.domain.model.VehicleTelemetry
-import com.evcockpit.domain.model.AppConfiguration
 import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.repository.OsrmRoadDetourRepository
@@ -96,6 +95,7 @@ class EyaCarNavigationScreen(
     private var chargingLoadStarted = false
     private var chargingCatalog = charging.catalog.value
     private var chargingCandidates: List<DCCorridorCandidate> = emptyList()
+    private var preparedChargingRouteId: String? = null
     private var roadDetours = RoadDetourCatalog()
     private var vehicleTelemetry = VehicleTelemetry()
     private var vehicleProfile = VehicleProfileConfig()
@@ -135,10 +135,14 @@ class EyaCarNavigationScreen(
                     combine(routes.currentRoute, charging.catalog) { current, catalog ->
                         current to catalog
                     }.collectLatest { (current, catalog) ->
-                        chargingCatalog = catalog
-                        chargingCandidates = withContext(Dispatchers.Default) {
+                        val filtered = withContext(Dispatchers.Default) {
                             CarChargingListPolicy.candidates(current, catalog)
                         }
+                        // Publish catalog/candidates atomically after the matching
+                        // route's indexing work. Never render old-route chargers.
+                        chargingCatalog = catalog
+                        chargingCandidates = filtered
+                        preparedChargingRouteId = current?.routeId
                         roadDetours = RoadDetourCatalog()
                         refreshChargingModel()
                         requestDetourVerification()
@@ -361,7 +365,8 @@ class EyaCarNavigationScreen(
     private fun requestDetourVerification() {
         val current = route ?: return
         if (!chargingVisible || chargingCatalog.loading || chargingCatalog.staleCache ||
-            chargingCandidates.isEmpty() || current.routeId.isNullOrBlank()
+            chargingCandidates.isEmpty() || current.routeId.isNullOrBlank() ||
+            preparedChargingRouteId != current.routeId
         ) return
         val key = current.routeId + "|" + chargingCatalog.verifiedAtUtc + "|" +
             chargingCandidates.joinToString(",") { it.station.id }
@@ -391,7 +396,9 @@ class EyaCarNavigationScreen(
         chargingModelJob?.cancel()
         val r = route
         val source = chargingCatalog
-        val candidates = chargingCandidates
+        val candidates = chargingCandidates.takeIf {
+            preparedChargingRouteId == r?.routeId
+        } ?: emptyList()
         val currentFix = fix
         val telemetry = vehicleTelemetry
         val profile = vehicleProfile
