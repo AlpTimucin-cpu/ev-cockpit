@@ -1,5 +1,7 @@
 package com.evcockpit.data.repository
 
+import com.evcockpit.BuildConfig
+
 import com.google.gson.JsonParser
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.domain.usecase.BoundedNetworkRetry
@@ -41,6 +43,7 @@ class OsrmRouteRepository @Inject constructor(
     private val selected = MutableStateFlow<RouteSnapshot?>(null)
     private val variants = MutableStateFlow<List<RouteOption>>(emptyList())
     private val index = MutableStateFlow<Int?>(null)
+    private val demoGate = DebugDemoRequestGate()
     override val currentRoute: StateFlow<RouteSnapshot?> = selected.asStateFlow()
     override val options: StateFlow<List<RouteOption>> = variants.asStateFlow()
     override val selectedIndex: StateFlow<Int?> = index.asStateFlow()
@@ -78,18 +81,30 @@ class OsrmRouteRepository @Inject constructor(
         destination: RoutePlace,
         stops: List<GeoCoordinate>
     ): RouteCalculationResult = withContext(Dispatchers.IO) {
-        val root = appConfig.configuration.first().endpoints.osrmBaseUrl
-            ?: return@withContext RouteCalculationResult.Failure(
-                null, CoreIssue.CONFIG_UNCONFIRMED.messageTr +
-                    " Kendi HTTPS OSRM sunucunuzun adresini Ayarlar bölümüne girin."
+        // A road route does not require BMS SoC, usable capacity or a
+        // confirmed energy scenario. Only a valid HTTPS road-router is needed.
+        val endpoint = OsrmEndpointSelector.choose(
+            appConfig.configuration.first().endpoints, BuildConfig.DEBUG
+        ) ?: return@withContext RouteCalculationResult.Failure(
+            null, "Rota servisi seçilmedi. Ayarlar bölümünden kendi HTTPS " +
+                "OSRM adresini girin veya TEST sürümünde deneme rotasını açın."
+        )
+        if (endpoint.demo && !demoGate.accept(System.currentTimeMillis())) {
+            return@withContext RouteCalculationResult.Failure(
+                null, "Deneme rota servisi için 15 saniyelik istek aralığını bekleyin."
             )
+        }
+        val root = endpoint.baseUrl
         val url = try {
             OsrmRequestFormat.urlVia(origin, stops, destination.coordinate)
         } catch (error: IllegalArgumentException) {
             return@withContext RouteCalculationResult.Failure(null, error.message ?: "Coordinate error")
         }
         try {
-            val response = BoundedNetworkRetry.io { osrm(root).route(url) }
+            // Shared public demo: exactly one request, no automatic retries.
+            val response = BoundedNetworkRetry.io(
+                maxAttempts = if (endpoint.demo) 1 else 2
+            ) { osrm(root).route(url) }
             if (!response.isSuccessful) {
                 val info = response.errorBody()?.use { body ->
                     val bytes = body.bytes()
