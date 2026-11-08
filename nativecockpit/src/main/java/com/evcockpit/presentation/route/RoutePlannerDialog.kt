@@ -119,7 +119,9 @@ fun RoutePlannerDialog(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Text(
-                                text = "Başlangıç ve varış için gerçek OSRM rotası hesaplanır. " +
+                                text = "Yol rotası batarya veya OBD doğrulaması gerektirmez. " +
+                                    "Rota servisi OSRM; yol verisi OpenStreetMap " +
+                                    "(Open Database License — ODbL). " +
                                     "Batarya şarjı yalnızca doğrulanmış OBD ölçümünden okunur.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = muted
