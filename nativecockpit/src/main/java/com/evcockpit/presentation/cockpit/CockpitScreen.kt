@@ -294,10 +294,12 @@ fun CockpitScreen(
     }
 
     // Fixed bottom navigation. Media is a separate page, not a third HUD column.
-    Column(
+    BoxWithConstraints(
         Modifier.fillMaxSize().background(Ink)
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        val compactDashboard = CockpitLayoutPolicy.isCompact(maxWidth.value, maxHeight.value)
+        Column(Modifier.fillMaxSize()) {
         if (selectedPage == 1) {
             MediaHomeScreen(
                 phoneAllowed = phoneMediaAllowed,
@@ -308,19 +310,23 @@ fun CockpitScreen(
         } else {
             Row(
                 Modifier.fillMaxWidth().weight(1f)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(
+                        horizontal = if (compactDashboard) 6.dp else 10.dp,
+                        vertical = if (compactDashboard) 4.dp else 8.dp
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(if (compactDashboard) 6.dp else 12.dp)
             ) {
                 TelemetryLeftPanel(
                     data = displayState,
                     connected = obdConnection.phase == ObdPhase.CONNECTED,
+                    compact = compactDashboard,
                     onConnect = { settings = true; onObdRefresh() },
                     onEngineering = { engineeringOpen = true },
                     onSoundSettings = onOpenSoundSettings,
-                    modifier = Modifier.weight(.36f).fillMaxHeight()
+                    modifier = Modifier.weight(if (compactDashboard) .33f else .36f).fillMaxHeight()
                 )
                 Box(
-                    Modifier.weight(.64f).fillMaxHeight()
+                    Modifier.weight(if (compactDashboard) .67f else .64f).fillMaxHeight()
                         .background(Navy, RoundedCornerShape(14.dp))
                 ) {
                     // The route is always visible on the driving page.
@@ -345,14 +351,15 @@ fun CockpitScreen(
                             else journeySheet = true
                         },
                         modifier = Modifier.align(Alignment.TopCenter)
-                            .fillMaxWidth(.87f).padding(top = 10.dp)
+                            .fillMaxWidth(if (compactDashboard) .94f else .87f)
+                            .padding(top = if (compactDashboard) 5.dp else 10.dp)
                     )
                     // Weather and GPS/voice badges share one stacked edge group.
                     // Previously the weather pill was an unaligned Box child and
                     // could overlap the navigation card and other controls.
                     Column(
                         modifier = Modifier.align(Alignment.BottomStart)
-                            .padding(8.dp),
+                            .padding(if (compactDashboard) 5.dp else 8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (route?.routeId != null) {
@@ -409,6 +416,7 @@ fun CockpitScreen(
             // not the unrelated Bluetooth OBD diagnostic dialog.
             onSettings = onOpenSoundSettings
         )
+        }
     }
 }
 
@@ -692,6 +700,7 @@ private fun HardwareNotice(title: String, detail: String, onClick: () -> Unit) {
 private fun TelemetryLeftPanel(
     data: CockpitUiState,
     connected: Boolean,
+    compact: Boolean,
     onConnect: () -> Unit,
     onEngineering: () -> Unit,
     onSoundSettings: () -> Unit,
@@ -703,6 +712,51 @@ private fun TelemetryLeftPanel(
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        if (compact) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("SÜRÜŞ", color = NeonGreen,
+                    style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                Text(if (connected) "OBD bağlı" else "OBD bağlı değil",
+                    color = if (connected) NeonGreen else SoftText,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                CompactMetricTile("HIZ · OBD", CockpitFormat.speed(if (connected) data.speedKmh else null),
+                    modifier = Modifier.weight(1f))
+                CompactMetricTile("SoC · BMS", CockpitFormat.percent(if (connected) data.socPercent else null),
+                    modifier = Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                CompactMetricTile("GÜÇ · OBD", CockpitFormat.power(if (connected) data.powerKw else null),
+                    modifier = Modifier.weight(1f))
+                CompactMetricTile("MENZİL · TAHMİN",
+                    CockpitFormat.distance(if (connected && data.socPercent != null)
+                        data.estimatedRangeKm else null), modifier = Modifier.weight(1f))
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TextButton(onClick = onEngineering, modifier = Modifier.weight(1f)) {
+                    Text("Teknik", fontSize = 11.sp, maxLines = 1)
+                }
+                TextButton(
+                    onClick = if (connected) onSoundSettings else onConnect,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (connected) "Ses" else "OBD bağlan",
+                        fontSize = 11.sp, maxLines = 1)
+                }
+            }
+            Text("— = doğrulanmış veri yok. Menzil model tahminidir.",
+                style = MaterialTheme.typography.labelSmall, color = SoftText,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+        } else {
         Text(
             "ARAÇ · SÜRÜŞ ÖZETİ",
             color = NeonGreen,
@@ -770,6 +824,22 @@ private fun TelemetryLeftPanel(
             style = MaterialTheme.typography.labelSmall,
             maxLines = 4
         )
+        }
+    }
+}
+
+@Composable
+private fun CompactMetricTile(title: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier.background(Navy, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(title, color = SoftText, fontSize = 9.sp, lineHeight = 11.sp,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = if (value.startsWith("—")) SoftText else Color.White,
+            fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium,
+            maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }
 }
 
