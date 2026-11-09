@@ -78,12 +78,12 @@ android {
         }
         getByName("release") {
             isDebuggable = false
-            // Only 64-bit ARM native binaries are packaged in Release.
-            // Debug keeps its broader ABI coverage for host/emulator QA.
-            ndk { abiFilters += "arm64-v8a" }
             // Production build: R8 code and resource shrinking enabled.
             isMinifyEnabled = true
             isShrinkResources = true
+            // Only 64-bit ARM native binaries are packaged in Release.
+            // Debug keeps its broader ABI coverage for host/emulator QA.
+            ndk { abiFilters += "arm64-v8a" }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
