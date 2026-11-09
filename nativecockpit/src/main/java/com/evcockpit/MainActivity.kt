@@ -44,6 +44,10 @@ import com.evcockpit.domain.model.ObdPhase
 import com.evcockpit.domain.repository.ObdConnectionController
 import com.evcockpit.domain.repository.VehicleRepository
 import com.evcockpit.domain.repository.RouteRepository
+import com.evcockpit.domain.repository.ChargingRepository
+import com.evcockpit.domain.repository.LocationRepository
+import com.evcockpit.diagnostics.DiagnosticsHub
+import com.evcockpit.BuildConfig
 import com.evcockpit.domain.model.validRouteGeometry
 import com.evcockpit.car.CarNavigationContinuity
 import com.evcockpit.car.CarContinuityPhase
@@ -94,6 +98,9 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var welcome: WelcomeGreetingManager
     @Inject lateinit var routes: RouteRepository
     @Inject lateinit var continuity: CarNavigationContinuity
+    @Inject lateinit var diagnosticsHub: DiagnosticsHub
+    @Inject lateinit var chargingRepository: ChargingRepository
+    @Inject lateinit var locationRepository: LocationRepository
 
     private data class SoundFrame(
         val settings: UserSettings,
@@ -200,6 +207,21 @@ class MainActivity : ComponentActivity() {
         // Landscape on phones; Android may override orientation on large-screen devices.
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         Log.i(TAG, "Launching modern Compose CockpitScreen, package=$packageName")
+
+        if (BuildConfig.DEBUG) {
+            lifecycleScope.launch {
+                combine(
+                    locationRepository.gpsFix,
+                    chargingRepository.catalog,
+                    obd.connection
+                ) { gps, catalog, connection -> Triple(gps, catalog, connection) }
+                    .collect { (gps, catalog, connection) ->
+                        diagnosticsHub.gps(gps)
+                        diagnosticsHub.charging(catalog)
+                        diagnosticsHub.obd(connection)
+                    }
+            }
+        }
 
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -401,6 +423,7 @@ class MainActivity : ComponentActivity() {
                             SettingsScreen(
                                 viewModel = settingsViewModel,
                                 activeSound = activeSound,
+                                diagnosticsHub = diagnosticsHub,
                                 carNavigationState = carNavigationState,
                                 onRetryCarNavigation = ::retryCarNavigationTracking,
                                 onStopCarNavigation = ::stopCarNavigationTracking,
