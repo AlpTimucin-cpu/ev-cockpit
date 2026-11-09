@@ -22,6 +22,15 @@ The **EV Cockpit preview APK** built from the MediaEngine/Fermata 2.2.2 foundati
 | Open-Meteo | Weather forecasts | Data: CC BY 4.0; free API access may be restricted to non-commercial use `[verify]` | Provide attribution and check current terms |
 | EPDK station registry | Charging-station listings | Publicly accessible data; reuse terms `[verify]` | Display the snapshot date and data source |
 
+## Historical source preservation
+
+The older `main` Media Hub had additional historical notices for Mola/Fermata,
+OSM/Leaflet, TomTom and independent media dependencies. Its history and
+corresponding source obligations remain applicable; this document does not
+waive or supersede those licenses. Review all upstream licenses before any
+redistribution, particularly when an old APK does not match the native
+cockpit source tree.
+
 ## Exclusions
 
 This project does not and must not include databases, premium entitlements, server access, trademarks, or code belonging to third-party commercial applications, such as radar/warning applications.
