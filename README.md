@@ -1,71 +1,83 @@
-# EV Cockpit
+# EV Cockpit — development preview
 
-EV Cockpit is an independent Android cockpit for electric-vehicle navigation, charging planning, read-only diagnostics, online radio, and optional in-cabin audio.
+Independent EV navigation/telemetry Android project (GPL-3.0). **Not a
+verified or approved production Android Auto release.** Maintained source uses
+Kotlin, Jetpack Compose, MapLibre, OSRM road routing and the Android for Cars
+App Library 1.7.0.
 
-## Real hardware only
+## Source of truth (9 November 2026)
 
-- **GPS:** Android Fused Location Provider with runtime location permission and freshness/accuracy validation. No generated route locations or automatic demo journeys.
-- **Vehicle telemetry:** explicitly paired ELM327 Bluetooth Classic SPP adapter, read-only CAN/UDS queries, and individually timestamped measurements. No generated vehicle speed, battery charge, or diagnostic responses.
-- **Unavailable measurements:** display an unavailable or disconnected state; never replace absent BMS data with invented values.
-- **Navigation:** OSRM road geometry, MapLibre rendering, TTS maneuver guidance, and Android Auto session support.
-- **Media:** live HTTPS radio stations and official external DRM application launches. Video restrictions remain subject to Android and Android Auto safety policies.
-- **Active Sound:** optional in-cabin synthesized audio from fresh vehicle speed only. It does not replace the vehicle's legally required external warning system.
+- The GitHub `main` branch still contains the older Media Hub baseline and
+  does **not** yet contain the stacked native cockpit work. Do not treat GitHub
+  Releases `v1.0.0`/`v1.0.2` as builds of the new native code.
+- The native cockpit is maintained in a series of **draft** PRs, currently
+  rooted in `feature/ev-cockpit`, with
+  [Phase 12](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/45),
+  [Debug diagnostics](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/46),
+  [phone/vehicle acceptance protocol](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/47)
+  and the Job 3 security/release-verification PR stacked on top.
+- **Physical Volkswagen ID.4 and Android Auto host acceptance remains NOT
+  VERIFIED.** The owner is testing without a computer, ADB, logcat or DHU.
+  Real phone/vehicle evidence is tracked in
+  [the A–H acceptance protocol](docs/IS2_TELEFON_ID4_KABUL_TESTI_TR.md).
+- A previously exposed signing credential is still a critical risk. The
+  `.github/workflows/release.yml` signing job remains **disabled**. No
+  trusted signed Release or Play Store distribution is authorized.
 
-## Build and testing (verified source layout)
+## Data and safety invariants
 
-**Branch matters:** `main` is `ID4MediaHub` with only `:app`. The
-real native cockpit is on `feature/ev-cockpit`, root project `EvCockpit`,
-which includes `:app`, `:evlite`, and `:nativecockpit`. The
-`media-engine/` directory is **not** an included Gradle project.
+- Real, permissioned Fused GPS and real OSRM route geometry only; times, energy
+  consumption and arrival are **models**, not live traffic or measurements.
+- Read-only ELM327: SAE Mode 01 / explicitly approved UDS service `0x22`
+  only. No automatic manufacturer DID scan or ECU write, and **VW ID.4 Pure
+  SoC DID / CAN address / multiplier are not verified**. Missing values display
+  *unavailable*, never invented.
+- Android Auto uses approved Car App templates, not video/WebView. Phone video
+  has strict real-speed, user-confirmed parked-only gating.
+- EPDK station catalog does not prove current charger availability or tariff.
+  Route weather is a forecast from Open-Meteo, refreshed at **most every 30
+  minutes while the foreground Android Auto screen has valid route+GPS**.
+  Doze, lost connectivity or host pause can delay the next attempt.
+- The Debug diagnostic view holds at most 500 redacted **application** events,
+  not operating-system logcat; copy/share only after inspecting the report.
 
-The actual configuration is Java 17, Android SDK 36, Gradle Wrapper 8.14.3
-and `nativecockpit minSdk = 28`. Android API 26 support is a requested target,
-**not** validated or enabled.
+## Modules and tested build targets
+
+| Module | Purpose |
+| --- | --- |
+| `:nativecockpit` | Kotlin/Compose app, Android Auto, GPS, OBD, weather, charging |
+| `:app` | Older Media Hub and companion app (separately packaged) |
+| `:evlite` | Lightweight EV guide (separately packaged) |
+| `media-engine/` | Separate source overlay, **not** a Gradle module |
+
+Source toolchain: Java 17, Android SDK 36, pinned Gradle 8.14.3;
+`nativecockpit` minSdk 28. A Debug APK may be built with:
 
 ```bash
-git switch feature/ev-cockpit
-./gradlew --version
-./gradlew projects
-./gradlew :nativecockpit:lintDebug :nativecockpit:testDebugUnitTest :nativecockpit:assembleDebug --no-daemon --stacktrace
-python3 -m unittest discover -s tests -p 'test_native_phase0_policy.py' -v
-python3 -m unittest discover -s tests -p 'test_apk_secret_scan.py' -v
-python3 scripts/check_apk_secrets.py nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk
+./gradlew :nativecockpit:lintDebug :nativecockpit:testDebugUnitTest :nativecockpit:assembleDebug
+python3 scripts/verify_youtube_filter_absent.py --apk nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk
 ```
 
-Expected projects: `:app`, `:evlite`, `:nativecockpit`. After a successful
-Debug build, expect `nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk`.
-On the phase-zero draft branch use `git switch audit/phase0-native-validation-20261107`
-instead. Only that branch currently contains the new lint/Gitleaks/APK safety gates.
+Debug uses application ID `com.evcockpit.debug`, version `1.0.8-DEBUG`;
+it is **not** the `com.evcockpit` production identity. Release source version
+is `1.0.8` (without `-TEST`), R8 and resource shrinking enabled,
+only `arm64-v8a` native libraries, HTTPS-only network security
+configuration and no backup/cleartext/debug flag. A separate CI **Release
+smoke test** creates a *throwaway signing key* for build verification only.
+Even if that CI passes, **do not install or distribute its signed artifact**.
 
-An earlier verified Debug APK workflow succeeded on 2026-11-06, but it lacked
-mandatory lint and secret-scanning steps. New strict native CI is under
-[Phase 0 review](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/25).
-**Gitleaks and APK scanning do not prove old credentials are safe.**
-No physical-device or Android Auto acceptance has been recorded.
+There is no authorized workflow to create a trusted Release from the
+previously exposed credentials; `main` is not updated automatically.
 
-**Unverified ID.4 MEB mapping:** no BMS SoC DID, CAN addresses or scale are
-validated for this vehicle. The phase-zero draft disables automatic MEB DID
-polling and numerical conversion; user-initiated UDS 0x22 diagnostics remain
-raw and are not allowed to supply measured battery telemetry. OBD wire commands
-are limited to SAE Mode 01 and read-only UDS service 0x22. This is **not**
-a validation of any community DID or addressing configuration.
+## Documentation and licensing
 
-Production release requires review of the exposed signing-key history and
-a protected owner-signing environment. No signed production build is authorized.
+- [Turkish guide](README_TR.md) / [English guide](README_EN.md)
+- [Job 2: phone and ID.4 test checklist](docs/IS2_TELEFON_ID4_KABUL_TESTI_TR.md)
+- [Stacked PR integration and conflict plan](docs/INTEGRATION_PLAN_2026-11-09_TR.md)
+- [Metadata and old ZIP archive plan](docs/REPO_PROFILE_AND_SOURCE_ARCHIVE_TR.md)
+- [CHANGELOG](CHANGELOG.md), [LICENSE](LICENSE),
+  [NOTICE](NOTICE.md), [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md),
+  [Security guidance](SECURITY_TOMTOM.md)
 
-## Components
-
-| Module | Role |
-|---|---|
-| `nativecockpit` | Kotlin + Compose cockpit, OBD, navigation, audio and Android Auto |
-| `app` | Companion media integration |
-| `evlite` | Lightweight navigation and charging tools |
-| `media-engine` | Separately licensed optional media integration |
-
-## Security and legal boundaries
-
-Vehicle queries are read-only and must be performed on a personally owned, paired adapter. Estimated charging needs and range are models, not measured battery condition. This application does not authorize video use while driving.
-
-Third-party libraries and integration package IDs retain their required licence notices. See [LICENSE](LICENSE), [NOTICE](NOTICE.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [security guidance](SECURITY_TOMTOM.md).
-
-EV Cockpit is an independent project and does not imply affiliation with any vehicle manufacturer or streaming service.
+Independent project; no affiliation with Volkswagen, Android Auto, Google,
+streaming services or charging-network operators is implied.
