@@ -127,6 +127,14 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_cockpit_dashboard_layout.py' -v
           python3 -m unittest discover -s tests -p 'test_job3_release_policy.py' -v
 
+      - name: Audit legacy source archives without publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_legacy_archive_audit.py' -v
+          python3 scripts/audit_legacy_archives.py \
+            --report build/legacy-source-archives-audit.json
+
       - name: Android lint (do not waive failures)
         id: lint
         continue-on-error: true
@@ -197,6 +205,7 @@ jobs:
             nativecockpit/build/reports/lint-results-debug.xml
             nativecockpit/build/reports/tests/testDebugUnitTest/**
             nativecockpit/build/test-results/testDebugUnitTest/**
+            build/legacy-source-archives-audit.json
           if-no-files-found: warn
           retention-days: 7
 
