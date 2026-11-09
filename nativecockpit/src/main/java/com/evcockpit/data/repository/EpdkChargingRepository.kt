@@ -16,11 +16,13 @@ import com.evcockpit.data.remote.EpdkService
 import com.evcockpit.data.remote.EpdkSnapshotParser
 import com.evcockpit.domain.model.ChargingCatalog
 import com.evcockpit.domain.repository.ChargingRepository
+import com.evcockpit.diagnostics.DiagnosticsHub
 
 @Singleton
 class EpdkChargingRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val service: EpdkService
+    private val service: EpdkService,
+    private val diagnostics: DiagnosticsHub
 ): ChargingRepository {
     private val mutex=Mutex()
     private val _catalog=MutableStateFlow(ChargingCatalog())
@@ -31,12 +33,16 @@ class EpdkChargingRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             val previous=_catalog.value
             _catalog.value=previous.copy(loading=true,error=null)
+            diagnostics.charging(_catalog.value)
             // Immediately publish cached source WITH original snapshot date.
             val cached=runCatching { if(cache.isFile) EpdkSnapshotParser.parseGzip(
                 cache.inputStream().use { EpdkSnapshotParser.readBounded(it,EpdkSnapshotParser.MAX_GZIP_BYTES) }) else null
             }.getOrNull()
-            if(cached!=null) _catalog.value=ChargingCatalog(cached.stations,cached.verifiedAtUtc,
-                loading=true,staleCache=true)
+            if(cached!=null) {
+                _catalog.value=ChargingCatalog(cached.stations,cached.verifiedAtUtc,
+                    loading=true,staleCache=true)
+                diagnostics.charging(_catalog.value)
+            }
             try {
                 val network=service.getPublicStations().use {
                     EpdkSnapshotParser.readBounded(it.byteStream(),EpdkSnapshotParser.MAX_GZIP_BYTES)
@@ -49,10 +55,12 @@ class EpdkChargingRepository @Inject constructor(
                     check(temp.renameTo(cache)) { "Could not update the station cache" }
                 } finally { temp.delete() }
                 _catalog.value=ChargingCatalog(result.stations,result.verifiedAtUtc,loading=false)
+                diagnostics.charging(_catalog.value)
             } catch(e: Exception) {
                 val existing=_catalog.value
                 _catalog.value=existing.copy(loading=false,staleCache=existing.stations.isNotEmpty(),
                     error="Could not refresh EPDK · ${e.javaClass.simpleName}")
+                diagnostics.charging(_catalog.value)
             }
         }
         Unit
