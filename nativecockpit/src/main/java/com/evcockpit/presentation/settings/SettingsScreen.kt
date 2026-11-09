@@ -1,6 +1,8 @@
 package com.evcockpit.presentation.settings
 
 import com.evcockpit.BuildConfig
+import com.evcockpit.diagnostics.DiagnosticsHub
+import com.evcockpit.diagnostics.DebugDiagnosticsEntry
 import com.evcockpit.car.CarContinuityPhase
 import com.evcockpit.car.CarContinuityState
 
@@ -51,6 +53,7 @@ import java.util.Locale
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     activeSound: ActiveSoundManager,
+    diagnosticsHub: DiagnosticsHub,
     carNavigationState: CarContinuityState,
     onRetryCarNavigation: () -> Unit,
     onStopCarNavigation: () -> Unit,
@@ -105,6 +108,9 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Text("Araç ve Servis Ayarları", style = MaterialTheme.typography.titleLarge)
+                if (BuildConfig.DEBUG) {
+                    DebugDiagnosticsEntry(diagnosticsHub)
+                }
                 HorizontalDivider()
                 Text("Android Auto · Arka plan GPS", style = MaterialTheme.typography.titleMedium)
                 Text(
