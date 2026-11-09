@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 python3 tests/architecture_checks.py
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-src=app/src/main/java/tr/id4/mediahub
+src=app/src/main/java/com/evcockpit/mediahub
 check() {
   local name=$1; shift
   echo "--- $name ---"

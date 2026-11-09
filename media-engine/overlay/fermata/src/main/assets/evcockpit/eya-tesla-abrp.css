@@ -1,0 +1,66 @@
+/* Tesla-inspired spacious map layout, not an imitation of proprietary icons.
+   One real Leaflet map, one original navigation/telemetry owner. */
+@media (min-width:640px) and (orientation:landscape){
+ :root{--eya-top:clamp(52px,8vh,74px);--eya-dock:clamp(54px,9vh,71px)}
+ #map{left:25%!important;width:75%!important;inset:auto 0 var(--eya-dock) 25%!important;top:var(--eya-top)!important}
+ #vehicle-cockpit .evcockpit-tesla-side{left:.65%!important;width:23.6%!important;top:6px!important;bottom:8px!important;
+  grid-template-rows:minmax(0,1fr) minmax(0,.88fr) minmax(0,.79fr) minmax(0,2.22fr) minmax(0,.33fr)!important;
+  gap:clamp(3px,.62vh,8px)!important}
+ #vehicle-cockpit .evcockpit-tesla-card,#vehicle-cockpit .evcockpit-mini-metric{
+  background:#0b2239f7!important;border:1px solid #274e66!important;
+  border-radius:10px!important;box-shadow:none!important}
+ #vehicle-cockpit .ev-premium-speed-card{border:none!important;background:transparent!important}
+ #vehicle-cockpit .ev-speed-gauge::before{opacity:.5!important}
+ #vehicle-cockpit .evcockpit-battery-card .evcockpit-soc-text{font-size:clamp(27px,6vh,55px)!important}
+ #vehicle-cockpit .evcockpit-tesla-caption,#vehicle-cockpit .evcockpit-mini-metric small{letter-spacing:0!important}
+ #vehicle-cockpit .cockpit-right{
+   top:8px!important;right:12px!important;bottom:auto!important;width:min(310px,24.5%)!important;
+   max-height:min(51vh,420px)!important;overflow:auto!important}
+ #vehicle-cockpit .cockpit-right .cockpit-panel{
+  padding:clamp(8px,1.2vh,16px)!important;
+  border:1px solid #50748977!important;background:#061d31ed!important;
+  border-radius:15px!important;box-shadow:0 8px 20px #0009!important}
+ #vehicle-cockpit .cockpit-right .co-turn{min-height:clamp(55px,9vh,83px)!important}
+ #vehicle-cockpit .cockpit-right .co-turn-arrow{font-size:clamp(28px,4vw,48px)!important}
+ #vehicle-cockpit .cockpit-right .co-nav-row{
+  min-height:35px!important;grid-template-columns:18px minmax(0,1fr)!important;
+  padding:4px 0!important;gap:6px!important}
+ #vehicle-cockpit .cockpit-right .co-nav-meta small{font-size:10px!important}
+ #vehicle-cockpit .cockpit-right .ev-upcoming-maneuvers{
+  font-size:11px!important;margin:4px 0!important;padding:4px 0!important}
+ #vehicle-cockpit.has-route .cockpit-tripbar{
+  left:calc(25% + 14px)!important;right:calc(min(310px,24.5%) + 20px)!important;
+  bottom:10px!important;min-height:96px!important;max-height:160px!important;
+  background:#071e35e8!important;border-radius:13px!important;padding:9px 12px!important;
+  box-shadow:0 9px 24px #000a!important;overflow:auto!important}
+ #vehicle-cockpit .cockpit-tripbar .tripbar-track{height:13px!important}
+ #vehicle-cockpit .cockpit-tripbar #co-trip-fill{border-radius:12px!important}
+ .current-weather-chip{left:calc(25% + 13px)!important;top:calc(var(--eya-top) + 13px)!important}
+ .buttons{left:calc(25% + 12px)!important;top:calc(var(--eya-top) + 71px)!important}
+ .cockpit-alts.open,.sheet.search-open,.sheet.details-open{max-width:min(510px,70vw)!important}
+ #eya-trip-panel{top:calc(var(--eya-top) + 8px);bottom:calc(var(--eya-dock) + 8px);
+  width:min(500px,57vw);right:12px}
+ #vehicle-cockpit .eya-trip-open{position:relative;display:block!important;
+  margin:9px 0 0!important;color:#eafffa!important;
+  background:#0e5671!important;border:1px solid #249eb9!important;
+  border-radius:9px!important;min-height:48px!important}
+ .eya-energy-legend{position:fixed;left:calc(25% + 13px);bottom:calc(var(--eya-dock) + 5px);
+  z-index:909;padding:6px 9px;border-radius:9px;color:#d4f7ed;
+  background:#092b3eea;border:1px solid #277e93;font-size:10px;pointer-events:none}
+}
+@media (min-width:640px) and (orientation:landscape) and (max-height:500px){
+ #vehicle-cockpit .cockpit-right{max-height:58vh!important}
+ #vehicle-cockpit .cockpit-right .co-nav-row{min-height:30px!important}
+ #vehicle-cockpit .cockpit-right .ev-upcoming-maneuvers{display:none!important}
+ #vehicle-cockpit.has-route .cockpit-tripbar{max-height:116px!important;min-height:90px!important}
+}
+@media (orientation:portrait),(max-width:639px){
+ #eya-trip-panel{bottom:calc(60px + env(safe-area-inset-bottom,0px))}
+ #eya-trip-open{min-height:48px}
+}
+
+.eya-voice-toggle{display:block;width:100%;margin-top:7px;min-height:48px;
+ border:1px solid #2b6a83;border-radius:9px;background:#0c344e;
+ color:#d8f8ff;font-size:12px;font-weight:700;cursor:pointer}
+.eya-voice-volume{display:block;margin:12px 0 5px;color:#c9e4f2;font-size:12px}
+.eya-voice-volume input{display:block;width:100%;height:48px;accent-color:#4ce5c4}

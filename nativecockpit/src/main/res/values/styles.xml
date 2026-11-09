@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.EvCockpit" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/ev_navy</item>
+        <item name="android:navigationBarColor">@color/ev_navy</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <style name="Theme.EvCockpit.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ev_navy</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_animated</item>
+        <item name="windowSplashScreenAnimationDuration">1200</item>
+        <item name="postSplashScreenTheme">@style/Theme.EvCockpit</item>
+    </style>
+</resources>

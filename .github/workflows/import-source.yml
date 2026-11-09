@@ -16,13 +16,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          archive="ID4_Media_Hub_v0.8_APK_Derlemeye_Hazir_Kaynak.zip"
+          archive="EV_Cockpit_v0.8_Source.zip"
           test -s "$archive"
-          mkdir -p /tmp/id4-src
-          unzip -q "$archive" -d /tmp/id4-src
-          src="/tmp/id4-src/ID4_Media_Hub_v0_8"
+          mkdir -p /tmp/evcockpit-src
+          unzip -q "$archive" -d /tmp/evcockpit-src
+          src="/tmp/evcockpit-src/EV_Cockpit_v0_8"
           test -f "$src/app/build.gradle.kts"
-          test -f "$src/app/src/main/java/tr/id4/mediahub/MainActivity.kt"
+          test -f "$src/app/src/main/java/com/evcockpit/mediahub/MainActivity.kt"
           cp -a "$src/app" .
           cp -a "$src/settings.gradle.kts" "$src/build.gradle.kts" .
           cp -a "$src/scripts" "$src/tests" "$src/docs" "$src/examples" .

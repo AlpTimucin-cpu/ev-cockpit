@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https://tile.openstreetmap.org data:; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; connect-src 'none'; font-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none';">
+<title>EV Cockpit · Türkiye Haritası</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+ integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+<style>
+html,body,#map{width:100%;height:100%;margin:0;padding:0;background:#e3e8e5;font:14px system-ui,sans-serif}
+.leaflet-control-attribution{font-size:11px!important}
+#top-note{position:absolute;z-index:1000;top:10px;left:10px;right:10px;
+background:#09202ddd;color:#f2f9ff;border-radius:10px;padding:9px 12px;
+pointer-events:none;box-shadow:0 2px 12px #0002;font-size:12px}
+#loading{position:absolute;z-index:1001;left:12%;right:12%;top:40%;background:#09202df0;
+color:white;text-align:center;padding:18px;border-radius:12px}
+.legend{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="top-note">Haritaya dokun: <b>hedef</b> · Uzun bas: <b>başlangıç</b> · ⚡ Noktalar: EPDK</div>
+<div id="loading">Harita hazırlanıyor… İnternet bağlantısı gerekli.</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+ integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+<script>
+(function(){
+"use strict";
+var loaded=false, map=null, pins=null, originMarker=null, destinationMarker=null, routeLayer=null;
+var origin=null, destination=null;
+function visibleStatus(text){
+  var element=document.getElementById("top-note"); if(element)element.textContent=text;
+}
+function pointOK(a,b){ return typeof a==="number" && typeof b==="number" &&
+  isFinite(a) && isFinite(b) && a>=35 && a<=43 && b>=25 && b<=46; }
+function setOrigin(lat,lon){
+  if(!pointOK(lat,lon) || !loaded)return false;
+  origin=[lat,lon];
+  if(originMarker){map.removeLayer(originMarker)}
+  originMarker=L.circleMarker(origin,{radius:9,fillColor:"#f59e0b",fillOpacity:1,color:"#fff",weight:2})
+    .addTo(map).bindPopup("Başlangıç • uzun basılarak seçildi");
+  clearRoute();
+  visibleStatus("Başlangıç seçildi. Hedef için haritaya dokun veya şarj noktası seç.");
+  return true;
+}
+function setTarget(lat,lon,label){
+  if(!pointOK(lat,lon) || !loaded)return false;
+  destination=[lat,lon];
+  if(destinationMarker){map.removeLayer(destinationMarker)}
+  destinationMarker=L.circleMarker(destination,{radius:9,fillColor:"#10b981",fillOpacity:1,color:"#fff",weight:2})
+    .addTo(map).bindPopup(String(label||"Varış noktası").slice(0,90));
+  clearRoute();
+  visibleStatus("Hedef seçildi. Başlangıç için uzun basıp üstteki 'Rota çiz' düğmesini kullan.");
+  return true;
+}
+function clearRoute(){
+  if(routeLayer){map.removeLayer(routeLayer);routeLayer=null}
+}
+try {
+  if(typeof L==="undefined"){ throw new Error("Leaflet yüklenemedi") }
+  map=L.map("map",{zoomControl:true,preferCanvas:true,maxZoom:18,
+    worldCopyJump:false,zoomSnap:1}).setView([39.0,35.0],6);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    attribution:"&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap katkıcıları</a>",
+    maxZoom:18,noWrap:true,keepBuffer:1,updateWhenIdle:true
+  }).addTo(map);
+  pins=L.layerGroup().addTo(map);
+  map.on("click",function(e){setTarget(e.latlng.lat,e.latlng.lng,"Haritadaki hedef")});
+  map.on("contextmenu",function(e){L.DomEvent.stop(e);setOrigin(e.latlng.lat,e.latlng.lng)});
+  loaded=true;window.evcockpitReady=true;
+  document.getElementById("loading").style.display="none";
+} catch(e) {
+  document.getElementById("loading").textContent=
+    "Harita açılamadı. İnterneti kontrol et. Harita kitaplığı: "+String(e.message).slice(0,90);
+}
+window.evcockpitMapBounds=function() {
+  if(!loaded)return null;
+  var b=map.getBounds();
+  return [b.getSouth(),b.getWest(),b.getNorth(),b.getEast()];
+};
+window.evcockpitShowStations=function(entries){
+  if(!loaded||!Array.isArray(entries))return 0;
+  pins.clearLayers();
+  var count=0;
+  entries.slice(0,55).forEach(function(s){
+    if(!s||!pointOK(s.lat,s.lon))return;
+    var mark=L.circleMarker([s.lat,s.lon],{
+      radius:6,fillColor:"#008e94",fillOpacity:.95,color:"#fff",weight:1.5
+    }).addTo(pins);
+    var box=document.createElement("div");
+    var title=document.createElement("strong");
+    title.textContent=String(s.title||"Şarj istasyonu").slice(0,100);
+    box.appendChild(title);
+    var info=document.createElement("div");
+    info.textContent=String(s.operator||"").slice(0,80)+" · "+
+      String(s.sockets||"Soket türü: bilinmiyor").slice(0,80);
+    box.appendChild(info);
+    var btn=document.createElement("button");
+    btn.textContent="Bu istasyonu hedef yap";
+    btn.style.padding="8px";btn.style.marginTop="6px";
+    btn.addEventListener("click",function(){setTarget(s.lat,s.lon,s.title);map.closePopup()});
+    box.appendChild(btn);
+    mark.bindPopup(box);
+    count++;
+  });
+  return count;
+};
+window.evcockpitFocus=function(lat,lon,label){
+  if(!setTarget(lat,lon,label))return false;
+  map.setView([lat,lon],14,{animate:false});
+  return true;
+};
+window.evcockpitGetRouteEndpoints=function(){
+  if(!loaded||!origin||!destination)return null;
+  return [origin[1],origin[0],destination[1],destination[0]];
+};
+window.evcockpitShowRoute=function(data){
+  if(!loaded||!data||!Array.isArray(data.coordinates))return false;
+  if(data.coordinates.length>12000)return false;
+  var coords=[];
+  for(var i=0;i<data.coordinates.length;i++){
+    var p=data.coordinates[i];
+    if(!Array.isArray(p)||p.length<2||!pointOK(p[1],p[0]))return false;
+    coords.push([p[1],p[0]]);
+  }
+  clearRoute();
+  routeLayer=L.polyline(coords,{color:"#2066ff",weight:6,opacity:.9}).addTo(map);
+  map.fitBounds(routeLayer.getBounds(),{padding:[24,24],maxZoom:15});
+  visibleStatus("Tahmini rota: "+String(data.distanceKm||"?")+" km • "+
+    String(data.durationMin||"?")+" dk. Canlı trafik/sesli yönlendirme yok.");
+  return true;
+};
+window.evcockpitClearRoute=function(){if(loaded)clearRoute()};
+window.evcockpitIsReady=function(){return loaded};
+})();
+</script>
+</body>
+</html>

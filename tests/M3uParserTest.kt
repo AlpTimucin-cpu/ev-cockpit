@@ -1,4 +1,4 @@
-package tr.id4.mediahub
+package com.evcockpit.mediahub
 
 fun main() {
     val content = """

@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0.."
-echo ID.4 Media Hub v0.8 - APK derleme
+echo EV Cockpit v0.8 - APK derleme
 where gradle >nul 2>nul
 if errorlevel 1 (
   echo Gradle PATH uzerinde bulunamadi.

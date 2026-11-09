@@ -1,13 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- MapLibre includes optional location access; this app intentionally does not. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <queries>
+        <package android:name="com.shihab.diplay" />
+        <package android:name="com.trt.tabii.android" />
+        <package android:name="com.trt.trtspor" />
         <package android:name="com.google.android.apps.youtube.music" />
         <package android:name="com.netflix.mediaclient" />
+        <package android:name="com.amazon.avod.thirdpartyclient" />
+        <package android:name="com.rectv.shot" />
         <package android:name="com.google.android.youtube" />
+        <package android:name="com.google.android.projection.gearhead" />
+        <package android:name="com.kododake.aabrowser" />
+        <package android:name="idv.lzn.screenonauto" />
+        <package android:name="moe.shizuku.privileged.api" />
+        <package android:name="sksa.aa.customapps" />
+        <package android:name="me.aap.fermata" />
+        <package android:name="me.aap.fermata.auto" />
+        <package android:name="me.aap.fermata.auto.dear.google.why" />
+        <package android:name="me.app.fermataX.auto.debug" />
+        <package android:name="me.app.fermataX.auto.mola.debug" />
+        <package android:name="me.app.fermataX.auto.mola32.debug" />
+        <package android:name="me.app.fermataX.auto" />
+        <package android:name="me.app.fermataX" />
+        <package android:name="android.loandamaps.it" />
+        <package android:name="android.loandamaps.it.aaad_157ff3" />
+        <package android:name="maps.jaoloonda.android" />
+        <package android:name="com.chiller3.mirrormobile" />
+        <package android:name="com.chiller3.mirrormobile.debug" />
         <package android:name="com.sportzx.live" />
         <!-- Inspect only installed launchable apps for the optional SportzX shortcut. -->
         <intent>
@@ -15,21 +44,55 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
-    <application android:label="ID.4 Media Hub"
+    <application android:name=".SafeStartApplication" android:label="EV Cockpit • Test"
         android:usesCleartextTraffic="false"
         android:allowBackup="false"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
-        android:icon="@drawable/app_icon">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher">
         <meta-data android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
-        <activity android:name=".MainActivity" android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+        <!-- Shizuku's binder receiver is protected against regular third-party callers.
+             This app only checks its status; no privileged commands are executed. -->
+        <provider android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        <activity android:name=".SafeStartActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".MainActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".PlayerActivity" android:exported="false" />
+        <activity android:name=".MediaEngineVlcPlayerActivity" android:exported="false" />
+        <activity android:name=".EvGarageActivity" android:exported="false" />
+        <activity android:name=".TurkeyNavigationActivity" android:exported="false" />
+        <activity android:name=".SportzXHubActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".MediaEngineYoutubeActivity"
+            android:exported="false" android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".MediaEngineSubscriptionActivity"
+            android:exported="false" android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".MediaEngineTvBrowseActivity"
+            android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".PodcastBrowserActivity"
+            android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".TmdbCatalogActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".MediaLibraryHubActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".MediaWebActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <service android:name=".AudioLibraryService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">

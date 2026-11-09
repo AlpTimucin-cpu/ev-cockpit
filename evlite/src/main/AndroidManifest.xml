@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only explicit MediaEngine/Fermata package visibility; no QUERY_ALL_PACKAGES. -->
+    <queries>
+        <package android:name="me.app.fermataX.auto.mola32.debug" />
+        <package android:name="me.app.fermataX.auto.debug" />
+        <package android:name="me.app.fermataX.auto" />
+    </queries>
+    <!-- No location, media, SMS, Bluetooth, microphone or accessibility permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:allowBackup="false"
+        android:label="EV Cockpit • TV &amp; EV"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:usesCleartextTraffic="false">
+        <activity android:name="com.evcockpit.mediahub.EvLiteActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity android:name="com.evcockpit.mediahub.EvStationActivity"
+            android:exported="false"/>
+        <activity android:name="com.evcockpit.mediahub.EvEnergyActivity"
+            android:exported="false"/>
+        <activity android:name="com.evcockpit.mediahub.MediaEngineTvActivity" android:exported="false"/>
+        <activity android:name="com.evcockpit.mediahub.MediaEngineTvPlayerActivity" android:exported="false"/>
+        <activity android:name="com.evcockpit.mediahub.EmbeddedMapActivity" android:exported="false"/>
+    </application>
+</manifest>

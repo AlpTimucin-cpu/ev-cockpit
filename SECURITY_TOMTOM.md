@@ -1,50 +1,60 @@
-# TomTom API Anahtarı Güvenliği
+# TomTom API Key Security
 
-## Durum (26 Ekim 2026)
+## Status (October 26, 2026)
 
-**Eski sürümler için inceleme gerekir.** `build-mola-native-id4.yml` daha önce `secrets.ID4_TOMTOM_API_KEY` değerini derleme adımına iletiyordu ve `patch_mola.py` bunu `assets/id4/traffic-config.js` içine yazabiliyordu. GitHub Actions artifact'ları indirilebilir olduğundan, ilgili secret tanımlıysa eski APK'dan çıkarılmış olabilir.
+**Earlier releases require review.** `build-ev-cockpit.yml` previously passed `secrets.EVCOCKPIT_TOMTOM_API_KEY` to the build, and `patch_mediaengine.py` could write it into `assets/evcockpit/traffic-config.js`. Since GitHub Actions artifacts are downloadable, the key may have been extractable from an older APK if that secret was configured.
 
-**Yeni çözüm:** Paylaşılan anahtar build ortamına verilmez. `patch_mola.py` `traffic-config.js` içine daima boş anahtar yazar, eski `ID4_TOMTOM_API_KEY` ortam değişkeni doluysa build'i reddeder. GitHub Actions final APK'daki config dosyasını doğrular.
+**New approach:** The shared key is not supplied to the build environment. `patch_mediaengine.py` always writes an empty key to `traffic-config.js` and rejects the build if the legacy `EVCOCKPIT_TOMTOM_API_KEY` environment variable is populated. GitHub Actions validates the configuration file in the final APK.
 
-## Anahtar şifreli saklama (26 Ekim 2026)
+## Encrypted key storage (October 26, 2026)
 
-Kullanıcının yüklediği `Id4ApiKeyStore.java` temel alınarak Android Keystore'da AES-256-GCM ile saklama eklendi. Android 23 altındaki cihazlarda **düz metin/Base64 geri dönüş yolu yoktur**; anahtar kaydı güvenli değilse başarısız olur.
+Storage using AES-256-GCM in Android Keystore was added based on the user-uploaded `EvCockpitApiKeyStore.java`. There is **no plaintext/Base64 fallback** on devices below Android 23; saving the key fails if secure storage is unavailable.
 
-Mevcut `Id4NavigatorActivity` yerel Android anahtar penceresi korunmuştur. Eski `id4_traffic_keys/tomtom` tercihi uygulama ilk kez anahtara ihtiyaç duyduğunda **bir defalık** şifreli depoya aktarılır ve düz metin kopyası silinir. Keystore anahtarı sıfırlanır veya bozulursa kullanıcı anahtarı yeniden girmek zorundadır.
+The existing native Android key-entry dialog in `EvCockpitNavigatorActivity` is retained. The legacy `evcockpit_traffic_keys/tomtom` preference is migrated **once** to encrypted storage when the application first needs the key, and the plaintext copy is deleted. If the Keystore key is reset or corrupted, the user must enter the key again.
 
-Yüklenen `Id4KeyBridge.java` ve `id4-tomtom-key.js` bu sürüme **bilerek eklenmedi**. `getTomTomKey()` gibi bir `@JavascriptInterface` çağrısı bütün WebView frame'lerine erişilebilir olabileceği için gereksiz erişim alanı yaratır. TomTom katmanını kullanan mevcut JavaScript, anahtarı yalnızca yerel Android kodundan sayfa yüklenince alır; anahtarın trafik URL'sinde görünmesi ise ayrı ve devam eden bir risktir. Bu çözüm yalnızca **cihazda saklama güvenliğini** artırır; tarayıcı çalışma zamanında mutlak gizlilik sağlamaz.
+The uploaded `EvCockpitKeyBridge.java` and `evcockpit-tomtom-key.js` were **deliberately not included** in this release. An `@JavascriptInterface` method such as `getTomTomKey()` could be accessible from every WebView frame, unnecessarily increasing exposure. Existing JavaScript using the TomTom layer receives the key from native Android code when the page loads; visibility of the key in traffic URLs remains a separate, ongoing risk. This improves **on-device storage security** only; it does not guarantee absolute secrecy in the browser runtime.
 
-## Uygulamada kişisel anahtar
+## Personal key in the application
 
-1. Kullanıcı Elektrikli Yol Arkadaşım içinde **Harita servis anahtarı** ekranını açar.
-2. Kendisine ait TomTom API anahtarını girer.
-3. Anahtar Android'in uygulamaya özel `SharedPreferences` alanında tutulur; WebView'a gerektiğinde çalışma sırasında aktarılır. Tarayıcı kaynak isteklerinde anahtar görülebilir: bu, tam gizleme değildir.
-4. Anahtar asla GitHub deposuna, `BuildConfig` içine veya paylaşılan APK varlıklarına yazılmaz.
+1. The user opens **Map service key** in EV Cockpit.
+2. They enter their own TomTom API key.
+3. The key is held in Android's app-private `SharedPreferences` and passed to WebView at runtime when needed. It may be visible in browser resource requests; this is not complete concealment.
+4. The key is never written to the GitHub repository, `BuildConfig`, or shared APK assets.
 
-Tek anahtarı herkesle paylaşmak yerine, dağıtılan uygulamada **her kullanıcı kendi anahtarını** kullanmalıdır. Çok kullanıcılı güvenilir dağıtım için hız sınırı, kimlik doğrulama ve maliyet kontrolü olan sunucu proxy'si ayrıca değerlendirilebilir.
+Every user of the distributed application should use **their own key**, rather than sharing one key with everyone. For a trusted multi-user deployment, a server proxy with rate limiting, authentication, and cost controls can be considered separately.
 
-## Eski sürümler için yapılacaklar
+## Historic main-branch TomTom key handling (prior to integration)
 
-- TomTom Developer panelinde eski anahtarı **yenile / iptal et**. Bu işlemi ChatGPT doğrudan gerçekleştiremez.
-- Kullanım miktarlarını ve kota/harcama sınırlarını denetle.
-- Önceden yayımlanmış APK/Actions artifact'larını kontrol et. Eski anahtar çıkarsa ele geçirilmiş kabul et.
-- Git geçmişini bir secret tarayıcısıyla tara ve şüpheli sonuçları doğrula. Geçmiş temizliği gerekecekse ayrı bir yedek ve plan kullan; doğrudan force-push yapma.
-- Repository Settings → Code security üzerinden secret scanning ve push protection özelliklerini, hesap/plan sunuyorsa, aç.
-- Genel Action izinlerini salt-okunur tut ve `pull_request_target` ile güvenilmeyen PR koduna secret verme.
+The older Media Hub branch used `secrets.ID4_TOMTOM_API_KEY` and
+`patch_mola.py` with `assets/id4/traffic-config.js`, rather than the
+EV Cockpit-prefixed names above. The archived key handling is **not**
+a validation that prior APKs were secret-free. Treat any potentially
+embedded prior key as compromised and rotate it separately. The existing
+native Release signing hold must remain in place until credential and
+signing-certificate continuity are independently verified.
 
-## APK paket denetimi
+## Actions for earlier releases
+
+- **Rotate / revoke** the old key in the TomTom Developer dashboard. ChatGPT cannot perform this directly.
+- Review usage and quota/spending limits.
+- Inspect previously published APKs and Actions artifacts. Treat an extractable old key as compromised.
+- Scan Git history with a secret scanner and verify suspicious findings. If history cleanup is needed, use a separate backup and plan; do not immediately force-push.
+- Enable secret scanning and push protection under Repository Settings → Code security if available for the account/plan.
+- Keep general Actions permissions read-only and do not expose secrets to untrusted PR code through `pull_request_target`.
+
+## APK package check
 
 ```bash
 python3 - <<'PY'
 from zipfile import ZipFile
 from pathlib import Path
 
-apk=next(Path('mola/dist').glob('*.apk'))
+apk=next(Path('mediaengine/dist').glob('*.apk'))
 with ZipFile(apk) as z:
-    config=z.read('assets/id4/traffic-config.js').decode('utf-8')
-    assert config.strip() == 'window.ID4_TRAFFIC_CONFIG={tomtomKey:""};'
+    config=z.read('assets/evcockpit/traffic-config.js').decode('utf-8')
+    assert config.strip() == 'window.EVCOCKPIT_TRAFFIC_CONFIG={tomtomKey:""};'
 print('PASS: APK traffic-config.js has no embedded TomTom key')
 PY
 ```
 
-Bu test, yalnızca belirlenen config dosyasına anahtar gömülmediğini doğrular; eski APK'ların güvenli olduğunu veya bütün ikili içeriğin tarandığını kanıtlamaz. Özellikle eski build'leri ayrıca inceleyin.
+This test only verifies that the specified configuration file does not contain an embedded key. It does not prove that older APKs are safe or that the entire binary has been scanned. Review older builds separately.

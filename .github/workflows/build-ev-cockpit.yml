@@ -1,0 +1,445 @@
+name: EV Cockpit APK (TV ve rota koruma)
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [feature/media-engine-migration]
+  push:
+    branches: [feature/ev-cockpit]
+    paths:
+      - 'media-engine/**'
+      - 'nativecockpit/**'
+      - '.github/workflows/build-ev-cockpit.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ev-cockpit-build
+  cancel-in-progress: true
+jobs:
+  ev-cockpit-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Uygulama entegrasyon dosyalarını al
+        uses: actions/checkout@v7
+        with:
+          path: integration
+      - name: GPL lisanslı medya tabanını al
+        # The pinned source tree includes a large historical APK on Git LFS.
+        # Compiling needs the GPL sources only, not a 160 MB LFS binary.
+        # Downloading that unrelated binary sometimes returns GitHub LFS 502.
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/moris545454/araba-.git mediaengine
+          cd mediaengine
+          git checkout --detach 3f45ad3557a25822c2a3a9f152f32ef82f57e005
+          test "$(git rev-parse HEAD)" = "3f45ad3557a25822c2a3a9f152f32ef82f57e005"
+          test -f LICENSE
+      - name: EV Cockpit entegrasyonunu uygula
+        # Never inject account API secrets into publicly downloadable APKs.
+        # Each user supplies their own TomTom key in the native settings.
+        run: python3 integration/media-engine/patch_mediaengine.py mediaengine integration/media-engine/overlay
+      - name: Android araç entegrasyonu ve medya uyumluluğunu doğrula
+        run: python3 integration/media-engine/tests/test_android_auto_manifest.py mediaengine
+      - name: Korunan medya oynatıcı kaynaklarını doğrula
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd mediaengine
+          git diff --name-only | tee /tmp/mediaengine-modified.txt
+          cat >/tmp/expected.txt <<'EOF'
+          fermata/src/auto/AndroidManifest.xml
+          fermata/src/auto/res/xml/automotive_app_desc.xml
+          fermata/src/main/AndroidManifest.xml
+          fermata/src/main/java/me/aap/fermata/ui/activity/MainActivity.java
+          fermata/src/main/java/me/aap/fermata/ui/fragment/AudioEffectsPrefsBuilder.java
+          fermata/src/main/java/me/aap/fermata/ui/fragment/DashboardCard.java
+          fermata/src/main/java/me/aap/fermata/ui/fragment/DashboardFragment.java
+          fermata/src/main/java/me/aap/fermata/ui/fragment/PlaybackPrefsBuilder.java
+          fermata/src/main/java/me/aap/fermata/ui/fragment/SettingsFragment.java
+          fermata/src/main/res/layout/dashboard_fragment.xml
+          fermata/src/main/res/values-tr/strings.xml
+          fermata/src/main/res/values/strings.xml
+          EOF
+          diff -u /tmp/expected.txt /tmp/mediaengine-modified.txt
+          test -s fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java
+          test -s fermata/src/main/assets/evcockpit/index.html
+          # Compare code for TV, VLC, YouTube, MediaProjection etc with base.
+          git diff --exit-code -- modules/tv modules/web modules/vlc modules/exoplayer
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify journey card survives media refresh
+        run: python3 integration/media-engine/tests/test_dashboard_identity.py mediaengine
+      - name: Araç görünümünde manuel enerji girişi olmadığını doğrula
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 integration/media-engine/tests/test_vehicle_dashboard.py \
+            integration/media-engine/overlay \
+            integration/media-engine/patch_mediaengine.py
+      - name: Validate embedded navigation, dual search and no-GPS route
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check integration/media-engine/tests/test_basemap.js
+          node integration/media-engine/tests/test_basemap.js
+          node --check integration/media-engine/tests/test_navigator.js
+          # Word delivery: parse-check both attached scripts before packaging.
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/evcockpit-live-map.js
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/evcockpit-navigator-adapter.js
+          node --check integration/media-engine/tests/test_live_map.js
+          node integration/media-engine/tests/test_live_map.js
+          node integration/media-engine/tests/test_journey_guide_integration.js
+          node integration/media-engine/tests/test_visible_brand.js
+          # Premium cockpit skin is separate from the tested route/OBD bridge.
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/evcockpit-tesla-cockpit.js
+          node integration/media-engine/tests/test_tesla_cockpit.js
+          node integration/media-engine/tests/test_eya_cockpit.cjs
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/eya-trip-planner.js
+          node integration/media-engine/tests/test_eya_trip_planner.cjs
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/eya-charging-model.js
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/eya-corridor-stations.js
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/eya-energy-route.js
+          node integration/media-engine/tests/test_eya_charging_model.cjs
+          node integration/media-engine/tests/test_eya_corridor_stations.cjs
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/evcockpit-mediaengine-media.js
+          node integration/media-engine/tests/test_mediaengine_media.js
+          node integration/media-engine/tests/test_external_mediaengine32.cjs
+          python3 integration/media-engine/tests/test_embedded_media.py mediaengine
+          node --check integration/media-engine/tests/test_evcockpit_native_bridge.js
+          node integration/media-engine/tests/test_evcockpit_native_bridge.js
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('integration/media-engine/overlay/fermata/src/main/assets/evcockpit')
+          html=(root/'navigator.html').read_text()
+          core=(root/'evcockpit-live-map.js').read_text()
+          adapter=(root/'evcockpit-navigator-adapter.js').read_text()
+          assert html.count('window.evcockpitLiveLeafletMap=map')==1
+          assert html.count('window.EVCOCKPIT_LIVE_ATTACH_ONLY=true')==1
+          assert html.count('src="evcockpit-live-map.js"')==1
+          assert html.count('src="evcockpit-navigator-adapter.js"')==1
+          assert 'ingestNativeRoute' in core and 'attachExistingMap' in core
+          assert 'window.evcockpitLiveLeafletMap' in adapter or 'evcockpitLiveLeafletMap' in adapter
+          assert 'localIncidentKey' in core and 'corridorKm: 5' in core
+          print('PASS: Word addon attaches to existing navigator, no duplicate map')
+          PY
+          node integration/media-engine/tests/test_navigator.js \
+            integration/media-engine/overlay/fermata/src/main/assets/evcockpit/navigator.html
+          node --check integration/media-engine/overlay/fermata/src/main/assets/evcockpit/traffic-provider.js
+          node integration/media-engine/tests/test_traffic_provider.js
+          # A missing/uncertain GPS fix must never grant video permission.
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitNavigatorActivity.java').read_text()
+          start=src.index('private boolean videoLaunchBlockedByMotion()')
+          end=src.index('private void openEmbeddedVideo(',start)
+          gate=src[start:end]
+          assert 'p==null' in gate and 'p.getAccuracy()>35' in gate
+          assert '!p.hasSpeed()' in gate and 'return true;' in gate
+          assert 'elapsed>15000' in gate and 'p.getSpeed()>0.4f' in gate
+          assert 'if(videoLaunchBlockedByMotion())' in src
+          assert 'if(movingWithRecentGps())' not in src
+          print('PASS: video launch fails closed on missing, stale and moving GPS')
+          PY
+          # One native owner of the API key. Uploaded JS getter bridge was
+          # intentionally not shipped: WebView JavaScript can be reached from
+          # subframes, so it must not expose unrestricted credential reads.
+          python3 - <<'PY'
+          from pathlib import Path
+          java=Path('integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev')
+          store=(java/'EvCockpitApiKeyStore.java').read_text()
+          nav=(java/'EvCockpitNavigatorActivity.java').read_text()
+          build=Path('integration/media-engine/patch_mediaengine.py').read_text()
+          assert 'AndroidKeyStore' in store and 'AES/GCM/NoPadding' in store
+          assert 'setKeySize(256)' in store
+          assert 'PREFIX_PLAIN' not in store
+          assert 'Base64.encodeToString(cipher.getIV()' in store
+          assert 'EvCockpitApiKeyStore.set(this,key)' in nav
+          assert 'EvCockpitApiKeyStore.clear(this)' in nav
+          assert 'EvCockpitApiKeyStore.get(this)' in nav
+          assert 'legacy.edit().remove("tomtom").commit()' in nav
+          assert 'addJavascriptInterface(new EvCockpitKeyBridge' not in nav
+          assert not (java/'EvCockpitKeyBridge.java').exists()
+          assert 'api_key_store' in build
+          print('PASS: Keystore encryption, legacy migration, no plaintext or extra JS secret bridge')
+          PY
+      - name: Render and validate cockpit at phone and reference sizes
+        run: |
+          npm install --prefix "$RUNNER_TEMP/evcockpit-browser" playwright
+          NODE_PATH="$RUNNER_TEMP/evcockpit-browser/node_modules" \
+          CHROME_BIN="$(command -v google-chrome)" \
+          EVCOCKPIT_SCREENSHOTS="$RUNNER_TEMP/evcockpit-layout" \
+          node integration/media-engine/tests/test_cockpit_layout.cjs
+      - name: Verify live OpenFreeMap vector map in Turkey
+        run: |
+          NODE_PATH="$RUNNER_TEMP/evcockpit-browser/node_modules" \
+          CHROME_BIN="$(command -v google-chrome)" \
+          EVCOCKPIT_SCREENSHOTS="$RUNNER_TEMP/evcockpit-layout" \
+          node integration/media-engine/tests/test_vector_map.cjs
+      - name: Kokpit görünüm testlerini yükle
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: EV-Cockpit-Gorsel-Testleri
+          path: ${{ runner.temp }}/evcockpit-layout
+          retention-days: 7
+      - name: Şarj geçmişi ve veri tazeliğini test et
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/charge-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/charge-tests" \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitChargeHistory.java \
+            integration/media-engine/tests/EvCockpitChargeHistoryTest.java
+          java -ea -cp "$RUNNER_TEMP/charge-tests" EvCockpitChargeHistoryTest
+      - name: Validate automatic energy has no manual-entry controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/charge-tests" \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEnergyModel.java \
+            integration/media-engine/tests/EvCockpitEnergyModelTest.java
+          java -ea -cp "$RUNNER_TEMP/charge-tests" EvCockpitEnergyModelTest
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/charge-tests" \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEnergyModel.java \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitChargeAdvisor.java \
+            integration/media-engine/tests/EvCockpitChargeAdvisorTest.java
+          java -ea -cp "$RUNNER_TEMP/charge-tests" EvCockpitChargeAdvisorTest
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/charge-tests" \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitChargeCost.java \
+            integration/media-engine/tests/EvCockpitChargeCostTest.java
+          java -ea -cp "$RUNNER_TEMP/charge-tests" me.aap.fermata.ev.EvCockpitChargeCostTest
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/charge-tests" \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEnergyModel.java \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitChargeCost.java \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitTripChargePlan.java \
+            integration/media-engine/tests/EvCockpitTripChargePlanTest.java
+          java -ea -cp "$RUNNER_TEMP/charge-tests" me.aap.fermata.ev.EvCockpitTripChargePlanTest
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java").read_text()
+          a=s[s.index('private void energyScreen()'):s.index('private void showPrices()')]
+          assert 'field(' not in a
+          assert 'EditText' not in a
+          assert 'renderAutoEnergy' in a and 'fetchAutomaticPrice' in a
+          assert 'EvCockpitEnergyData.load' in a
+          print('PASS: no manual energy form; route/OBD/price bound to sources')
+          PY
+      - name: Reject uncalibrated ELM327 readings as live vehicle measurements
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/obd-safety"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/obd-safety" \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitMebDecoder.java \
+            integration/media-engine/tests/EvCockpitMebDecoderSafetyTest.java
+          java -ea -cp "$RUNNER_TEMP/obd-safety" EvCockpitMebDecoderSafetyTest
+      - name: Check EPDK AC/DC socket classification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/station-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/station-tests" \
+            integration/media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitStationTypes.java \
+            integration/media-engine/tests/EvCockpitStationTypesTest.java
+          java -ea -cp "$RUNNER_TEMP/station-tests" me.aap.fermata.ev.EvCockpitStationTypesTest
+      - name: Install matching Android toolchain
+        uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+            ndk;29.0.14206865
+      - name: EV Cockpit APK oluştur
+        shell: bash
+        working-directory: mediaengine
+        env:
+          NO_GS: 'true'
+          APP_ID_SFX: '.evcockpitpreview'
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-parallel verifyWebOnlyProductionGraph
+          # The public MediaEngine build.sh conflates APP_ID_SFX env with flavor.
+          # Pass the suffix as an explicit Gradle *property* instead.
+          ./gradlew --no-daemon --no-parallel :fermata:packageAutoDebugUniversalApk -PAPP_ID_SFX=.evcockpitpreview -PAPP_NAME="EV Cockpit"
+          mkdir -p dist
+          mapfile -t built < <(find fermata/build/outputs/apk_from_bundle -type f -name 'fermata*.apk' -print)
+          test "${#built[@]}" -eq 1
+          cp "${built[0]}" dist/FermataX-evcockpitpreview.apk
+      - name: Gerçek harita kodlarını ve paket izinlerini doğrula
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          packages=list(Path("mediaengine/dist").glob("*.apk"))
+          assert len(packages)==1,"Exactly one APK must be present"
+          with ZipFile(packages[0]) as apk:
+              entries=set(apk.namelist())
+              html=apk.read("assets/evcockpit/navigator.html").decode("utf-8")
+              scripts=[
+                  "evcockpit-offline-geography.js","evcockpit-basemap.js",
+                  "traffic-provider.js","traffic-config.js",
+                  "leaflet.js","leaflet.css","maplibre-gl.js","maplibre-gl.css",
+                  "evcockpit-tesla-cockpit.css","evcockpit-tesla-cockpit.js",
+                  "eya-cockpit-3070.css","eya-trip-planner.js","eya-trip-planner.css",
+                  "eya-charging-model.js","eya-corridor-stations.js",
+                  "eya-energy-route.js","eya-tesla-abrp.css",
+                  "maplibre-gl-leaflet.js","MAPLIBRE_LICENSE.txt","MAPLIBRE_LEAFLET_LICENSE.txt",
+              ]
+              missing=["assets/evcockpit/"+name for name in scripts
+                       if "assets/evcockpit/"+name not in entries]
+              assert not missing,"APK missing map scripts: "+", ".join(missing)
+              for name in ["evcockpit-offline-geography.js","evcockpit-basemap.js"]:
+                  assert 'src="'+name+'"' in html
+                  assert len(apk.read("assets/evcockpit/"+name))>1000
+              assert 'id="evcockpit-tesla-side"' in html
+              assert 'src="evcockpit-tesla-cockpit.js"' in html
+              assert 'href="evcockpit-tesla-cockpit.css"' in html
+              assert 'href="eya-cockpit-3070.css"' in html
+              assert 'href="eya-trip-planner.css"' in html
+              assert 'src="eya-trip-planner.js"' in html
+              for js in ("eya-charging-model.js","eya-corridor-stations.js",
+                         "eya-energy-route.js"):
+                  assert 'src="'+js+'"' in html
+              assert 'href="eya-tesla-abrp.css"' in html
+              # Browser model scripts MUST load before the trip-planner observer.
+              assert html.index('src="eya-charging-model.js"') < html.index('src="eya-trip-planner.js"')
+              assert html.index('src="eya-corridor-stations.js"') < html.index('src="eya-trip-planner.js"')
+              assert "EvCockpitBaseMap.init(map" in html
+              assert 'class="dock-climate"' not in html
+              assert 'KLİMA</' not in html
+              assert "body.provider-active #map{visibility:hidden}" not in html
+              # Never distribute shared API credentials in public artifacts.
+              # Actual values live in app-private settings and are injected
+              # into WebView only when the user explicitly configures them.
+              cfg=apk.read("assets/evcockpit/traffic-config.js").decode("utf-8")
+              assert cfg.strip()=='window.EVCOCKPIT_TRAFFIC_CONFIG={tomtomKey:""};', (
+                  "Refusing public APK containing build-time traffic credentials")
+              print("PASS: installed APK contains real map scripts, no climate widgets and no TomTom build key")
+          PY
+      - name: Önizleme uygulamasının mevcut kullanıcı verilerini koruduğunu doğrula
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find mediaengine/dist -maxdepth 1 -name 'FermataX-*.apk' -print -quit)"
+          test -n "$APK"
+          test -s "$APK"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$AAPT" dump badging "$APK" > /tmp/mediaengine-preview-package.txt
+          # Final binary gate: an external proprietary APK is NOT the build input.
+          # Do not accidentally inherit its mic/file/video permissions.
+          "$AAPT" dump permissions "$APK" > /tmp/evcockpit-preview-permissions.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          manifest=Path('/tmp/evcockpit-preview-permissions.txt').read_text()
+          rejected={
+              'android.permission.CAMERA',
+              'android.permission.RECORD_AUDIO',
+              'android.permission.READ_EXTERNAL_STORAGE',
+              'android.permission.READ_MEDIA_VIDEO',
+              'android.permission.READ_MEDIA_AUDIO',
+              'android.permission.MANAGE_EXTERNAL_STORAGE',
+              'android.permission.WRITE_EXTERNAL_STORAGE'
+          }
+          requested=set(re.findall(r"uses-permission(?:-sdk-\d+)?: name='([^']+)'",manifest))
+          found=sorted(requested.intersection(rejected))
+          assert not found, 'Unexpected microphone/camera/filesystem permissions: '+str(found)
+          print('PASS: final merged EVCOCKPIT preview requests no microphone/camera/general media read permissions')
+          PY
+          head -3 /tmp/mediaengine-preview-package.txt
+          grep -q 'evcockpitpreview' /tmp/mediaengine-preview-package.txt
+          # aapt badging omits some activity-alias labels on newer SDK tools:
+          # inspect the compiled manifest directly instead of grepping badging.
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > /tmp/evcockpit-compiled-manifest.txt
+          grep -q 'EvCockpitLauncher' /tmp/evcockpit-compiled-manifest.txt
+          # Verify the COMPILED manifest, not only the pre-merge XML.
+          # Android Auto template apps are exposed through a real CarAppService;
+          # a phone LAUNCHER alias alone does not make them host discoverable.
+          grep -Fq 'com.google.android.gms.car.application' /tmp/evcockpit-compiled-manifest.txt
+          grep -Fq 'me.aap.fermata.ev.EvCockpitCarPoiService' /tmp/evcockpit-compiled-manifest.txt
+          grep -Fq 'androidx.car.app.CarAppService' /tmp/evcockpit-compiled-manifest.txt
+          grep -Fq 'androidx.car.app.category.POI' /tmp/evcockpit-compiled-manifest.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('/tmp/evcockpit-compiled-manifest.txt').read_text()
+          assert 'EvCockpitLauncher' in s
+          assert 'EV Cockpit' in s
+          print('PASS: EV Cockpit label and launcher alias in binary manifest')
+          PY
+          # Require the independent preview namespace, never an upstream app ID.
+          python3 - <<'PYCODE'
+          import re
+          from pathlib import Path
+          info = Path('/tmp/mediaengine-preview-package.txt').read_text()
+          package = re.search(r"^package: name='([^']+)'", info, re.M)
+          assert package and package.group(1).removesuffix('.debug').endswith('.evcockpitpreview'), \
+              'Refusing APK without the independent preview application ID'
+          PYCODE
+          test "$(stat -c %s "$APK")" -gt 10000000
+          mkdir -p output
+          cp "$APK" output/EV-Cockpit.apk
+          sha256sum output/EV-Cockpit.apk | tee output/SHA256.txt
+      - name: EV Cockpit APK paketini yükle
+        uses: actions/upload-artifact@v7
+        with:
+          name: EV-Cockpit-APK
+          path: |
+            output/EV-Cockpit.apk
+            output/SHA256.txt
+          retention-days: 7
+          if-no-files-found: error
+
+  native-cockpit-verify:
+    name: Native Kotlin Cockpit · tests and debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v7
+      - name: Configure Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Configure Android 36
+        uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+      - name: Configure Gradle 8.14.3
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.3'
+      - name: Compile and run Native Cockpit unit tests
+        run: gradle :nativecockpit:testDebugUnitTest --stacktrace --no-daemon
+      - name: Assemble Native Cockpit debug APK
+        run: gradle :nativecockpit:assembleDebug --stacktrace --no-daemon
+      - name: Verify generated APK and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml > nativecockpit-manifest.txt
+          grep -q 'android.permission.ACCESS_FINE_LOCATION' nativecockpit-manifest.txt
+          grep -q 'android.permission.ACCESS_COARSE_LOCATION' nativecockpit-manifest.txt
+          sha256sum "$apk" > nativecockpit-debug.sha256
+      - name: Publish Native Cockpit test APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: EV-Cockpit-Native-Cockpit-APK
+          path: |
+            nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk
+            nativecockpit-debug.sha256
+          retention-days: 14
+          if-no-files-found: error

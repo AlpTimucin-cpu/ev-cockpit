@@ -1,0 +1,58 @@
+/* Non-modal route planner: maintains one existing native map/route owner. */
+#eya-trip-panel[hidden],#eya-trip-use-stop[hidden]{display:none!important}
+.eya-trip-panel{position:fixed;z-index:1225;right:14px;top:94px;bottom:88px;
+ width:min(490px,65vw);overflow:auto;overscroll-behavior:contain;
+ background:rgba(4,23,39,.97);color:#e9f8ff;border:1px solid #356987;
+ border-radius:17px;box-shadow:0 22px 60px #0009;backdrop-filter:blur(18px);
+ padding:14px 17px;box-sizing:border-box;font:13px/1.45 system-ui,Roboto,sans-serif}
+.eya-trip-heading{display:flex;justify-content:space-between;gap:14px;align-items:center;
+ position:sticky;top:-14px;padding:10px 1px 12px;background:#061f32;z-index:1}
+.eya-trip-heading strong{font-size:18px;color:#f0fcff;display:block}
+.eya-trip-heading small{font-size:11px;color:#a9ccdc}
+.eya-trip-heading button,#eya-trip-use-stop,.eya-trip-open{
+ border:1px solid #2d8caa;border-radius:10px;background:#0a5471;color:#e6fbff;
+ min-height:48px;padding:9px 12px;font-weight:700;cursor:pointer;touch-action:manipulation}
+.eya-trip-heading button{min-width:48px;font-size:19px}
+.eya-trip-open{width:100%;margin-top:8px;background:linear-gradient(115deg,#126283,#165477);
+ font-size:12px;pointer-events:auto;min-height:46px}
+.eya-trip-status,.eya-trip-source{font-size:11px;color:#a8d7e8;margin:9px 0}
+.eya-trip-status{background:#092d43;padding:9px 11px;border-radius:10px;border-left:3px solid #35d7b6}
+.eya-trip-source{color:#8facbc;overflow-wrap:anywhere}
+.eya-trip-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.eya-trip-stats>div{background:#0d3047;border:1px solid #245470;border-radius:11px;
+ padding:9px 7px;min-width:0}
+.eya-trip-stats small{display:block;color:#a2c2d4;font-size:10px}
+.eya-trip-stats strong{display:block;font-size:clamp(12px,1.25vw,17px);margin-top:4px;
+ color:#4ae9ca;overflow-wrap:anywhere}
+.eya-trip-settings{margin:12px 0;background:#0e3048;border:1px solid #28546e;
+ border-radius:12px;padding:9px 12px}
+.eya-trip-settings summary{cursor:pointer;font-weight:650;color:#e5f8ff;min-height:27px}
+.eya-trip-settings small{color:#a7c4d3;display:block;padding:8px 0}
+.eya-trip-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.eya-trip-field{display:block;color:#c2e4ef;font-size:10px}
+.eya-trip-field span{display:block;min-height:30px}
+.eya-trip-field input{width:100%;height:48px;box-sizing:border-box;background:#082336;
+ border:1px solid #367391;border-radius:9px;color:#fff;padding:9px;font-size:15px}
+.eya-trip-panel h3{font-size:13px;margin:15px 0 9px;letter-spacing:.2px}
+.eya-trip-timeline{display:grid;gap:8px}
+.eya-trip-node{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:7px;
+ padding:9px;background:#0b2d43;border-radius:10px;border-left:2px solid #377a99}
+.eya-trip-dot{color:#9fdcef}.eya-trip-dot.charge{color:#40e3ac}.eya-trip-dot.destination{color:#ffba7c}
+.eya-trip-node-copy{min-width:0}.eya-trip-node-copy strong{display:block;font-size:12px;overflow-wrap:anywhere}
+.eya-trip-node-copy small{display:block;color:#a7c3d3;font-size:11px;margin-top:2px}
+.eya-trip-node-soc{font-size:13px;color:#4ce6bd;white-space:nowrap}
+#eya-trip-chart{display:block;width:100%;height:auto;border-radius:12px;background:#09263b;
+ border:1px solid #204c66}
+.eya-trip-chart-note,.eya-trip-disclaimer{font-size:10px;color:#9cb9ca;margin:7px 0}
+.eya-trip-station{padding:10px;background:#10384d;border:1px solid #2c6375;
+ border-radius:10px;margin-top:11px;line-height:1.45}
+#eya-trip-use-stop{width:100%;margin-top:10px;background:#12645b;border-color:#42daba}
+@media (orientation:landscape) and (max-height:570px){
+ .eya-trip-panel{top:58px;bottom:70px;padding:9px 12px;width:min(480px,70vw)}
+ .eya-trip-heading{top:-9px;padding:7px 0}
+}
+@media (orientation:portrait),(max-width:639px){
+ .eya-trip-panel{left:8px;right:8px;top:76px;bottom:9px;width:auto;padding:12px}
+ .eya-trip-heading{top:-12px}
+ .eya-trip-open{font-size:12px}
+}
