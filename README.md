@@ -7,9 +7,10 @@ App Library 1.7.0.
 
 ## Source of truth (9 November 2026)
 
-- The GitHub `main` branch still contains the older Media Hub baseline and
-  does **not** yet contain the stacked native cockpit work. Do not treat GitHub
-  Releases `v1.0.0`/`v1.0.2` as builds of the new native code.
+- **Before any integration merge**, `main` is the old Media Hub baseline.
+  The proposed integration is a **draft PR**, not yet a published release.
+  Existing GitHub Releases `v1.0.0`/`v1.0.2` remain older APKs and must
+  not be presented as builds of the new native cockpit.
 - The native cockpit is maintained in a series of **draft** PRs, currently
   rooted in `feature/ev-cockpit`, with
   [Phase 12](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/45),
@@ -67,7 +68,8 @@ smoke test** creates a *throwaway signing key* for build verification only.
 Even if that CI passes, **do not install or distribute its signed artifact**.
 
 There is no authorized workflow to create a trusted Release from the
-previously exposed credentials; `main` is not updated automatically.
+previously exposed credentials. **This integration remains unmerged** until
+CI, on-device acceptance and owner review succeed. No automatic Release.
 
 ## Documentation and licensing
 
