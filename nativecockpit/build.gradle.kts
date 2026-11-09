@@ -70,7 +70,9 @@ android {
             // Separate install ID and launcher name: never replace a user's
             // real signed app or trigger an incompatible-signature update.
             applicationIdSuffix = ".debug"
-            versionNameSuffix = "-TEST"
+            // Debug remains explicitly labeled and separately installed.
+            // "-TEST" is removed; this is NOT a production signing identity.
+            versionNameSuffix = "-DEBUG"
             // No synthetic GPS, BMS SoC or OBD test modes are enabled.
             isMinifyEnabled = false
         }
@@ -79,6 +81,9 @@ android {
             // Production build: R8 code and resource shrinking enabled.
             isMinifyEnabled = true
             isShrinkResources = true
+            // Only 64-bit ARM native binaries are packaged in Release.
+            // Debug keeps its broader ABI coverage for host/emulator QA.
+            ndk { abiFilters += "arm64-v8a" }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

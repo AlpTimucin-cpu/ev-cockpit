@@ -1,57 +1,76 @@
-# EV Cockpit
+# EV Cockpit — Android development preview
 
-The application interface, voice guidance, and repository documentation are in English.
+An independent map-first EV cockpit using Kotlin, Jetpack Compose, MapLibre,
+OSRM, real Fused GPS, read-only ELM327 and Android for Cars App Library 1.7.0.
+**The application UI and voice instructions are in Turkish; this guide is in
+English. The app has NOT passed on-vehicle acceptance testing.**
 
-A map-first electric-vehicle cockpit built with Kotlin, Jetpack Compose, MapLibre, OSRM, and read-only vehicle diagnostics.
+## What is actually verified (9 November 2026)
 
-## Interface
+- The current native cockpit features live on a **stack of draft pull requests**
+  atop `feature/ev-cockpit`. The repository default `main` branch still
+  represents an older Media Hub baseline; it is not yet the new native app.
+- Phase 12 source and automated Android lint/JVM/Debug build checks have
+  passed on the draft branch. This does **not** prove real Android Auto host
+  visibility, an actual VW ID.4 12.9-inch screen, TTS/audio focus, Bluetooth
+  reliability or USB reconnection.
+- The Debug diagnostics branch offers an in-memory, 500-event, privacy-limited
+  app-owned log with copy and `.txt` sharing; no system logcat and no precise
+  GPS/credential/vehicle identifier collection.
+- The [A–H phone/vehicle acceptance protocol](docs/IS2_TELEFON_ID4_KABUL_TESTI_TR.md)
+  has **not been completed**. Its cases are awaiting owner evidence.
+- The signed production release workflow is **SECURITY-HELD** following an
+  exposed signing credential. Old published tags do not establish new native
+  production acceptance.
 
-- One full-screen map, with direct access to routes and charging stations.
-- A large state-of-charge indicator and modeled range in the upper-left corner.
-- A compact arrival panel with the next maneuver, ETA, and estimated arrival SoC.
-- A slim Route / Charging / Media / Settings dock.
-- Dark navy surfaces, one neon-green accent, larger typography, and restrained corner radii.
-- Unknown vehicle measurements remain unavailable; no synthetic GPS or vehicle measurements are used.
+## Data and policy guarantees
 
-## Modules
+Only measured, recent GPS updates and validated OSRM road geometry drive
+navigation. Estimated time, remaining range, energy/arrival SoC and weather
+are **models/forecasts**, never direct real-time vehicle measurements.
+The application refuses to invent unavailable BMS SoC: **MEB DID, CAN address
+and scaling for this ID.4 Pure are unverified**.
 
-| Module | Purpose | Application ID |
-|---|---|---|
-| `nativecockpit` | Compose cockpit and Android Auto navigation | `com.evcockpit` |
-| `app` | Media Hub and companion utilities | `com.evcockpit.mediahub` (`.test` for debug) |
-| `evlite` | Lightweight map and charging tools | `com.evcockpit.evguide.lite` (`.tvbeta` for debug) |
-| `media-engine` | Source overlay for the separately licensed media foundation | Distinct preview identity |
+The ELM327 command boundary permits SAE Mode 01 and explicitly allowed UDS
+service `0x22` reads only. No ECU write commands. EPDK charger source age
+is displayed; it does not verify price, live availability or road detour.
+Open-Meteo route weather is scheduled for *at most once per 30 minutes when
+the Android Auto screen is foreground and accurate GPS/route evidence exists*.
+Doze and lost connections may delay it; a label alone is not evidence.
 
-## Build
+Android Auto uses allowed navigation templates and does not expose
+video/WebView. Phone video requires an explicit user parked confirmation
+and measured stationary OBD speed.
 
-Use Java 17, Android SDK 36, and Gradle 8.14.3 for the Kotlin modules.
+## Builds and variants
+
+- Java 17 / Android SDK 36 / pinned Gradle 8.14.3 / minSdk 28.
+- Modules `:nativecockpit`, `:app` and `:evlite`; `media-engine/`
+  is a source directory and is not built as a Gradle module.
+- Debug: `com.evcockpit.debug`, source version `1.0.8-DEBUG`,
+  intentionally independently installed.
+- Release source: `com.evcockpit`, version `1.0.8` (no `-TEST` suffix).
+  R8, resource shrinking, `arm64-v8a`, HTTPS system trust,
+  `debuggable=false`, no cleartext/no backup. A **throwaway CI key** may
+  sign an *unpublished Release smoke-test APK* solely to verify the build;
+  this does **not** create a trusted or distributable release.
 
 ```bash
-gradle :nativecockpit:testDebugUnitTest :nativecockpit:assembleDebug
-gradle :app:testDebugUnitTest :app:assembleDebug
-gradle :evlite:testDebugUnitTest :evlite:assembleDebug
+./gradlew :nativecockpit:lintDebug :nativecockpit:testDebugUnitTest :nativecockpit:assembleDebug
+python3 scripts/verify_youtube_filter_absent.py --apk nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk
 ```
 
-The native test APK is written to `nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk`. CI workflows publish APK artifacts and checksums. Production signing continues to use the owner's existing secret configuration; no production key is committed to the repository.
+The source/Debug DEX test rejects the legacy YouTube ad-filter class;
+a passing native APK scan does not certify a separate old media APK.
 
-## Package migration
+## Next checks
 
-The native source packages now live under `com.evcockpit`. The manifest, Hilt entry points, generated-resource imports, ProGuard rules, and CI launch commands use that namespace.
+- [Phone + real vehicle acceptance checklist](docs/IS2_TELEFON_ID4_KABUL_TESTI_TR.md)
+- [Stacked PR integration and risk analysis](docs/INTEGRATION_PLAN_2026-11-09_TR.md)
+- [Repository profile + legacy ZIP archive steps](docs/REPO_PROFILE_AND_SOURCE_ARCHIVE_TR.md)
+- [CHANGELOG](CHANGELOG.md) · [Turkish documentation](README_TR.md)
+- [GPL-3.0](LICENSE) · [NOTICE](NOTICE.md) ·
+  [Third-party notices](THIRD_PARTY_NOTICES.md) · [Security](SECURITY_TOMTOM.md)
 
-Changing an application ID creates a **separate Android application**. Existing installations are not overwritten, and private preferences, databases, saved logins, and Android permissions do not migrate automatically. No old application is uninstalled or cleared by this project.
-
-See [brand and package migration](docs/BRAND_MIGRATION.md) for the complete refactor scope and external compatibility exceptions.
-
-## Data and media boundaries
-
-OSRM route geometry is real routing data; its speed profile is not live traffic. Charging candidates use dated EPDK data and do not guarantee road access, charger availability, or current prices. Range and arrival SoC are estimates requiring valid measurements or explicitly configured assumptions.
-
-Media playback remains owned by the relevant engine. External application package IDs, upstream source attribution, and existing repository URLs retain their actual externally defined values. Renaming those identifiers would break interoperation or data downloads. Video is not enabled on the driving display by this rebrand.
-
-## License and notices
-
-See [LICENSE](LICENSE), [NOTICE](NOTICE.md), [third-party notices](THIRD_PARTY_NOTICES.md), and [API-key security](SECURITY_TOMTOM.md). Third-party attribution and license texts remain in place.
-
-This is an independent project and does not imply affiliation with a vehicle manufacturer or the owner of an external media application.
-
-[Turkish guide](README_TR.md) · [English guide](README_EN.md)
+Independent project; not affiliated with Volkswagen, Google, Android Auto,
+charging networks or any media provider.

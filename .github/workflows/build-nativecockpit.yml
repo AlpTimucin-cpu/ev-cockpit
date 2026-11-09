@@ -125,6 +125,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_phase10_zip_integration.py' -v
           python3 -m unittest discover -s tests -p 'test_route_osrm_debug_optin.py' -v
           python3 -m unittest discover -s tests -p 'test_cockpit_dashboard_layout.py' -v
+          python3 -m unittest discover -s tests -p 'test_job3_release_policy.py' -v
 
       - name: Android lint (do not waive failures)
         id: lint
@@ -163,6 +164,15 @@ jobs:
           grep -Fq 'androidx.car.app.CarAppService' "$RUNNER_TEMP/native-manifest.txt"
           grep -Fq 'android.permission.BLUETOOTH_CONNECT' "$RUNNER_TEMP/native-manifest.txt"
           sha256sum "$apk" > nativecockpit-debug.sha256
+
+      - name: Reject legacy YouTube ad-filter in Android sources and Debug DEX
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_no_youtube_ad_filter.py' -v
+          python3 -m unittest discover -s tests -p 'test_job3_release_security.py' -v
+          python3 scripts/verify_youtube_filter_absent.py \
+            --apk nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk
 
       - name: Test secret scanner against synthetic samples
         shell: bash

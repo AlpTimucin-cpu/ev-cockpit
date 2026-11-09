@@ -2,6 +2,38 @@
 
 Bu belge güncel kullanıcıya açık uygulamanın değişikliklerini özetler. Eski teknik deneyler ve bunların özgün kayıtları Git sürüm geçmişinde korunur. Telif sahipliği ve üçüncü taraf lisans bildirimleri [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) ve [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyalarındadır.
 
+## 9 Kasım 2026 — İş 3: yayın güvenliği hazırlığı (DRAFT)
+
+- `nativecockpit` kaynak sürümü Release için `1.0.8`, ayrı Debug
+  kimliği için `com.evcockpit.debug` / `1.0.8-DEBUG` olarak tanımlandı.
+  Eski `-TEST` eki yeni derlemelerde yok. Release **yayımlanmadı**.
+- Release: mevcut `isDebuggable=false`, `allowBackup=false`,
+  `usesCleartextTraffic=false`, R8 ve kaynak küçültme korunuyor.
+  Sistem CA'larıyla HTTPS-only ağ yapılandırması ve `arm64-v8a` ABI
+  sınırı eklendi. Yayın anahtarı yerine geçici CI anahtarıyla **yalnız
+  Release smoke derlemesi** tanımlandı; APK dağıtılmıyor.
+- Eski `YoutubeAdFilter` sınıfı için uygulama kaynak ve Debug DEX
+  taraması eklendi. Ayrı eski medya APK'sının da temiz olduğu
+  **bu kontrollerden çıkarılamaz**.
+- Open-Meteo'nun gerçek GPS/OSRM rota kanıtı arayan `30 dakika`
+  foreground yenileme sınırı doğrulama kapsamına alındı.
+  Doze/ağ kopması/zamanlayıcı ertelemesi nedeniyle tam dakikada
+  çalışma **garanti edilmez**.
+- 34 açık PR'ın bağımlılık haritası ve main çakışma riskleri belgelendi.
+  Repo açıklaması/Topics henüz uygulanmadı; eski kök ZIP bir
+  Releases asset'i olarak doğrulanmadığından **silinmedi**.
+- Eski ifşa edilmiş imza bilgisi nedeniyle `release.yml` üzerindeki
+  `if: false` kilidi kaldırılmadı. Android Auto/ID.4 cihaz kabulü
+  ve güvenilir imzalı Release **DOĞRULANMADI**.
+
+## 9 Kasım 2026 — İş 1 ve İş 2 (taslak kaynaklar)
+
+- [Tanılama PR #46](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/46):
+  Debug 500 satırlık maskeli uygulama günlüğü ve paylaşım; otomatik
+  CI geçti, gerçek araç doğrulaması yok.
+- [Telefon/ID.4 UAT PR #47](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/47):
+  A–H protokol belgesi; manuel araç kabulü henüz tamamlanmadı.
+
 ## 26 Ekim 2026 — Tesla esintili ABRP planlayıcı geliştirmesi
 
 - Yatay kokpitin harita payı %75 olarak ayarlandı; batarya kartları ve manevra kartı daha sade yerleşime alındı. **Tarayıcı görsel testi hedefleniyor; gerçek araç ekranında doğrulanmadı.**

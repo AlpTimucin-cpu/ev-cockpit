@@ -3,9 +3,7 @@ package com.evcockpit.presentation.media
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
-import android.net.Uri
 import android.net.http.SslError
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -36,8 +34,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.evcockpit.R
-import java.io.ByteArrayInputStream
-import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,106 +56,6 @@ class MediaWebViewViewModel : ViewModel() {
 
 private class MediaBrowserHost(context: Context) : FrameLayout(context) {
     var releaseFullscreen: (() -> Unit)? = null
-}
-
-/** Only explicitly identified ad endpoints; never block googlevideo.com or general youtubei. */
-private object YoutubeAdFilter {
-    private val blockedDomains = setOf(
-        "doubleclick.net", "googleadservices.com", "googlesyndication.com",
-        "2mdn.net", "adservice.google.com"
-    )
-
-    fun shouldBlock(url: Uri, isMainFrame: Boolean, method: String): Boolean {
-        if (isMainFrame || !method.equals("GET", ignoreCase = true) ||
-            url.scheme != "https") return false
-        val host = url.host?.lowercase(Locale.ROOT)?.trimEnd('.') ?: return false
-        if (blockedDomains.any { host == it || host.endsWith(".$it") }) return true
-        val youtube = host == "youtube.com" || host.endsWith(".youtube.com")
-        if (!youtube) return false
-        val path = url.encodedPath.orEmpty().lowercase(Locale.ROOT)
-        return path.startsWith("/pagead/") ||
-            path.startsWith("/api/stats/ads") ||
-            path.startsWith("/get_midroll_info")
-    }
-
-    fun emptyResponse(): WebResourceResponse = WebResourceResponse(
-        "text/plain", "UTF-8", 204, "No Content",
-        mapOf("Cache-Control" to "no-store"), ByteArrayInputStream(ByteArray(0))
-    )
-
-    // Install on both page start and page finish. YouTube changes DOM via SPA routing.
-    // Fast-forward is attempted ONLY while YouTube marks the player as showing an ad.
-    val pageScript = """
-        (function () {
-          if (!document.documentElement) return;
-          if (window.__evCockpitCleaner) return;
-          window.__evCockpitCleaner = true;
-          var css = [
-            '.video-ads', '.ytp-ad-module', '.ytp-ad-overlay-container',
-            '#player-ads', '#masthead-ad', 'ytd-display-ad-renderer',
-            'ytd-promoted-sparkles-web-renderer', 'ytd-ad-slot-renderer',
-            'ytd-in-feed-ad-layout-renderer', 'ytm-promoted-sparkles-web-renderer',
-            'ytm-companion-ad-renderer', 'ytm-ad-slot-renderer'
-          ];
-          var style = document.createElement('style');
-          style.textContent = css.join(',') + '{display:none !important}';
-          (document.head || document.documentElement).appendChild(style);
-          var prior = new WeakMap();
-          var activeVideo = null;
-          var scheduled = false;
-          function clean() {
-            scheduled = false;
-            if (document.hidden) return;
-            document.querySelectorAll(
-              '.ytp-ad-skip-button, .ytp-ad-skip-button-modern, ' +
-              '.ytp-skip-ad-button, .ytp-ad-skip-button-slot button'
-            ).forEach(function (button) {
-              if (!button.disabled && button.getClientRects().length) {
-                try { button.click(); } catch (e) {}
-              }
-            });
-            var player = document.querySelector('#movie_player, .html5-video-player');
-            var isAd = !!(player && player.classList.contains('ad-showing'));
-            var video = player && player.querySelector('video.html5-main-video');
-            if (activeVideo && (activeVideo !== video || !isAd)) {
-              var old = prior.get(activeVideo);
-              if (old) {
-                try {
-                  activeVideo.playbackRate = old.rate;
-                  activeVideo.muted = old.muted;
-                } catch (e) {}
-              }
-              prior.delete(activeVideo);
-              activeVideo = null;
-            }
-            if (isAd && video) {
-              if (!prior.has(video)) prior.set(video, {
-                rate: video.playbackRate,
-                muted: video.muted
-              });
-              activeVideo = video;
-              try {
-                video.muted = true;
-                video.playbackRate = 16.0;
-              } catch (e) {}
-            }
-          }
-          function schedule() {
-            if (scheduled) return;
-            scheduled = true;
-            requestAnimationFrame(clean);
-          }
-          new MutationObserver(schedule).observe(document.documentElement, {
-            childList: true, subtree: true, attributes: true,
-            attributeFilter: ['class']
-          });
-          document.addEventListener('visibilitychange', schedule);
-          document.addEventListener('yt-navigate-finish', schedule);
-          setInterval(schedule, 1250);
-          schedule();
-        })();
-    """.trimIndent()
-
 }
 
 private fun WebView.pauseMedia() {
@@ -325,15 +221,6 @@ fun MediaWebViewScreen(
                                 model.error("Bu bağlantı site dışında olduğu için engellendi.")
                                 return true
                             }
-                            override fun shouldInterceptRequest(
-                                view: WebView, request: WebResourceRequest
-                            ): WebResourceResponse? {
-                                // Called off the main thread: do not access Compose mutable state here.
-                                if (service != MediaSite.YOUTUBE) return null
-                                return if (YoutubeAdFilter.shouldBlock(
-                                        request.url, request.isForMainFrame, request.method
-                                    )) YoutubeAdFilter.emptyResponse() else null
-                            }
                             override fun onPageStarted(
                                 view: WebView, url: String?, favicon: Bitmap?
                             ) {
@@ -342,21 +229,10 @@ fun MediaWebViewScreen(
                                     model.error("Güvenli sayfa adresi doğrulanamadı.")
                                 } else {
                                     model.start()
-                                    // May run before the DOM is ready; onPageFinished retries.
-                                    if (service == MediaSite.YOUTUBE) runCatching {
-                                        view.evaluateJavascript(YoutubeAdFilter.pageScript, null)
-                                    }
                                 }
                             }
                             override fun onPageFinished(view: WebView, url: String?) {
                                 if (MediaSitePolicy.allows(service, url)) {
-                                    if (service == MediaSite.YOUTUBE && allowed) {
-                                        runCatching {
-                                            view.evaluateJavascript(YoutubeAdFilter.pageScript, null)
-                                        }.onFailure {
-                                            Log.w("EV-Cockpit-AdBlock", "JS injection skipped", it)
-                                        }
-                                    }
                                     CookieManager.getInstance().flush()
                                     model.ready()
                                 }

@@ -111,4 +111,26 @@ class CarWeatherPresentationPolicyTest {
         gate.reset()
         assertTrue(gate.shouldRefresh("first", true, now + 4000))
     }
+    @Test fun automaticRefreshNeverRunsBeforeExactlyThirtyMinutes() {
+        val gate = CarWeatherRefreshGate()
+        assertEquals(1_800_000L, CarWeatherRefreshGate.AUTOMATIC_REFRESH_MS)
+        assertFalse(gate.shouldRefresh("real-route", false, now))
+        assertTrue(gate.shouldRefresh("real-route", true, now))
+        gate.markAttempt("real-route", now)
+        assertFalse(gate.shouldRefresh("real-route", true, now + 1_799_999L))
+        assertTrue(gate.shouldRefresh("real-route", true, now + 1_800_000L))
+        gate.markAttempt("real-route", now + 1_800_000L)
+        assertFalse(gate.shouldRefresh("real-route", true, now + 1_800_001L))
+        assertTrue(gate.shouldRefresh("real-route", true, now + 3_600_000L))
+    }
+
+    @Test fun clockRollbackAndMissingProgressCannotTriggerForecastRequests() {
+        val gate = CarWeatherRefreshGate()
+        assertTrue(gate.shouldRefresh("real-route", true, now))
+        gate.markAttempt("real-route", now)
+        assertFalse(gate.shouldRefresh("real-route", true, now - 1000L))
+        assertFalse(gate.shouldRefresh("real-route", false, now + 10_800_000L))
+        assertTrue(gate.shouldRefresh("real-route", true, now + 10_800_000L))
+    }
+
 }
