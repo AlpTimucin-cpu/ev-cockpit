@@ -20,7 +20,8 @@ class Phase7SafetyPolicyTest(unittest.TestCase):
         workflow = read(".github/workflows/build-nativecockpit.yml")
         self.assertIn('applicationId = "com.evcockpit"', build)
         self.assertRegex(build, r'applicationIdSuffix\s*=\s*"\.debug"')
-        self.assertIn('versionNameSuffix = "-TEST"', build)
+        self.assertIn('versionNameSuffix = "-DEBUG"', build)
+        self.assertNotIn('versionNameSuffix = "-TEST"', build)
         self.assertIn("package: name='com.evcockpit.debug'", workflow)
         self.assertIn("application-label:'EV Cockpit TEST'", workflow)
         for locale in ("values", "values-tr"):
