@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "metadata": {
+    "last_attempt_utc": "2026-10-17T21:31:05+00:00",
+    "record_type": "official_operator_tariffs",
+    "operator_count": 2,
+    "last_refresh_had_errors": false,
+    "price_valid_hours": 36,
+    "availability_included": false,
+    "station_specific_prices_included": false,
+    "source_note": "Do not treat a baseline as the actual socket checkout price."
+  },
+  "operators": [
+    {
+      "operator_id": "trugo",
+      "operator": "Trugo",
+      "official_url": "https://www.trugo.com.tr/price",
+      "checked_at_utc": "2026-10-17T21:31:05+00:00",
+      "verified_at_utc": "2026-10-17T21:31:05+00:00",
+      "tariffs": [
+        {
+          "connector_band": "AC",
+          "price_try_per_kwh": 9.95,
+          "price_scope": "operator_published_baseline",
+          "location_specific_price": null,
+          "verified_at_utc": "2026-10-17T21:31:05+00:00",
+          "source_url": "https://www.trugo.com.tr/price"
+        },
+        {
+          "connector_band": "DC_MAX",
+          "price_try_per_kwh": 14.98,
+          "price_scope": "operator_published_baseline",
+          "location_specific_price": null,
+          "verified_at_utc": "2026-10-17T21:31:05+00:00",
+          "source_url": "https://www.trugo.com.tr/price"
+        },
+        {
+          "connector_band": "DC_MIN",
+          "price_try_per_kwh": 12.0,
+          "price_scope": "operator_published_baseline",
+          "location_specific_price": null,
+          "verified_at_utc": "2026-10-17T21:31:05+00:00",
+          "source_url": "https://www.trugo.com.tr/price"
+        }
+      ],
+      "notice": "Tarife yalnızca işletmecinin yayımladığı genel referanstır. İstasyona, sokete, üyeliğe veya kampanyaya göre farklı fiyat olabilir."
+    },
+    {
+      "operator_id": "zes",
+      "operator": "ZES",
+      "official_url": "https://zes.net/tr/fiyatlandirma",
+      "checked_at_utc": "2026-10-17T21:31:05+00:00",
+      "verified_at_utc": "2026-10-17T21:31:05+00:00",
+      "tariffs": [
+        {
+          "connector_band": "AC",
+          "price_try_per_kwh": 10.99,
+          "price_scope": "operator_published_baseline",
+          "location_specific_price": null,
+          "verified_at_utc": "2026-10-17T21:31:05+00:00",
+          "source_url": "https://zes.net/tr/fiyatlandirma"
+        },
+        {
+          "connector_band": "DC_1",
+          "price_try_per_kwh": 12.99,
+          "price_scope": "operator_published_baseline",
+          "location_specific_price": null,
+          "verified_at_utc": "2026-10-17T21:31:05+00:00",
+          "source_url": "https://zes.net/tr/fiyatlandirma"
+        },
+        {
+          "connector_band": "DC_2",
+          "price_try_per_kwh": 16.49,
+          "price_scope": "operator_published_baseline",
+          "location_specific_price": null,
+          "verified_at_utc": "2026-10-17T21:31:05+00:00",
+          "source_url": "https://zes.net/tr/fiyatlandirma"
+        }
+      ],
+      "notice": "Tarife yalnızca işletmecinin yayımladığı genel referanstır. İstasyona, sokete, üyeliğe veya kampanyaya göre farklı fiyat olabilir."
+    }
+  ]
+}

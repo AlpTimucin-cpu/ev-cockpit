@@ -1,14 +1,20 @@
-name: Build ID4 Media Hub APK
+name: Build EV Cockpit APK
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [feature/fermata-style-car-video]
   push:
-    branches: [main]
+    branches: [main, feature/fermata-style-car-video, feature/media-engine-migration, feature/ev-cockpit]
     paths:
       - 'app/**'
+      - 'evlite/**'
       - '*.gradle.kts'
       - 'gradle.properties'
       - '.github/workflows/build-apk.yml'
-      - 'ID4_Media_Hub_v0.8_APK_Derlemeye_Hazir_Kaynak.zip'
+      - 'EV_Cockpit_v0.8_Source.zip'
 permissions:
   contents: read
 jobs:
@@ -22,10 +28,10 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! -f settings.gradle.kts ]]; then
-            test -f ID4_Media_Hub_v0.8_APK_Derlemeye_Hazir_Kaynak.zip
-            mkdir -p /tmp/id4-src
-            unzip -q ID4_Media_Hub_v0.8_APK_Derlemeye_Hazir_Kaynak.zip -d /tmp/id4-src
-            cp -a /tmp/id4-src/ID4_Media_Hub_v0_8/. .
+            test -f EV_Cockpit_v0.8_Source.zip
+            mkdir -p /tmp/evcockpit-src
+            unzip -q EV_Cockpit_v0.8_Source.zip -d /tmp/evcockpit-src
+            cp -a /tmp/evcockpit-src/EV_Cockpit_v0_8/. .
           fi
           test -f app/build.gradle.kts
           test -f settings.gradle.kts
@@ -44,9 +50,33 @@ jobs:
           "$SDKMANAGER" --install 'platforms;android-36' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: '8.14.3'
+      - name: Bundle the exact owner-provided filmler_full.m3u
+        shell: bash
+        run: bash .github/scripts/prepare-bundled-m3u.sh
       - name: Run tests and build debug APK
         run: gradle --no-daemon --stacktrace :app:testDebugUnitTest :app:assembleDebug
+      - name: Validate merged Android permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -x "$AAPT"
+          "$AAPT" dump permissions "$APK" > /tmp/evcockpit-merged-permissions.txt
+          # No banking-sensitive/privileged Android permissions should be merged.
+          for p in READ_SMS RECEIVE_SMS READ_CONTACTS READ_CALL_LOG ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION RECORD_AUDIO CAMERA READ_MEDIA_AUDIO READ_MEDIA_VIDEO QUERY_ALL_PACKAGES SYSTEM_ALERT_WINDOW REQUEST_INSTALL_PACKAGES; do
+            if grep -Fq "android.permission.$p" /tmp/evcockpit-merged-permissions.txt; then
+              echo "::error::Unexpected merged permission: $p"
+              exit 1
+            fi
+          done
+          if "$AAPT" dump badging "$APK" | grep -q "application-debuggable"; then
+            echo "::error::Merged test APK is debuggable"
+            exit 1
+          fi
+          echo "No listed banking-sensitive permissions requested."
+
       - name: Verify APK and checksum
         shell: bash
         run: |
@@ -57,9 +87,60 @@ jobs:
           cat APK_SHA256.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ID4-Media-Hub-debug-APK
+          name: EV-Cockpit-debug-APK
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/debug/APK_SHA256.txt
           if-no-files-found: error
           retention-days: 14
+
+  ev-lite-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android 36 platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOL="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager -print -quit)"
+          test -n "$TOOL"
+          "$TOOL" --install 'platforms;android-36' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+      - name: Build NO-MEDIA EV Lite and run unit tests
+        run: gradle --no-daemon :evlite:testDebugUnitTest :evlite:assembleDebug
+      - name: Verify EV Lite APK excludes media and sensitive permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=evlite/build/outputs/apk/debug/evlite-debug.apk
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -s "$APK"
+          "$AAPT" dump badging "$APK" | tee /tmp/ev-lite-badging.txt
+          "$AAPT" dump permissions "$APK" | tee /tmp/ev-lite-permissions.txt
+          grep -q "package: name='com.evcockpit.evguide.lite.tvbeta'" /tmp/ev-lite-badging.txt
+          for p in READ_SMS RECEIVE_SMS READ_CONTACTS READ_CALL_LOG ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION ACCESS_BACKGROUND_LOCATION RECORD_AUDIO CAMERA READ_MEDIA_AUDIO READ_MEDIA_VIDEO QUERY_ALL_PACKAGES SYSTEM_ALERT_WINDOW REQUEST_INSTALL_PACKAGES; do
+            if grep -q "android.permission.$p" /tmp/ev-lite-permissions.txt; then
+              echo "::error::Forbidden permission $p"; exit 1
+            fi
+          done
+          if unzip -Z1 "$APK" | grep -E 'libvlc|libmaplibre|libandroid-mpv|^lib/'; then
+            echo "::error::Unexpected packaged media or map renderer"; exit 1
+          fi
+          test "$(stat -c %s "$APK")" -lt 18000000
+          sha256sum "$APK" > evlite/build/outputs/apk/debug/EV_LITE_SHA256.txt
+          du -h "$APK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EVCOCKPIT-EV-Lite-No-Media-APK
+          path: |
+            evlite/build/outputs/apk/debug/evlite-debug.apk
+            evlite/build/outputs/apk/debug/EV_LITE_SHA256.txt
+          retention-days: 14
+          if-no-files-found: error

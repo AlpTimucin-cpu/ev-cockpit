@@ -1,11 +1,16 @@
 name: Android emulator launch smoke test
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feature/fermata-style-car-video]
     paths:
       - '.github/workflows/emulator-smoke.yml'
       - 'app/**'
+      - '.github/scripts/mediaengine-smoke.sh'
+      - '.github/scripts/prepare-bundled-m3u.sh'
 permissions:
   contents: read
 jobs:
@@ -21,11 +26,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
+      - name: Bundle the exact owner-provided filmler_full.m3u
+        shell: bash
+        run: bash .github/scripts/prepare-bundled-m3u.sh
       - name: Build application
         run: gradle --no-daemon :app:assembleDebug
-      - name: Enable KVM
+      - name: Enable KVM and reclaim runner disk space
         run: |
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          # Android 15 emulator requires ~7.4 GB free for userdata creation.
+          # The hosted image contains tools unrelated to this Android build.
+          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache/CodeQL /usr/local/share/powershell
+          df -h "$HOME"
       - name: Boot emulator and open app
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -33,36 +45,23 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect
-          script: |
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb logcat -c
-            adb shell am start -W -n tr.id4.mediahub/.MainActivity
-            sleep 10
-            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|tr.id4.mediahub' | head -20 || true
-            adb shell screencap -p /sdcard/id4_home.png
-            adb pull /sdcard/id4_home.png id4_home.png
-            adb shell input tap 406 2250
-            sleep 3
-            adb shell screencap -p /sdcard/id4_tv.png
-            adb pull /sdcard/id4_tv.png id4_tv.png
-            adb shell input tap 680 2250
-            sleep 6
-            adb shell screencap -p /sdcard/id4_radio.png
-            adb pull /sdcard/id4_radio.png id4_radio.png
-            adb shell uiautomator dump /sdcard/id4_ui.xml || true
-            adb pull /sdcard/id4_ui.xml id4_ui.xml || true
-            adb logcat -d -s AndroidRuntime:E > android_runtime_errors.log
-            cat android_runtime_errors.log
-            if grep -q 'FATAL EXCEPTION' android_runtime_errors.log; then exit 1; fi
+          # Pixel 6 profile otherwise asks for ~7.4GB userdata while the
+          # hosted runner may have only ~7.1GB free (FATAL during AVD boot).
+          disk-size: 2048M
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -partition-size 2048
+          script: bash .github/scripts/mediaengine-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: android-emulator-smoke
           path: |
-            id4_home.png
-            id4_tv.png
-            id4_radio.png
-            id4_ui.xml
+            evcockpit_home.png
+            evcockpit_home_movie.xml
+            evcockpit_movie.xml
+            evcockpit_movie.png
+            evcockpit_offline_player.xml
+            evcockpit_offline_player.png
+            evcockpit_movie_detail.xml
+            evcockpit_movie_detail.png
             android_runtime_errors.log
           retention-days: 7

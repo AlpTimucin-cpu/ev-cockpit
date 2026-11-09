@@ -1,44 +1,70 @@
-# v0.8 — 9 Ekim 2026
+# EV Cockpit — Sürüm Notları
 
-- MediaLibraryService: önce liste sayfalama, sonra Media3 dönüşümü; gereksiz nesne üretiminin azaltılması.
-- `LibraryPage.kt` yardımcı sınıfı ve 10 Kotlin sınır/taşma testi.
-- Telefon Activity yaşam döngüsü düzeltmeleri ve IPTV bağlantılarının erişim anahtarı içerebilen hatalarının güvenli mesajlarla değiştirilmesi.
-- GitHub Actions: JUnit/Gradle build, APK varlık kontrolü, SHA-256 ve 14 günlük artifakt.
-- Yeni `MediaHubUnitTest.kt` dört test, Windows derleme betiği, `.gitignore`, APK ve doğrulama rehberi.
-- Çevrimdışı testler geçti; tam Android APK derlemesi ve araç testi hâlâ yapılmadı.
+Bu belge güncel kullanıcıya açık uygulamanın değişikliklerini özetler. Eski teknik deneyler ve bunların özgün kayıtları Git sürüm geçmişinde korunur. Telif sahipliği ve üçüncü taraf lisans bildirimleri [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) ve [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dosyalarındadır.
 
-# Değişiklikler — v0.7
+## 9 Kasım 2026 — İş 3: yayın güvenliği hazırlığı (DRAFT)
 
-- SportzX kullanıcı adresi için onaylı, haricî tarayıcı kısayolu; rastgele APK indirilmez.
-- Kaynağı doğrulanmamış önceki Telegram yönlendirmesi kaldırıldı.
-- Radyo/IPTV bağlantıları için indirimsiz, yönlendirmesiz HEAD kontrolü ve kullanışlı hata durumları.
-- HTTP yanıtı yayın oynatımının kanıtı olarak gösterilmez; HTTPS şartı korunur.
-- Çevrimdışı birim testleri genişletildi; mevcut v0.6.1 işlevleri korundu.
-- Kaynak paketidir: Android SDK olmadan tam APK derlemesi yapılamadı.
+- `nativecockpit` kaynak sürümü Release için `1.0.8`, ayrı Debug
+  kimliği için `com.evcockpit.debug` / `1.0.8-DEBUG` olarak tanımlandı.
+  Eski `-TEST` eki yeni derlemelerde yok. Release **yayımlanmadı**.
+- Release: mevcut `isDebuggable=false`, `allowBackup=false`,
+  `usesCleartextTraffic=false`, R8 ve kaynak küçültme korunuyor.
+  Sistem CA'larıyla HTTPS-only ağ yapılandırması ve `arm64-v8a` ABI
+  sınırı eklendi. Yayın anahtarı yerine geçici CI anahtarıyla **yalnız
+  Release smoke derlemesi** tanımlandı; APK dağıtılmıyor.
+- Eski `YoutubeAdFilter` sınıfı için uygulama kaynak ve Debug DEX
+  taraması eklendi. Ayrı eski medya APK'sının da temiz olduğu
+  **bu kontrollerden çıkarılamaz**.
+- Open-Meteo'nun gerçek GPS/OSRM rota kanıtı arayan `30 dakika`
+  foreground yenileme sınırı doğrulama kapsamına alındı.
+  Doze/ağ kopması/zamanlayıcı ertelemesi nedeniyle tam dakikada
+  çalışma **garanti edilmez**.
+- 34 açık PR'ın bağımlılık haritası ve main çakışma riskleri belgelendi.
+  Repo açıklaması/Topics henüz uygulanmadı; eski kök ZIP bir
+  Releases asset'i olarak doğrulanmadığından **silinmedi**.
+- Eski ifşa edilmiş imza bilgisi nedeniyle `release.yml` üzerindeki
+  `if: false` kilidi kaldırılmadı. Android Auto/ID.4 cihaz kabulü
+  ve güvenilir imzalı Release **DOĞRULANMADI**.
 
-# 0.6.1 — 9 Ekim 2026
+## 9 Kasım 2026 — İş 1 ve İş 2 (taslak kaynaklar)
 
-- TRT Haber için TRT CDN üzerinde yayınlanan HLS video kısayolu (çalışırlık telefonda doğrulanacak)
-- Türkiye/haber açık IPTV listesi içe aktarma düğmeleri; Apple HLS telefon test videosu
-- Kurulu SportzX uygulamasını ada göre bulan güvenli dış uygulama kısayolu
-- SportzX APK içeriği/maç yayınları gömülmedi, araç ekranına video aktarılmıyor
+- [Tanılama PR #46](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/46):
+  Debug 500 satırlık maskeli uygulama günlüğü ve paylaşım; otomatik
+  CI geçti, gerçek araç doğrulaması yok.
+- [Telefon/ID.4 UAT PR #47](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/47):
+  A–H protokol belgesi; manuel araç kabulü henüz tamamlanmadı.
 
-# Değişiklikler
+## 26 Ekim 2026 — Tesla esintili ABRP planlayıcı geliştirmesi
 
-## 0.6.0 — 2026-10-09
-- Tek radyo seçimini yalnızca tek medya kimliği üzerinden oturuma gönderme; çok büyük Binder isteği riskini azaltma.
-- Medya oturumu oynatma listesini seçilen öğenin çevresinde en fazla 41 radyo ile sınırlama.
-- Radyo/favori değişince medya tarayıcılarının klasörlerine URL/token içermeyen güncelleme bildirimi.
-- 2500 kayıt senaryolarını kapsayan Kotlin testleri ve yeni kaynak kontratı denetimleri.
-- Hâlâ Android SDK / araç testi yok; gerçek APK derlemesi doğrulanmadı.
+- Yatay kokpitin harita payı %75 olarak ayarlandı; batarya kartları ve manevra kartı daha sade yerleşime alındı. **Tarayıcı görsel testi hedefleniyor; gerçek araç ekranında doğrulanmadı.**
+- Rota kaynaklı tüketim, sıcaklık ve DC şarj eğrisi ayrı ve birim testli JS modülüne taşındı. Sonuçların tamamı **model tahminidir**.
+- EPDK rota koridoru 5 km olarak daraltıldı. Kayıt tarihi korunur. Gerçek sürüş sapma süresi, canlı istasyon müsaitliği ve fiyatı **doğrulanmadı**; hiçbirini uydurmaz.
+- Doğrulanmış GPS/OBD geldiğinde batarya renkli rota çizgisi hesaplanabilir; aksi hâlde sahte pil göstergesi oluşturulmaz.
+- OBD veri yaş eşiği 10 saniye olarak düşürüldü; Java köprüsü eski geriye dönük callback’lere ek olarak zaman damgalı `evcockpit:obd`, `evcockpit:route`, `evcockpit:gps`, `evcockpit:stations`, `evcockpit:weather` olayı gönderir.
+- Türkçe yerel TTS yönlendirmesine yaklaşık 1 km/300 m/100 m/şimdi eşikleri ve kısa süreli ses odağı eklendi. **Cihaz üzerinde anons kesinliği ve ses odağı doğrulanmadı.**
+- Android Auto, gerçek şarj istasyonu erişilebilirliği, GPS yol eşlemesi ve SoC PID kalibrasyonu cihaz testine kadar **doğrulanmadı** kabul edilir.
 
-## 0.5.0 — 2026-10-09
-- `onSetMediaItems` Android Auto/legacy MediaController oynatma isteklerini destekler
-- Ses kanalı seçildiğinde ileri/geri radyo kuyruğu oluşturma
-- Ses kataloğunun tarama/metadata öğelerinde yayın URL'sini gizleme
-- Radyo seçimi için 9 JVM test senaryosu
-- Hatalarda yayın URL/token dökümleri bulunmaması için Log kullanımını sınırlandırma
-- Test rehberi ve derleme durumunu netleştirme
+## 26 Ekim 2026 — Entegrasyon ve marka yenilemesi
 
-## 0.4.0
-- M3U dışa aktarma, grup/arama, ses-video tür değiştirme, HLS ve Android Auto klasörleri
+- Görünen Android uygulama adı ve kokpit başlığı **EV Cockpit** olarak güncellendi.
+- Özgün elektrikli otomobil/rota uygulama simgesi ve daha sade medya kartları hazırlandı.
+- Harita üzerinde tek Leaflet örneği korunarak gerçek OSRM GeoJSON rota geometrisi ve mevcut açık harita altlığı kullanıldı. Var olan güzergâh/istasyon fonksiyonları değiştirilmedi.
+- Android'deki doğrulanmış Bluetooth OBD ölçümleri, mevcut yerel olay köprüsü üzerinden arayüze aktarılmaya devam ediyor. Sahte SoC, voltaj, hız veya kalan menzil gösterilmiyor.
+- Rota ilerleme çubuğu yalnız yeni ve yeterince doğru GPS konumunu rota geometrisine izdüşürerek güncelleniyor. Araç ikonu çubuk sınırları içinde tutuluyor.
+- Harita üzerindeki hava etiketleri ve alternatif rota çizgileri daha okunaklı olacak şekilde sınırlandırıldı; veri ayrıntıları korunuyor.
+- Trafik katmanının gerçek yükleme durumu gösteriliyor; trafik verisi doğrulanmamışsa canlı durum etiketi kullanılmıyor.
+- Kişisel trafik servis anahtarının cihazda şifreli saklanması ve eski yerel ayarlardan güvenli taşınması eklendi.
+- Yayın öncesi kaynak, görünür marka, sürüş güvenliği ve APK paketleme kontrolleri güçlendirildi.
+- Teknik entegrasyon: [Harita, araç verisi ve rota ilerleme rehberi](docs/ELEKTRIKLI_YOL_ARKADASIM_ENTEGRASYON.md).
+
+## 14–20 Ekim 2026 — Medya ve rota geliştirmeleri
+
+- Canlı TV, radyo, podcast, yerel medya ve web özellikleri için modüler kullanıcı arayüzü.
+- Var olan medya oynatıcı oturumlarının korunması; ağ kopması, oynatıcı yeniden bağlanma ve kullanıcı dostu hata açıklamaları.
+- Rota arama, alternatif güzergâh, istasyon önerisi ve örnek veriden ayrılan enerji tahminleri.
+- Ekran yönü, telefon görünümü ve araç ekranındaki kart yerleşimlerinin iyileştirilmesi.
+- Harita, GPS, telemetri ve bağlantı izni hatalarında çökmeyi önleyen korumalar.
+
+## Yayın / kullanım notu
+
+Sürüm **test aşamasındadır**. Otomatik kaynak ve derleme testlerinin geçmesi, gerçek cihazda canlı trafik ya da OBD bağlantısının doğrulandığı anlamına gelmez. Sürücü dikkatini dağıtabilecek görsel medya için hareket hâlindeki kullanım kısıtlamaları kaldırılmamıştır.

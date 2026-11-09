@@ -1,0 +1,70 @@
+name: Build EVCOCKPIT EV Lite (No Media)
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/media-engine-migration]
+    paths:
+      - 'evlite/**'
+      - 'settings.gradle.kts'
+      - '.github/workflows/build-ev-lite.yml'
+permissions:
+  contents: read
+jobs:
+  ev-lite-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Android 36 SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager -print -quit)"
+          test -n "$SDKMANAGER"
+          "$SDKMANAGER" --install 'platforms;android-36' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Unit tests and compact APK
+        run: gradle --no-daemon :evlite:testDebugUnitTest :evlite:assembleDebug
+      - name: Confirm no media engines or privileged permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=evlite/build/outputs/apk/debug/evlite-debug.apk
+          test -s "$APK"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$AAPT" dump badging "$APK" | tee /tmp/evlite_badging.txt
+          "$AAPT" dump permissions "$APK" | tee /tmp/evlite_permissions.txt
+          grep -q "package: name='com.evcockpit.evguide.lite.tvbeta'" /tmp/evlite_badging.txt
+          for p in READ_SMS RECEIVE_SMS READ_CONTACTS READ_CALL_LOG ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION ACCESS_BACKGROUND_LOCATION RECORD_AUDIO CAMERA READ_MEDIA_AUDIO READ_MEDIA_VIDEO QUERY_ALL_PACKAGES SYSTEM_ALERT_WINDOW REQUEST_INSTALL_PACKAGES; do
+            if grep -q "android.permission.$p" /tmp/evlite_permissions.txt; then
+              echo "::error::Not allowed permission: $p"
+              exit 1
+            fi
+          done
+          if "$AAPT" dump badging "$APK" | grep -q 'application-debuggable'; then
+            echo "::error::APK must not be debuggable"
+            exit 1
+          fi
+          # This APK must not package Media3, VLC, MapLibre or video player native libs.
+          if unzip -Z1 "$APK" | grep -E 'libvlc|libmaplibre|libandroid-mpv|^lib/' ; then
+            echo "::error::Unexpected native media or map libraries"; exit 1
+          fi
+          if test "$(stat -c %s "$APK")" -ge 18000000; then
+            echo "::error::Unexpectedly large lite package"; exit 1
+          fi
+          sha256sum "$APK" > evlite/build/outputs/apk/debug/EV_LITE_SHA256.txt
+          du -h "$APK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EV-Cockpit-EV-Lite-APK
+          path: |
+            evlite/build/outputs/apk/debug/evlite-debug.apk
+            evlite/build/outputs/apk/debug/EV_LITE_SHA256.txt
+          retention-days: 14
+          if-no-files-found: error

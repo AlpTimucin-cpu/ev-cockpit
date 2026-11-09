@@ -8,11 +8,11 @@ if errorlevel 1 (
 )
 echo Telefonu USB uzerinden bagla ve hata ayiklama iznini kabul et.
 adb devices
-set "OUT=ID4_tani_%RANDOM%.txt"
+set "OUT=EVCOCKPIT_tani_%RANDOM%.txt"
 (
-  echo === ID4 Media Hub diagnosis (user initiated) ===
+  echo === EV Cockpit diagnosis (user initiated) ===
   echo === App ===
-  adb shell dumpsys package tr.id4.mediahub ^| findstr /I "versionName versionCode"
+  adb shell dumpsys package com.evcockpit.mediahub ^| findstr /I "versionName versionCode"
   echo === Android Auto ===
   adb shell dumpsys package com.google.android.projection.gearhead ^| findstr /I "versionName versionCode"
   echo === Media sessions ===

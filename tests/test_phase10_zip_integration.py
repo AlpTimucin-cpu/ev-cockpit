@@ -1,0 +1,130 @@
+"""Phase 10: verified archive provenance and explicit user-controlled ZIP integration.
+
+CI does not embed or execute the ZIP. Source and Kotlin/JUnit tests complement
+each other; phone, Android Auto and VW hardware QA remain separate.
+"""
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+CODE = ROOT / "nativecockpit/src/main/java/com/evcockpit"
+
+
+def code(path):
+    return (CODE / path).read_text(encoding="utf-8")
+
+
+class Phase10ZipIntegrationTest(unittest.TestCase):
+    def test_candidate_specs_have_provenance_without_auto_verification(self):
+        reference = code("domain/model/ZipId4PureReference.kt")
+        settings = code("presentation/settings/SettingsScreen.kt")
+        config = code("domain/model/AppConfiguration.kt")
+        store = code("data/settings/AppConfigRepository.kt")
+        self.assertIn(
+            "9f66d0b1302789b7377ae82b94545daad198a02003c69625f7cf5ab4e413e62a",
+            reference
+        )
+        for literal in ("52.0", "145.0", "11.0", "354", "363", "125", "170"):
+            self.assertIn(literal, reference)
+        self.assertIn("fun stagedDraft(current: VehicleProfileConfig)", reference)
+        self.assertIn("userConfirmed = false", reference)
+        self.assertIn("ZipId4PureReference.stagedDraft(configuration.vehicle)", settings)
+        self.assertIn("zipDraftStaged = true", settings)
+        self.assertIn("Kaydedilmedi", settings.replace("kaydedilmedi", "Kaydedilmedi"))
+        self.assertIn("viewModel.saveVehicleConfig(", settings)
+        self.assertIn("userConfirmed: Boolean = false", config)
+        self.assertIn("p[Keys.CONFIRMED] = profile.userConfirmed", store)
+        self.assertNotIn("ZipId4PureReference", store)
+
+    def test_reported_consumption_is_optional_editable_scenario_not_soc(self):
+        scenario = code("domain/model/UserDrivingScenarios.kt")
+        screen = code("presentation/settings/SettingsScreen.kt")
+        self.assertIn("10.0, 11.0", scenario)
+        self.assertIn("17.0, 19.0", scenario)
+        self.assertIn("UserDrivingScenarios.summer", screen)
+        self.assertIn("UserDrivingScenarios.winter", screen)
+        self.assertNotIn("socPercent", scenario)
+
+    def test_zip_audio_shortcuts_are_explicit_official_apps_only(self):
+        media = code("presentation/media/MediaHomeScreen.kt")
+        launcher = code("presentation/media/MediaLauncher.kt")
+        manifest = (ROOT / "nativecockpit/src/main/AndroidManifest.xml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('SPOTIFY("Spotify", "com.spotify.music")', launcher)
+        self.assertIn(
+            'YOUTUBE_MUSIC("YouTube Music", "com.google.android.apps.youtube.music")',
+            launcher
+        )
+        self.assertIn("MediaLauncher.launchOfficialMusicApp(context, app)", media)
+        self.assertIn("PhoneVideoSafetyPolicy.allow(", media)
+        self.assertIn("allowVideo = false", media)
+        for package in ("com.spotify.music", "com.google.android.apps.youtube.music"):
+            self.assertIn(f'android:name="{package}"', manifest)
+        self.assertNotIn("passengerMode", media)
+        self.assertNotIn("android.intent.action.VIEW", launcher)
+        car = code("car/EyaCarAppService.kt")
+        self.assertNotIn("MediaWebViewScreen", car)
+        self.assertNotIn("launchOfficialMusicApp", car)
+
+    def test_zip_unsafe_models_live_only_inside_offline_lab(self):
+        lab = code("domain/usecase/ZipPrototypeLabPolicy.kt")
+        panel = code("presentation/settings/ZipPrototypeLabPanel.kt")
+        settings = code("presentation/settings/SettingsScreen.kt")
+        self.assertIn("ZipPrototypeLabPanel()", settings)
+        self.assertIn("zipLabExpanded", settings)
+        self.assertIn("ZIP_INITIAL_DEMO_SOC_PERCENT = 80.0", lab)
+        self.assertIn("unverified028cFromTypedPayload", lab)
+        self.assertIn("prototypeWouldAcceptUnsafeCommand", lab)
+        self.assertIn("prototypeWouldPermitVideo", lab)
+        self.assertIn("ZIP deney laboratuvarı", panel)
+        self.assertIn("Gerçek video kilidi AÇILMADI", panel)
+        self.assertIn("CANLI GPS/OBD DEĞİL", panel)
+        # Source isolation: this UI cannot transmit to ECU, set navigation
+        # speed/SoC, invoke a video player or persist a dangerous toggle.
+        for forbidden in (
+            "android.bluetooth", "VehicleRepository", "ObdConnectionController",
+            "AppConfigRepository", "DataStore", "MediaLauncher",
+            "MediaWebViewScreen", "startActivity(", "ExoPlayer",
+            "onMebDiagnostic", "ZipPrototypeLabPolicy.prototypeWouldPermitVideo("
+        ):
+            if forbidden == "ZipPrototypeLabPolicy.prototypeWouldPermitVideo(":
+                self.assertNotIn(forbidden, code("presentation/media/MediaHomeScreen.kt"))
+            else:
+                self.assertNotIn(forbidden, panel)
+        self.assertNotIn("ZipPrototypeLabPolicy", code(
+            "data/repository/Elm327VehicleRepository.kt"
+        ))
+        self.assertNotIn("ZipPrototypeLabPolicy", code(
+            "presentation/navigation/NavigationViewModel.kt"
+        ))
+        self.assertNotIn("ZipPrototypeLabPolicy", code(
+            "presentation/media/PhoneVideoSafetyPolicy.kt"
+        ))
+        self.assertIn("MebUdsParser.ALLOWED_REQUESTS", code(
+            "data/obd/ObdWireCommandPolicy.kt"
+        ))
+
+    def test_opt_in_raw_028c_hypothesis_is_display_only(self):
+        dialog = code("presentation/obd/ObdSettingsDialog.kt")
+        # Formatter chain uses line wrap; ensure both endpoints exist.
+        self.assertIn("unverified028cFromTypedPayload(payload)", dialog)
+        self.assertIn('item.request == "22028C"', dialog)
+        self.assertIn('item.responder == "17FE007B"', dialog)
+        self.assertIn("zipHypothesisVisible", dialog)
+        self.assertIn("DOĞRULANMAMIŞ", dialog)
+        self.assertNotIn("vehicleRepository", dialog)
+        self.assertNotIn("VehicleTelemetry(", dialog)
+        self.assertNotIn("socEvidence", dialog)
+
+    def test_old_zip_source_and_unverified_bms_were_not_ported(self):
+        java_root = ROOT / "nativecockpit/src/main/java"
+        self.assertFalse((java_root / "tr/yolarkadasi").exists())
+        obd = code("data/repository/Elm327VehicleRepository.kt")
+        self.assertNotIn("Obd.value(b, 1, 1, 2.5)", obd)
+        self.assertNotIn("socEvidence", obd)
+        self.assertIn('protocol.readRawOnce("010D")', obd)
+
+
+if __name__ == "__main__":
+    unittest.main()

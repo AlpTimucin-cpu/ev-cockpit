@@ -1,28 +1,74 @@
-# Elektrikli Yol Arkadaşım
+# EV Cockpit — geliştirme sürümü
 
-Elektrikli araç yolculukları için geliştirilen bağımsız Android rota, şarj, medya ve telemetri uygulaması.
+Kotlin, Jetpack Compose, MapLibre ve Android for Cars App Library 1.7.0
+ile geliştirilen bağımsız elektrikli araç kokpiti. **Gerçek VW ID.4 üzerinde
+Android Auto kabulü henüz doğrulanmadı.**
 
-**Güncel durum:** Aktif geliştirme dalında APK GitHub Actions üzerinden oluşturulur. Başarılı CI testi, araç ekranında fiziksel test veya trafik/OBD bağlantısının gerçek cihazda doğrulandığı anlamına gelmez.
+## 9 Kasım 2026 — gerçek durum
 
-## Öne çıkanlar
+- **Entegrasyon öncesi** `main` eski Media Hub tabanıdır. Native kokpit değişiklikleri
+  [Faz 12 PR #45](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/45),
+  [Tanılama PR #46](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/46)
+  ve [telefon/ID.4 protokolü PR #47](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/47)
+  üzerinden üst üste duran **taslak PR** dallarındadır. Henüz
+  `main` dalına **henüz** birleştirilmedi. Yeni entegrasyon PR'ı taslaktır;
+  mevcut eski Releases APK'ları bu yeni uygulamanın sürümleri değildir.
+- Kullanıcının bilgisayarı yok; telefon ve park halindeki ID.4 ile test
+  yapılacak. [A–H kabul protokolü](docs/IS2_TELEFON_ID4_KABUL_TESTI_TR.md)
+  bu nedenle gerçek ekran fotoğrafı ve maskeli Debug raporu ister.
+- Uygulamada **gerçek GPS** ve **gerçek OSRM** kullanılır. ETA, varış enerjisi
+  ve hava verileri **TAHMİN** olarak etiketlenir. Veri yoksa
+  `kullanılamıyor`.
+- ELM327 yalnız izinli SAE Mode 01 ve UDS `0x22` okumalarına izin verir.
+  **ID.4 Pure batarya SoC DID/adres/çarpanı doğrulanmadı.** ECU yazma
+  ve üretim dışı sahte GPS/SoC/OBD kullanılmaz.
+- Hava tahmini otomatik sorgusu, **Android Auto ön planda** ve gerçek rota/GPS
+  eşleşmesi varken en fazla 30 dakikada bir denenir. Doze/host kopması
+  veya internet kesilmesi zamanlamayı geciktirebilir; Debug olay tarihleriyle
+  ölçülmelidir.
+- **Sürüş ekranında video yoktur.** Telefon videosu sadece gerçek duruş
+  ölçümü ve kullanıcının açık park onayıyla izinlenir.
 
-- **Rota ve harita:** Tek Leaflet haritası, gerçek OSRM yol geometrisi, alternatif rota seçimi ve trafiksiz süre uyarısı.
-- **Batarya ve enerji:** Geçerli, taze OBD verileri; veri yoksa tahminin/varsayımın açıkça işaretlenmesi.
-- **GPS ilerleme:** Son 30 saniyeye ait güvenilir konumdan rota izdüşümü; araç simgesi GPS yokken gizlenir.
-- **Şarj istasyonları:** Türkiye'de AC/DC istasyonları ve rota boyunca şarj durağı adayları.
-- **Canlı trafik:** Kullanıcıya ait API anahtarıyla akış katmanı; doğrulanmamış veriyi canlı diye göstermez.
-- **Medya:** Var olan medya çekirdeği ve resmî servis bağlantıları korunur; sürüş güvenliği ve telif kısıtları değiştirilmez.
+## Sürüm ve paket
 
-## Kurulum ve geliştirici belgeleri
+| Paket | Durum |
+| --- | --- |
+| `com.evcockpit.debug` · `1.0.8-DEBUG` | Test APK'sı; ayrı kurulur |
+| `com.evcockpit` · `1.0.8` | Release kaynak sürümü; **yayımlanmadı** |
 
-[**En yeni APK derlemesini görüntüle**](https://github.com/AlpTimucin-cpu/ID4-Media-Hub/actions/workflows/build-mola-native-id4.yml)
+Debug Tanılama, Ayarlar'dan açılır. Yalnız uygulamanın kendi olaylarının
+son **500 kaydını** RAM'de tutar; **Kopyala / Paylaş (.txt)** özelliği
+vardır. Koordinatlar, gizli anahtarlar, MAC, VIN ve tam ECU cevabı
+günlüğe alınmaz. Telefon/araç uygulaması üzerinde tüm işlevler henüz
+doğrulanmadı.
 
-[**Aktif geliştirme dalını aç**](https://github.com/AlpTimucin-cpu/ID4-Media-Hub/tree/feature/mola-native-id4)
+Release varyantı `isDebuggable=false`, `allowBackup=false`,
+`usesCleartextTraffic=false`, sistem CA'larıyla HTTPS ağ politikası,
+R8 + resource shrinking ve **yalnız `arm64-v8a` ABI** içerir. Bu ayarlar
+için ayrı CI **geçici imzalı derleme kontrolü** tanımlanmıştır; bu dosya
+üretim yayını **değildir**. Önceden açık edilmiş gerçek imza
+bilgileri nedeniyle `release.yml` kilidi kaldırılmadı.
 
-[**Gerçek rota, Android/OBD ve GPS entegrasyon kılavuzu**](https://github.com/AlpTimucin-cpu/ID4-Media-Hub/blob/feature/mola-native-id4/docs/ELEKTRIKLI_YOL_ARKADASIM_ENTEGRASYON.md)
+## Derleme
 
-## Uyumluluk ve lisans
+Java 17, Android SDK 36 ve SHA-256 kontrollü Gradle Wrapper 8.14.3:
 
-Bu proje üçüncü taraf resmî bir araç veya medya uygulaması değildir. Bağımsız marka **Elektrikli Yol Arkadaşım** olarak kullanılır. Gerekli açık kaynak ve veri atıfları [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) ve [SECURITY_TOMTOM.md](SECURITY_TOMTOM.md) belgelerinde korunur.
+```bash
+./gradlew :nativecockpit:lintDebug :nativecockpit:testDebugUnitTest :nativecockpit:assembleDebug
+```
 
-Geriye dönük uyumluluk için bazı teknik paket/dosya adları hâlâ eski iç kimlikleri taşır; bunlar kullanıcıya sunulan ürünün adı değildir.
+Depoda `:nativecockpit`, `:app` ve `:evlite` Gradle modülleri bulunur;
+`media-engine/` kaynak üst katmanıdır, Gradle modülü değildir.
+Birleştirme gerçekleşene kadar `main` içeriği bu geliştirme dalından
+farklıdır; bu belge üretim yayını veya araç test kanıtı değildir.
+
+## Kaynaklar
+
+[A–H test listesi](docs/IS2_TELEFON_ID4_KABUL_TESTI_TR.md) ·
+[34 açık PR için entegrasyon sırası](docs/INTEGRATION_PLAN_2026-11-09_TR.md) ·
+[Eski ZIP ve GitHub profil planı](docs/REPO_PROFILE_AND_SOURCE_ARCHIVE_TR.md) ·
+[Sürüm notları](CHANGELOG.md) ·
+[English](README_EN.md) · [GPL-3.0](LICENSE)
+
+EV Cockpit bağımsız bir projedir; Volkswagen, Android Auto veya
+istasyon işletmecileriyle bağlantı iddiası yoktur.
