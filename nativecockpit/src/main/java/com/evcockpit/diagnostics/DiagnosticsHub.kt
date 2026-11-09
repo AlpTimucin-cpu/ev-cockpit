@@ -78,7 +78,7 @@ class DiagnosticsHub @Inject constructor() {
         val stamp = java.time.format.DateTimeFormatter.ISO_INSTANT
             .format(Instant.ofEpochMilli(atMillis))
         if (ring.size == MAX_LINES) ring.removeFirst()
-        ring.addLast("$" + "{stamp} | $" + "{event.title}")
+        ring.addLast("$stamp | ${event.title}")
         mutable.value = mutable.value.copy(entries = ring.toList())
     }
 
