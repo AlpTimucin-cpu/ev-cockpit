@@ -32,12 +32,16 @@ import com.evcockpit.domain.model.WeatherWaypoint
 import com.evcockpit.domain.model.GpsFix
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
+import com.evcockpit.diagnostics.DiagnosticsHub
 
 /**
  * Renders MapLibre to the host Surface, never a browser/phone-screen mirror.
  * No MapView is created if Android Auto has not supplied a valid Surface.
  */
-internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallback {
+internal class EyaCarMapSurface(
+    private val context: CarContext,
+    private val diagnostics: DiagnosticsHub
+) : SurfaceCallback {
     private var activeSurface: Surface? = null
     private var display: VirtualDisplay? = null
     private var presentation: Presentation? = null
@@ -75,6 +79,7 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
         if (activeSurface === hostSurface && display != null) {
             if (viewport == updated) return
             viewport = updated
+            reportSurface()
             lastPadding = null
             val generation = surfaceGeneration
             try {
@@ -93,6 +98,7 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
         release()
         activeSurface = hostSurface
         viewport = updated
+        reportSurface()
         val generation = ++surfaceGeneration
         try {
             val dm = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
@@ -169,10 +175,21 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
         updateSafeViewport()
     }
 
+    /** Only geometry, never latitude/longitude or screen pixels. */
+    private fun reportSurface() {
+        val v = viewport ?: return
+        val insets = v.cameraInsets()
+        diagnostics.surface(
+            v.widthPx, v.heightPx, v.dpi,
+            insets?.left, insets?.top, insets?.right, insets?.bottom
+        )
+    }
+
     private fun updateSafeViewport() {
         val before = viewport ?: return
         val after = before.copy(visible = visibleArea, stable = stableArea)
         viewport = after
+        reportSurface()
         if (before.cameraInsets() != after.cameraInsets()) fitCamera()
     }
 
@@ -356,6 +373,7 @@ internal class EyaCarMapSurface(private val context: CarContext) : SurfaceCallba
     }
 
     fun release() {
+        diagnostics.surfaceGone()
         surfaceGeneration++ // Invalidate asynchronous map/style callbacks first.
         style = null
         map = null
