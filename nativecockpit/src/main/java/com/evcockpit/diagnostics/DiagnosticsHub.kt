@@ -68,6 +68,7 @@ class DiagnosticsHub @Inject constructor() {
         private val safeUtc = Regex("""\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z""")
         private val hex = Regex("[A-F0-9]{8,512}")
     }
+    private val mode01Response = Regex("""(?i)(?:^|[^A-F0-9])41\s*0D\s*([A-F0-9]{2})(?![A-F0-9])""")
     private val ring = ArrayDeque<String>(MAX_LINES)
     private val mutable = MutableStateFlow(DiagnosticsSnapshot())
     val snapshot: StateFlow<DiagnosticsSnapshot> = mutable.asStateFlow()
@@ -199,7 +200,9 @@ class DiagnosticsHub @Inject constructor() {
     fun obd(connection: ObdConnectionState) {
         if (!BuildConfig.DEBUG) return
         val before = mutable.value
-        val masked = maskReadOnlyObd(connection.diagnosticResult)
+        val masked = connection.diagnosticResult?.let(::maskReadOnlyObd)
+            ?: if (connection.phase == com.evcockpit.domain.model.ObdPhase.CONNECTED)
+                before.obdRawMasked else "Kullanılamıyor"
         val phase = connection.phase.name
         if (phase == before.obdStatus && masked == before.obdRawMasked) return
         mutable.value = before.copy(obdStatus = phase, obdRawMasked = masked)
@@ -207,6 +210,22 @@ class DiagnosticsHub @Inject constructor() {
         if (masked != before.obdRawMasked && masked != "Kullanılamıyor") {
             event(DiagnosticEvent.OBD_READ_OBSERVED)
         }
+    }
+
+    /**
+     * Store only the three-byte SAE Mode 01 PID 0D response after an existing
+     * ElmSpeedParser success. No arbitrary serial frames, adapter identifiers,
+     * Bluetooth addresses, or full raw UART transcript.
+     */
+    @Synchronized
+    fun obdSpeedResponse(raw: String) {
+        if (!BuildConfig.DEBUG) return
+        val speedByte = mode01Response.find(raw.take(512))
+            ?.groupValues?.getOrNull(1)?.uppercase() ?: return
+        val safe = "010D / 410D" + speedByte
+        if (mutable.value.obdRawMasked == safe) return
+        mutable.value = mutable.value.copy(obdRawMasked = safe)
+        event(DiagnosticEvent.OBD_READ_OBSERVED)
     }
 
     /** Only allowlisted read-only 0x22 UDS responses, at most eight hex bytes. */
