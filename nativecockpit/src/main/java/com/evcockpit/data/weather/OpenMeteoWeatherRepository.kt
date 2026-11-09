@@ -1,6 +1,7 @@
 package com.evcockpit.data.weather
 
 import com.evcockpit.data.settings.AppConfigRepository
+import com.evcockpit.diagnostics.DiagnosticsHub
 import com.evcockpit.domain.usecase.BoundedNetworkRetry
 import com.evcockpit.domain.usecase.RouteForecastPolicy
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +52,8 @@ internal interface OpenMeteoService {
 /** A bounded, cancellable request for real model-based current conditions. */
 @Singleton
 class OpenMeteoWeatherRepository @Inject constructor(
-    private val appConfig: AppConfigRepository
+    private val appConfig: AppConfigRepository,
+    private val diagnostics: DiagnosticsHub
 ) {
     // Shared only for active route warning checks; never persists location or
     // transforms model output into live meteorological observations.
@@ -74,6 +76,7 @@ class OpenMeteoWeatherRepository @Inject constructor(
      * points on the remaining route. A missing GPS projection yields no guess.
      */
     suspend fun routeWeather(route: RouteSnapshot): Result<RouteWeatherState> = try {
+        diagnostics.weatherAttempt()
         val sites = withContext(Dispatchers.Default) {
             RouteForecastPolicy.sample(route, System.currentTimeMillis())
         }
@@ -123,10 +126,12 @@ class OpenMeteoWeatherRepository @Inject constructor(
                 "Bazı rota noktalarının geçiş saati tahmini alınamadı" else null
         )
         _latestForecast.value = fetched
+        diagnostics.weatherFinished(true, fetched.fetchedAtMillis ?: System.currentTimeMillis())
         Result.success(fetched)
     } catch (cancel: CancellationException) {
         throw cancel
     } catch (error: Exception) {
+        diagnostics.weatherFinished(false)
         Result.failure(error)
     }
 
