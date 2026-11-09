@@ -170,6 +170,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_no_youtube_ad_filter.py' -v
+          python3 -m unittest discover -s tests -p 'test_job3_release_security.py' -v
           python3 scripts/verify_youtube_filter_absent.py \
             --apk nativecockpit/build/outputs/apk/debug/nativecockpit-debug.apk
 
