@@ -6,12 +6,13 @@ Android Auto kabulü henüz doğrulanmadı.**
 
 ## 9 Kasım 2026 — gerçek durum
 
-- `main` hâlâ eski Media Hub tabanıdır. Native kokpit değişiklikleri
+- **Entegrasyon öncesi** `main` eski Media Hub tabanıdır. Native kokpit değişiklikleri
   [Faz 12 PR #45](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/45),
   [Tanılama PR #46](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/46)
   ve [telefon/ID.4 protokolü PR #47](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/47)
   üzerinden üst üste duran **taslak PR** dallarındadır. Henüz
-  `main` dalına birleştirilmedi.
+  `main` dalına **henüz** birleştirilmedi. Yeni entegrasyon PR'ı taslaktır;
+  mevcut eski Releases APK'ları bu yeni uygulamanın sürümleri değildir.
 - Kullanıcının bilgisayarı yok; telefon ve park halindeki ID.4 ile test
   yapılacak. [A–H kabul protokolü](docs/IS2_TELEFON_ID4_KABUL_TESTI_TR.md)
   bu nedenle gerçek ekran fotoğrafı ve maskeli Debug raporu ister.
@@ -58,7 +59,8 @@ Java 17, Android SDK 36 ve SHA-256 kontrollü Gradle Wrapper 8.14.3:
 
 Depoda `:nativecockpit`, `:app` ve `:evlite` Gradle modülleri bulunur;
 `media-engine/` kaynak üst katmanıdır, Gradle modülü değildir.
-`main` içeriği bu güncel dal yapısından farklı olabilir.
+Birleştirme gerçekleşene kadar `main` içeriği bu geliştirme dalından
+farklıdır; bu belge üretim yayını veya araç test kanıtı değildir.
 
 ## Kaynaklar
 
