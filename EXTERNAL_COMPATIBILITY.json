@@ -1,0 +1,215 @@
+{
+  "purpose": "Externally defined repository and Android package identities retained for working interoperability; not product branding.",
+  "occurrences": [
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "line": 31,
+      "external_identity": "me.app.fermataX.auto.mola.debug"
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "line": 32,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/EpdkPublicStations.kt",
+      "line": 22,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/IntegrationCatalog.kt",
+      "line": 66,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/IntegrationCatalog.kt",
+      "line": 70,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/MediaEngineBridge.kt",
+      "line": 14,
+      "external_identity": "me.app.fermataX.auto.mola.debug"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/MediaEngineBridge.kt",
+      "line": 15,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/OfficialChargingTariffs.kt",
+      "line": 22,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/OpenChargeMapSources.kt",
+      "line": 59,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "app/src/main/java/com/evcockpit/mediahub/TurkeyGeoServices.kt",
+      "line": 23,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "docs/DIPLAY_0_2_20_INTEGRATION_TR.md",
+      "line": 56,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "docs/EVCOCKPIT_KOKPIT_ANDROID_AUTO_URETIM_MIMARISI_TR.md",
+      "line": 3,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "docs/INTEGRATION_TR.md",
+      "line": 3,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "docs/MEDIAENGINE_4_1_10_ENTEGRASYON_TR.md",
+      "line": 12,
+      "external_identity": "me.app.fermataX.auto.mola.debug"
+    },
+    {
+      "path": "docs/MEDIAENGINE_MIGRATION.md",
+      "line": 8,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "docs/THREE_APK_AUDIT_TR.md",
+      "line": 9,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "evlite/src/main/AndroidManifest.xml",
+      "line": 5,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "evlite/src/main/java/com/evcockpit/mediahub/EmbeddedMapActivity.kt",
+      "line": 106,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "evlite/src/main/java/com/evcockpit/mediahub/EmbeddedMapServices.kt",
+      "line": 20,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "evlite/src/main/java/com/evcockpit/mediahub/EpdkPublicStations.kt",
+      "line": 22,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "evlite/src/main/java/com/evcockpit/mediahub/EvLiteActivity.kt",
+      "line": 69,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "evlite/src/main/java/com/evcockpit/mediahub/MediaEngineTvActivity.kt",
+      "line": 31,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "evlite/src/main/java/com/evcockpit/mediahub/OfficialChargingTariffs.kt",
+      "line": 22,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/docs/MEDIAENGINE32_MEDIA_BRIDGE_RELEASE_ARCHITECTURE.md",
+      "line": 3,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/docs/MEDIAENGINE32_MEDIA_BRIDGE_RELEASE_ARCHITECTURE.md",
+      "line": 12,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java",
+      "line": 68,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java",
+      "line": 71,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java",
+      "line": 509,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java",
+      "line": 785,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java",
+      "line": 851,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitEvActivity.java",
+      "line": 892,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitNavigatorActivity.java",
+      "line": 188,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitNavigatorActivity.java",
+      "line": 293,
+      "external_identity": "me.app.fermataX.auto.mola.debug"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitNavigatorActivity.java",
+      "line": 294,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitRoadSafety.java",
+      "line": 101,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/overlay/fermata/src/main/java/me/aap/fermata/ev/EvCockpitStationCatalog.java",
+      "line": 30,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "media-engine/patch_mediaengine.py",
+      "line": 273,
+      "external_identity": "me.app.fermataX.auto.mola.debug"
+    },
+    {
+      "path": "media-engine/patch_mediaengine.py",
+      "line": 274,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "media-engine/tests/test_external_mediaengine32.cjs",
+      "line": 10,
+      "external_identity": "me.app.fermataX.auto.mola32.debug"
+    },
+    {
+      "path": "media-engine/tests/test_external_mediaengine32.cjs",
+      "line": 12,
+      "external_identity": "me.app.fermataX.auto.mola.debug"
+    },
+    {
+      "path": "nativecockpit/src/main/java/com/evcockpit/data/remote/EpdkService.kt",
+      "line": 12,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    },
+    {
+      "path": "scripts/update_official_charge_prices.py",
+      "line": 25,
+      "external_identity": "AlpTimucin-cpu/ID4-Media-Hub"
+    }
+  ]
+}

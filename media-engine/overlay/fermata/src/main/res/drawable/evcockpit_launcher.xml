@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- EV Cockpit: original unbranded EV/route launcher symbol.
+     Keeps the existing Android resource path for upgrade compatibility. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+ android:width="108dp" android:height="108dp"
+ android:viewportWidth="108" android:viewportHeight="108">
+ <!-- Deep navy rounded icon -->
+ <path android:fillColor="#06152C"
+  android:pathData="M19,2 L89,2 Q106,2 106,19 L106,89 Q106,106 89,106 L19,106 Q2,106 2,89 L2,19 Q2,2 19,2Z"/>
+ <!-- Distant mountain silhouettes -->
+ <path android:fillColor="#0B2A49"
+  android:pathData="M3,52 L22,42 L35,48 L52,32 L69,46 L86,36 L105,47 L105,91 L3,91 Z"/>
+ <path android:fillColor="#0C3C61"
+  android:pathData="M3,63 L22,56 L40,65 L59,48 L79,57 L105,47 L105,94 L3,94 Z"/>
+ <!-- Signature electric halo and lightning -->
+ <path android:fillColor="#00000000" android:strokeColor="#189AFF"
+  android:strokeWidth="4.2" android:strokeLineCap="round"
+  android:pathData="M18,50 C18,24 39,12 61,14 C78,15 90,25 92,41"/>
+ <path android:fillColor="#2AF3CD"
+  android:pathData="M53,21 L39,45 L51,45 L47,63 L70,36 L57,36 L63,21 Z"/>
+ <!-- Glowing sweeping route -->
+ <path android:fillColor="#00000000" android:strokeColor="#0871B1"
+  android:strokeWidth="16" android:strokeLineCap="round"
+  android:pathData="M20,103 C32,91 51,90 76,85 C94,81 97,69 87,61"/>
+ <path android:fillColor="#00000000" android:strokeColor="#13CFE7"
+  android:strokeWidth="4.2" android:strokeLineCap="round"
+  android:pathData="M20,103 C32,91 51,90 76,85 C94,81 97,69 87,61"/>
+ <!-- Abstract unbranded electric car -->
+ <path android:fillColor="#03223E"
+  android:pathData="M16,73 Q23,63 34,61 L49,60 Q64,61 72,72 L78,76 L79,84 L11,84 L13,76 Z"/>
+ <path android:fillColor="#17B4EC"
+  android:pathData="M20,75 Q30,64 42,64 Q58,64 69,75 L60,75 L54,70 L34,70 L28,75 Z"/>
+ <path android:fillColor="#FC446B"
+  android:pathData="M17,78 L70,78 L70,80 L17,80Z"/>
+ <path android:fillColor="#06152C"
+  android:pathData="M24,83 a5,5 0,1 0,10 0 a5,5 0,1 0,-10 0 M60,83 a5,5 0,1 0,10 0 a5,5 0,1 0,-10 0"/>
+ <path android:strokeColor="#54E9FC" android:strokeWidth="2.2"
+  android:fillColor="#00000000"
+  android:pathData="M27,83 a2,2 0,1 0,4 0 a2,2 0,1 0,-4 0 M63,83 a2,2 0,1 0,4 0 a2,2 0,1 0,-4 0"/>
+ <!-- Destination pin, with punched center -->
+ <path android:fillColor="#46FFD0"
+  android:pathData="M87,42 C79,42 73,48 73,56 C73,65 87,76 87,76 C87,76 101,65 101,56 C101,48 95,42 87,42Z"/>
+ <path android:fillColor="#09334B"
+  android:pathData="M87,50 a6,6 0,1 0,0 12 a6,6 0,1 0,0 -12Z"/>
+</vector>

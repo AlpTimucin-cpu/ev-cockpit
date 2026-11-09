@@ -1,29 +1,38 @@
-# Üçüncü Taraf Bildirimleri (NOTICE)
+# Third-Party Notices (NOTICE)
 
-**Elektrikli Yol Arkadaşım** bağımsız bir deney projesidir. Volkswagen, Mola, Google, TomTom, OpenStreetMap Foundation veya burada adı geçen diğer kuruluşlar tarafından onaylanmamıştır; markalar ilgili sahiplerine aittir.
+**EV Cockpit** is an independent experimental project. It is not endorsed by any vehicle manufacturer, map/data provider, or external media application. Third-party names and trademarks belong to their respective owners.
 
-Bu projenin Mola/Fermata 2.2.2 tabanından derlenen **Elektrikli Yol Arkadaşım önizleme APK'sı**, pinlenmiş GPL-3.0 açık kaynak tabanından türetilir. Türev kaynak ve karşılık gelen değişiklikler GPL-3.0 yükümlülüklerine tabidir (bkz. [LICENSE](LICENSE)). Depodaki bağımsız medya geçmişi ve üçüncü taraf bağımlılıklar ayrı telif/lisans hükümleri içerebilir; mevcut telif sahipliği bu bildirimle değiştirilmez.
+The **EV Cockpit preview APK** built from the MediaEngine/Fermata 2.2.2 foundation is derived from a pinned GPL-3.0 open-source codebase. The derived source and corresponding changes are subject to GPL-3.0 obligations (see [LICENSE](LICENSE)). The repository's independent media history and third-party dependencies may carry separate copyright/license terms; this notice does not change existing ownership.
 
-> Bu tablo bilgilendirme amaçlıdır, hukuki danışmanlık değildir. `[doğrula]` işaretli satırları kendi kaynağında/şartlarında kontrol et; sürümler ve şartlar zamanla değişir.
+> This table is informational, not legal advice. Check entries marked `[verify]` against their own sources/terms; versions and terms change over time.
 
-| Bileşen / veri | Kullanım | Lisans / şart | Yapman gereken |
+| Component / data | Usage | License / terms | Required action |
 |---|---|---|---|
-| Fermata / Mola 2.2.2 (açık kaynak) | Taban medya uygulaması | GPL-3.0, pinli commit `3f45ad3557a25822c2a3a9f152f32ef82f57e005` LICENSE dosyasında doğrulandı | Repoda `LICENSE`; APK dağıtırken karşılık gelen tam kaynak kodunu erişilebilir tut, değişiklikleri belirt |
-| OpenStreetMap verisi | Harita, hız kamerası noktaları | ODbL 1.0 | Haritada "© OpenStreetMap contributors" görünsün; lisans bağlantısını koru |
-| OSM Foundation karo sunucusu | Harita karoları | [Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/) | User-Agent/Referer, toplu indirme/önbellek doldurma yok |
-| OSM France karoları | Yedek karo kaynağı | [Kullanım şartları](https://www.openstreetmap.fr/usage/) | Koşullara uygun ve sınırlı kullan |
-| TomTom Orbis | Trafik, harita | TomTom API ve harita şartları; kullanıcıya özel anahtar | "© TomTom" atfı `[doğrula]`; anahtarı repoya veya APK'ya gömme; bkz. [SECURITY_TOMTOM.md](SECURITY_TOMTOM.md) |
-| Natural Earth 110m | Çevrimdışı ülke sınırları | Kamu malı | Nezaketen atıf yapılabilir |
-| Türkiye il merkezleri verisi | Çevrimdışı yedek harita | MIT (proje README bilgisi) `[doğrula]` | Kaynak ve lisans metnini dosyanın yanında tut |
-| Leaflet | Harita kütüphanesi | BSD-2-Clause | Dağıtılan kopyada lisans metni kalsın |
-| MapLibre GL ve Leaflet adaptörü | Vektör harita | Dağıtılan varlık lisans dosyaları | `MAPLIBRE_LICENSE.txt` ve `MAPLIBRE_LEAFLET_LICENSE.txt` paketlemeyi koru |
-| OSRM | Rota hesabı | Yazılım BSD-2-Clause; demo sunucunun ayrıca kullanım politikası var | Yoğun kullanımda ayrı sunucu |
-| Photon | Adres arama | Yazılım Apache-2.0; veri OSM/ODbL | Genel sunucu politikasına uy |
-| Open-Meteo | Hava tahmini | Veri CC BY 4.0; ücretsiz API ticari olmayan kullanıma bağlı olabilir `[doğrula]` | Atıf ve güncel şartlar |
-| EPDK istasyon kaydı | Şarj istasyonu listesi | Kamuya açık veri, yeniden kullanım şartları `[doğrula]` | Snapshot tarihini ve veri kaynağını göster |
+| Fermata-derived media foundation (open source) | Base media application | GPL-3.0 verified in LICENSE at [pinned upstream commit](https://github.com/moris545454/araba-/tree/3f45ad3557a25822c2a3a9f152f32ef82f57e005) | Retain `LICENSE` in the repository; make the complete corresponding source available when distributing the APK and identify changes |
+| OpenStreetMap data | Maps, speed-camera points | ODbL 1.0 | Display “© OpenStreetMap contributors” on the map and retain the license link |
+| OSM Foundation tile server | Map tiles | [Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/) | Appropriate User-Agent/Referer; no bulk downloading or cache preloading |
+| OSM France tiles | Fallback tile source | [Usage terms](https://www.openstreetmap.fr/usage/) | Use within the applicable terms and limits |
+| TomTom Orbis | Traffic, maps | TomTom API/map terms; per-user key | “© TomTom” attribution `[verify]`; do not embed the key in the repository or APK; see [SECURITY_TOMTOM.md](SECURITY_TOMTOM.md) |
+| Natural Earth 110m | Offline country boundaries | Public domain | Courtesy attribution may be provided |
+| Turkish provincial-capital data | Offline fallback map | MIT (according to the project README) `[verify]` | Keep the source and license text alongside the file |
+| Leaflet | Map library | BSD-2-Clause | Retain the license text in distributed copies |
+| MapLibre GL and Leaflet adapter | Vector map | License files supplied with the distributed assets | Preserve packaging of `MAPLIBRE_LICENSE.txt` and `MAPLIBRE_LEAFLET_LICENSE.txt` |
+| OSRM | Routing | Software: BSD-2-Clause; the demo server has a separate usage policy | Use a separate server for heavy usage |
+| Photon | Address search | Software: Apache-2.0; data: OSM/ODbL | Follow the public server's policy |
+| Open-Meteo | Weather forecasts | Data: CC BY 4.0; free API access may be restricted to non-commercial use `[verify]` | Provide attribution and check current terms |
+| EPDK station registry | Charging-station listings | Publicly accessible data; reuse terms `[verify]` | Display the snapshot date and data source |
 
-## Kapsam dışında bırakılanlar
+## Historical source preservation
 
-Bu proje üçüncü taraf ticari uygulamaların (ör. radar/uyarı uygulamaları) veritabanlarını, premium haklarını, sunucu erişimini, markalarını veya kodunu içermez ve içermemelidir.
+The older `main` Media Hub had additional historical notices for Mola/Fermata,
+OSM/Leaflet, TomTom and independent media dependencies. Its history and
+corresponding source obligations remain applicable; this document does not
+waive or supersede those licenses. Review all upstream licenses before any
+redistribution, particularly when an old APK does not match the native
+cockpit source tree.
 
-Ayrıntılı geçmiş medya bağımlılıkları için [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) belgesine de bakın.
+## Exclusions
+
+This project does not and must not include databases, premium entitlements, server access, trademarks, or code belonging to third-party commercial applications, such as radar/warning applications.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for detailed historical media dependencies.

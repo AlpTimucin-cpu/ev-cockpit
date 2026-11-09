@@ -1,0 +1,410 @@
+/* EV Cockpit · 30/70 cockpit integration · 2026-10-26
+   Last-loaded, presentation-only layer. Existing Leaflet/MapLibre, route
+   engine, native callbacks, traffic, media, EPDK and OBD retain ownership.
+   No synthetic vehicle values and no duplicate map instance. */
+@media (min-width:640px) and (orientation:landscape) {
+  :root {
+    --eya-top:clamp(51px,8.4vh,78px);
+    --eya-dock:clamp(49px,9vh,76px);
+    --eya-gap:clamp(6px,1.05vw,16px);
+    --eya-panel:#09253bea;
+    --eya-border:#238fbe88;
+    --eya-white:#edfaff;
+    --eya-secondary:#add0e3;
+  }
+  html,body {background:#051425!important;color:var(--eya-white)!important}
+  /* Dedicate the RIGHT 70% to the one original, interactive map.
+     It is positioned before Leaflet initializes and still handles touches. */
+  #map {
+    position:fixed!important;
+    top:var(--eya-top)!important;bottom:var(--eya-dock)!important;
+    left:30%!important;right:0!important;
+    width:70%!important;height:auto!important;inset:auto 0 var(--eya-dock) 30%!important;
+    top:var(--eya-top)!important;
+    background:#071b2d!important;filter:none!important;
+  }
+  #map .leaflet-tile-pane {filter:none!important}
+  .top {
+    top:0!important;left:0!important;right:0!important;
+    height:var(--eya-top)!important;min-height:0!important;
+    background:#07192dee!important;border-bottom:1px solid #245e82!important;
+    box-shadow:0 3px 16px #0008!important;
+  }
+  .top .brand .brand-copy strong {color:#f7f9fb!important}
+  #vehicle-cockpit {
+    position:fixed!important;inset:var(--eya-top) 0 var(--eya-dock) 0!important;
+    background:transparent!important;pointer-events:none!important;
+    overflow:hidden!important;
+  }
+  /* Legacy co-* elements remain in DOM for original bridge, tests and details. */
+  #vehicle-cockpit .cockpit-left {opacity:0!important;pointer-events:none!important}
+  #vehicle-cockpit .evcockpit-tesla-side {
+    display:grid!important;position:absolute!important;
+    left:1.05%!important;right:auto!important;top:var(--eya-gap)!important;
+    bottom:var(--eya-gap)!important;width:27.9%!important;height:auto!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-rows:minmax(0,.92fr) minmax(0,.87fr)
+      minmax(0,.76fr) minmax(0,2.35fr) minmax(0,.34fr)!important;
+    gap:clamp(4px,.75vh,10px)!important;
+    overflow:hidden!important;pointer-events:none!important;
+    box-sizing:border-box!important;
+  }
+  #vehicle-cockpit .evcockpit-tesla-card,
+  #vehicle-cockpit .evcockpit-mini-metric,
+  #vehicle-cockpit .cockpit-right .cockpit-panel,
+  #vehicle-cockpit .cockpit-tripbar {
+    background:linear-gradient(145deg,#0b2d4ae8,#07182de8)!important;
+    color:var(--eya-white)!important;
+    border:1px solid var(--eya-border)!important;
+    border-radius:clamp(10px,1.45vw,18px)!important;
+    box-shadow:0 8px 24px #0008,inset 0 1px #ffffff0d!important;
+    backdrop-filter:blur(10px)!important;-webkit-backdrop-filter:blur(10px)!important;
+    box-sizing:border-box!important;
+  }
+  #vehicle-cockpit .evcockpit-tesla-card {
+    padding:clamp(5px,1vh,12px) clamp(9px,1vw,16px)!important;
+    min-height:0!important;overflow:hidden!important;
+  }
+  #vehicle-cockpit .ev-speed-gauge::before {
+    width:clamp(39px,11vh,103px)!important;
+    height:clamp(39px,11vh,103px)!important;
+  }
+  #vehicle-cockpit .ev-speed-gauge .evcockpit-drive-speed {
+    font-size:clamp(18px,5.3vh,53px)!important;
+    color:#f8fbff!important;
+  }
+  #vehicle-cockpit .evcockpit-tesla-caption,
+  #vehicle-cockpit .evcockpit-mini-metric small {
+    color:var(--eya-secondary)!important;font-size:clamp(8px,1.45vh,13px)!important;
+  }
+  #vehicle-cockpit .evcockpit-battery-card .evcockpit-soc-text {
+    color:#50e5b6!important;font-size:clamp(23px,5.5vh,52px)!important;
+  }
+  #vehicle-cockpit #evcockpit-side-bar-fill {
+    background:linear-gradient(90deg,#24b78a,#64f1c7)!important;
+  }
+  #vehicle-cockpit .evcockpit-range-card .evcockpit-range-value {
+    font-size:clamp(17px,4.1vh,38px)!important;color:#f0f5fa!important;
+  }
+  #vehicle-cockpit .evcockpit-tech-grid {
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    grid-template-rows:repeat(3,minmax(0,1fr))!important;
+    gap:clamp(3px,.55vw,9px)!important;min-height:0!important;
+  }
+  #vehicle-cockpit .evcockpit-mini-metric {
+    display:flex!important;flex-direction:column!important;
+    align-items:flex-start!important;justify-content:center!important;
+    padding:clamp(4px,.7vh,10px) clamp(5px,.75vw,12px)!important;
+    min-width:0!important;min-height:0!important;overflow:hidden!important;
+  }
+  #vehicle-cockpit .evcockpit-mini-metric strong {
+    max-width:100%!important;text-align:left!important;
+    font-size:clamp(11px,2.2vh,21px)!important;line-height:1.12!important;
+    overflow:hidden!important;text-overflow:ellipsis!important;
+  }
+  #vehicle-cockpit .evcockpit-status-strip {
+    min-height:0!important;overflow:hidden!important;
+    color:#cbd6df!important;background:#092e48ec!important;
+    border-color:var(--eya-border)!important;
+  }
+  /* Turn-by-turn and source-verified route projections FLOAT over the 70%
+     map but never consume touch events outside their own actual controls. */
+  #vehicle-cockpit .cockpit-right {
+    display:block!important;right:1.1%!important;left:auto!important;
+    top:var(--eya-gap)!important;width:clamp(185px,23vw,340px)!important;
+    max-width:33%!important;height:auto!important;
+    max-height:calc(100% - clamp(112px,22vh,177px))!important;
+    overflow:auto!important;pointer-events:auto!important;
+    scrollbar-width:thin;
+  }
+  #vehicle-cockpit .cockpit-right .cockpit-panel {
+    min-height:0!important;height:auto!important;max-height:none!important;
+    padding:clamp(8px,1.25vh,17px)!important;overflow:visible!important;
+  }
+  #vehicle-cockpit .cockpit-right .co-turn-arrow {
+    font-size:clamp(23px,4vh,45px)!important;
+  }
+  #vehicle-cockpit .cockpit-right #co-maneuver {
+    display:block!important;font-size:clamp(10px,1.65vh,16px)!important;
+    overflow-wrap:anywhere!important;
+  }
+  #vehicle-cockpit .cockpit-right .co-nav-row {
+    min-height:0!important;padding:clamp(3px,.72vh,8px) 0!important;
+  }
+  #vehicle-cockpit .cockpit-tripbar,
+  #vehicle-cockpit.has-route .cockpit-tripbar {
+    position:absolute!important;display:grid!important;
+    left:calc(30% + var(--eya-gap))!important;
+    right:var(--eya-gap)!important;bottom:var(--eya-gap)!important;
+    width:auto!important;height:clamp(91px,19vh,151px)!important;
+    min-height:0!important;max-height:34%!important;
+    padding:clamp(6px,1.2vh,13px)!important;
+    grid-template-columns:25% minmax(0,1fr) 23%!important;
+    align-items:center!important;gap:clamp(5px,1vw,16px)!important;
+    overflow:hidden!important;pointer-events:auto!important;
+  }
+  #vehicle-cockpit .cockpit-tripbar>div:first-child,
+  #vehicle-cockpit .cockpit-tripbar>div:nth-child(2),
+  #vehicle-cockpit .cockpit-tripbar>div:last-child {
+    display:block!important;grid-column:auto!important;min-width:0!important;
+  }
+  #vehicle-cockpit .cockpit-tripbar .tripbar-track {
+    height:clamp(7px,1.5vh,12px)!important;margin:clamp(3px,.7vh,8px) 0!important;
+  }
+  #vehicle-cockpit .cockpit-tripbar .tripbar-number {
+    font-size:clamp(12px,2.5vh,23px)!important;
+  }
+  #vehicle-cockpit .cockpit-tripbar #co-alt-toggle {
+    display:inline-block!important;min-height:26px!important;
+    padding:4px 7px!important;
+  }
+  /* Keep legacy route, station and layer buttons bound to their original JS.
+     This dock changes only size, arrangement and visual emphasis. */
+  .drive-dock {
+    display:flex!important;position:fixed!important;left:0!important;right:0!important;
+    bottom:0!important;height:var(--eya-dock)!important;
+    padding:3px clamp(10px,3vw,50px)!important;
+    background:#06182bed!important;border-top:1px solid #186590!important;
+    box-shadow:0 -5px 20px #0007!important;
+    align-items:center!important;justify-content:space-around!important;
+  }
+  .drive-dock #dock-route,.drive-dock #dock-stations,
+  .drive-dock #dock-apps,.drive-dock #dock-journal,
+  .drive-dock #dock-layers {display:flex!important}
+  .drive-dock #dock-home,.drive-dock #dock-music,.drive-dock #dock-obd {
+    display:none!important;
+  }
+  .drive-dock button {
+    flex:0 1 19%!important;height:calc(var(--eya-dock) - 7px)!important;
+    min-height:0!important;max-height:none!important;
+    border-radius:12px!important;color:#e4ebf2!important;
+    background:transparent!important;
+  }
+  .drive-dock #dock-route {
+    background:#084273!important;outline:1px solid #21d1fa!important;
+  }
+  .drive-dock button .dock-icon {font-size:clamp(18px,3.3vh,29px)!important}
+  .drive-dock button .dock-label {font-size:clamp(9px,1.5vh,13px)!important}
+  /* Popup surfaces and shortcuts must sit on the actual map side. */
+  .buttons {left:calc(30% + var(--eya-gap))!important;right:auto!important;
+    top:calc(var(--eya-top) + var(--eya-gap))!important}
+  #route-map-alts {left:calc(30% + var(--eya-gap))!important;
+    top:calc(var(--eya-top) + 7vh)!important}
+  .sheet.search-open,.sheet.details-open {
+    left:calc(30% + var(--eya-gap))!important;right:var(--eya-gap)!important;
+    top:calc(var(--eya-top) + var(--eya-gap))!important;
+    bottom:calc(var(--eya-dock) + var(--eya-gap))!important;
+  }
+  .map-layers-panel {left:calc(30% + var(--eya-gap))!important;right:var(--eya-gap)!important}
+  .cockpit-alts.open {left:calc(30% + var(--eya-gap))!important;
+    right:var(--eya-gap)!important;width:auto!important}
+  .map-credit {bottom:calc(var(--eya-dock) + 5px)!important}
+}
+@media (min-width:640px) and (orientation:landscape) and (max-height:460px) {
+  #vehicle-cockpit .evcockpit-tesla-side {gap:3px!important}
+  #vehicle-cockpit .evcockpit-mini-metric {padding:2px 5px!important}
+  #vehicle-cockpit .evcockpit-mini-metric small {font-size:8px!important}
+  #vehicle-cockpit .evcockpit-mini-metric strong {font-size:11px!important}
+  #vehicle-cockpit .evcockpit-tesla-card {padding:3px 7px!important}
+  #vehicle-cockpit .evcockpit-range-card .evcockpit-range-value {font-size:17px!important}
+  #vehicle-cockpit .cockpit-right .co-nav-row:nth-of-type(n+4) {display:none!important}
+  #vehicle-cockpit .cockpit-tripbar .tripbar-sub {display:none!important}
+  #vehicle-cockpit .cockpit-tripbar .ev-timeline-distances small {display:none!important}
+  #vehicle-cockpit .cockpit-tripbar {grid-template-columns:23% minmax(0,1fr) 23%!important}
+}
+@media (max-width:639px), (orientation:portrait) {
+  /* Phone portrait retains the proven original map-and-sheet layout. */
+  #map {filter:none!important}
+}
+
+/* EYA Cockpit v4 — functional presentation over the ORIGINAL navigator.
+   No new map, route calculations, station source, media surface or fake telemetry. */
+:root{
+  --eya-cyan:#26d5ff;
+  --eya-electric:#2385ff;
+  --eya-turquoise:#45ecc7;
+  --eya-sea:#0b3654;
+}
+@media (min-width:640px) and (orientation:landscape){
+  html,body {background:linear-gradient(135deg,#061225,#08253c)!important}
+  .top {background:linear-gradient(105deg,#07172bf7,#0c3046f4)!important;
+    border-bottom-color:#19769e!important}
+  .top .vw-symbol {filter:drop-shadow(0 0 8px #11bbf96a)}
+  .top .brand-copy strong {letter-spacing:.015em}
+  #map {background:#061c34!important}
+  #vehicle-cockpit .evcockpit-tesla-card,
+  #vehicle-cockpit .evcockpit-mini-metric,
+  #vehicle-cockpit .cockpit-right .cockpit-panel,
+  #vehicle-cockpit .cockpit-tripbar {
+    background:linear-gradient(142deg,#103653ee 0%,#091f39ef 58%,#071729ed 100%)!important;
+    border-color:#238fbe81!important;
+    box-shadow:0 8px 30px #0009,inset 0 1px 0 #6be4ff1b,0 0 20px #008cff12!important;
+  }
+  #vehicle-cockpit .evcockpit-tesla-caption,
+  #vehicle-cockpit .evcockpit-mini-metric small {color:#afd3e6!important}
+  #vehicle-cockpit .ev-speed-gauge::before{
+    background:conic-gradient(from 200deg,#12324d 0deg,#1771b8 115deg,#48f1d1 235deg,
+      transparent 236deg 360deg)!important;
+    -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 6px))!important;
+    mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 6px))!important;
+    filter:drop-shadow(0 0 9px #24c8ff75);
+  }
+  #vehicle-cockpit .evcockpit-battery-card .evcockpit-soc-text {color:var(--eya-turquoise)!important;
+    text-shadow:0 0 14px #22f1ca28}
+  #vehicle-cockpit .evcockpit-range-card .evcockpit-range-value {color:#def6ff!important}
+  #vehicle-cockpit #evcockpit-side-bar-fill {
+    background:linear-gradient(90deg,var(--eya-electric),var(--eya-turquoise))!important;
+    transition:width .45s ease-out!important
+  }
+  body.evcockpit-low-battery #vehicle-cockpit #evcockpit-side-bar-fill{
+    background:linear-gradient(90deg,#e94d5b,#ffab75)!important
+  }
+  #vehicle-cockpit .cockpit-right .co-turn-arrow,
+  #vehicle-cockpit #co-maneuver-distance {color:var(--eya-cyan)!important}
+  #vehicle-cockpit .cockpit-right .co-nav-row {
+    border-bottom:1px solid #39bfe61e!important
+  }
+  #vehicle-cockpit .cockpit-tripbar .tripbar-track{
+    background:#113957!important;border:1px solid #268fc56e!important;
+    overflow:visible!important
+  }
+  #vehicle-cockpit #co-trip-fill{
+    background:linear-gradient(90deg,#167dfc,var(--eya-turquoise))!important;
+    transition:width .5s linear!important
+  }
+  #vehicle-cockpit .cockpit-tripbar .tripbar-track.gps-confirmed::after {
+    transition:left .55s linear!important;
+    filter:drop-shadow(0 0 8px #2ddeff)!important
+  }
+  /* A route planner card is not a live trip until the route is real. */
+  #vehicle-cockpit:not(.has-route) .cockpit-tripbar {display:none!important}
+  #vehicle-cockpit.has-route .cockpit-tripbar {display:grid!important}
+  .drive-dock{background:linear-gradient(90deg,#06182bf9,#0a2842fc)!important;
+    border-top-color:#2380ad!important}
+  .drive-dock button.eya-current,.drive-dock button:focus-visible {
+    background:linear-gradient(135deg,#0b4f82,#0b3c6d)!important;
+    outline:1px solid var(--eya-cyan)!important;
+    color:#f1ffff!important;box-shadow:inset 0 0 12px #00b6ff22!important
+  }
+  .drive-dock button.eya-current .dock-icon {color:var(--eya-turquoise)!important}
+  .drive-dock button:active {transform:scale(.98)}
+  .drive-dock #dock-route:not(.eya-current) {outline:none!important;background:transparent!important}
+  #evcockpit-traffic-toggle[aria-pressed="true"] {color:var(--eya-turquoise)!important}
+  #vehicle-cockpit .cockpit-tripbar #co-alt-toggle{
+    border-color:#1db6dc!important;background:#0d4166!important;color:#dffaff!important
+  }
+  #vehicle-cockpit .evcockpit-route-stop-pin{
+    box-shadow:0 0 0 3px #0c2740,0 0 10px #37e6b5!important
+  }
+  .map-layers-panel,.sheet.search-open,.sheet.details-open{
+    border-color:#228aba!important;box-shadow:0 15px 35px #000a!important
+  }
+}
+@media (min-width:640px) and (orientation:landscape) and (max-height:460px){
+  #vehicle-cockpit .cockpit-right .cockpit-panel{padding:5px 8px!important}
+  #vehicle-cockpit .cockpit-right .co-nav-row{padding:1px 0!important}
+  #vehicle-cockpit .evcockpit-tesla-side{gap:2px!important}
+}
+/* In portrait, keep the original map and route sheets, but make the same
+   five REAL actions accessible above the system gesture inset. */
+@media (orientation:portrait), (max-width:639px){
+  :root{--eya-phone-dock:calc(58px + env(safe-area-inset-bottom,0px))}
+  html,body{background:#07182a!important}
+  .drive-dock{
+    display:flex!important;position:fixed!important;z-index:1210!important;
+    inset:auto 0 0!important;height:var(--eya-phone-dock)!important;
+    padding:4px 4px env(safe-area-inset-bottom,0px)!important;gap:0!important;
+    align-items:center!important;justify-content:space-around!important;
+    background:#071b30fa!important;border-top:1px solid #2477a2!important;
+  }
+  .drive-dock #dock-home,.drive-dock #dock-music,.drive-dock #dock-obd,
+  .drive-dock #dock-safety,.drive-dock #dock-traffic{display:none!important}
+  .drive-dock #dock-route,.drive-dock #dock-stations,
+  .drive-dock #dock-apps,.drive-dock #dock-journal,
+  .drive-dock #dock-layers{
+    display:flex!important;flex:1 1 20%!important;flex-direction:column!important;
+    min-width:0!important;max-width:none!important;height:48px!important;
+    min-height:44px!important;padding:2px!important;gap:2px!important;
+    border:0!important;background:transparent!important;color:#e4f6ff!important;
+    border-radius:9px!important;align-items:center!important;
+    justify-content:center!important
+  }
+  .drive-dock .dock-icon{font-size:20px!important;line-height:1!important}
+  .drive-dock .dock-label{font-size:10px!important;line-height:1.15!important}
+  .drive-dock button.eya-current{color:#49e8d1!important;
+    background:#0c4061!important;outline:1px solid #157cb4!important}
+  .sheet.search-open,.sheet.details-open{
+    bottom:calc(var(--eya-phone-dock) + 3px)!important
+  }
+  .map-layers-panel{bottom:calc(var(--eya-phone-dock) + 3px)!important;
+    max-height:calc(100vh - 135px)!important;overflow-y:auto!important}
+  .map-credit{bottom:calc(var(--eya-phone-dock) + 3px)!important}
+}
+@media (prefers-reduced-motion:reduce){
+  #vehicle-cockpit #co-trip-fill,#vehicle-cockpit #evcockpit-side-bar-fill,
+  #vehicle-cockpit .cockpit-tripbar .tripbar-track.gps-confirmed::after{
+    transition:none!important
+  }
+}
+
+/* EYA nav card overlap correction: legacy CSS makes each navigation row
+   flex:1 1 0 and, with an auto-height panel, those rows overlap at 920px.
+   Preserve actual route instructions; let the container scroll on small HU. */
+@media (min-width:640px) and (orientation:landscape){
+ #vehicle-cockpit .cockpit-right{
+   display:block!important;height:auto!important;
+   overflow-y:auto!important;overflow-x:hidden!important;
+   overscroll-behavior:contain;scrollbar-width:thin!important;
+ }
+ #vehicle-cockpit .cockpit-right .cockpit-panel{
+   display:block!important;height:auto!important;
+   min-height:0!important;max-height:none!important;
+   overflow:hidden!important;
+ }
+ #vehicle-cockpit .cockpit-right .co-turn{
+   display:grid!important;grid-template-columns:clamp(23px,2.6vw,39px) minmax(0,1fr)!important;
+   min-height:clamp(40px,8vh,76px)!important;
+   align-items:start!important;margin:0 0 6px!important;
+   padding:0 0 7px!important;gap:6px!important;
+ }
+ #vehicle-cockpit .cockpit-right .co-turn > div {min-width:0!important}
+ #vehicle-cockpit .cockpit-right .co-nav-row{
+   display:grid!important;
+   grid-template-columns:clamp(18px,2vw,28px) minmax(0,1fr)!important;
+   align-items:start!important;flex:0 0 auto!important;
+   position:static!important;min-height:clamp(43px,7vh,77px)!important;
+   height:auto!important;padding:clamp(4px,.75vh,10px) 0!important;
+   margin:0!important;gap:clamp(5px,.65vw,11px)!important;
+ }
+ #vehicle-cockpit .cockpit-right .co-nav-meta{
+   display:block!important;position:static!important;min-width:0!important;
+   line-height:1.22!important;height:auto!important;overflow:hidden!important
+ }
+ #vehicle-cockpit .cockpit-right .co-nav-meta .cockpit-value {
+   display:block!important;margin:2px 0 0!important;
+   line-height:1.15!important;overflow-wrap:anywhere!important;
+ }
+ #vehicle-cockpit .cockpit-right .ev-upcoming-maneuvers{
+   position:static!important;display:block!important;
+   margin:7px 0 0!important;padding:7px 0 0!important;
+   border-top:1px solid #22658771!important;
+   line-height:1.35!important;overflow-wrap:anywhere!important;
+   clear:both!important
+ }
+ /* No route: present the truthful prompt, not stacks of empty metric rows. */
+ #vehicle-cockpit:not(.has-route) .cockpit-right .co-nav-row{
+   display:none!important
+ }
+}
+@media (min-width:640px) and (orientation:landscape) and (max-height:460px){
+ #vehicle-cockpit .cockpit-right .co-turn {
+   min-height:35px!important;padding-bottom:3px!important;
+   margin-bottom:3px!important
+ }
+ #vehicle-cockpit .cockpit-right .co-nav-row{
+   min-height:37px!important;padding:3px 0!important
+ }
+ #vehicle-cockpit .cockpit-right .ev-upcoming-maneuvers{
+   margin-top:3px!important;padding-top:4px!important
+ }
+}

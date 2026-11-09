@@ -1,0 +1,41 @@
+name: Refresh EPDK Public Stations
+on:
+  schedule:
+    # 05:45 UTC = 08:45 Turkey. Scheduled jobs require workflow on DEFAULT branch.
+    - cron: "45 5 * * *"
+  workflow_dispatch:
+  push:
+    branches: [feature/media-engine-migration]
+    paths:
+      - "scripts/update_epdk_public_stations.py"
+      - "scripts/tests/test_epdk_public_stations.py"
+      - ".github/workflows/update-epdk-stations.yml"
+permissions:
+  contents: write
+concurrency:
+  group: epdk-stations-snapshot
+  cancel-in-progress: false
+jobs:
+  public-stations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test public station exporter
+        run: python -m unittest discover -s scripts/tests -p 'test_epdk_public_stations.py'
+      - name: Retrieve and validate official EPDK public stations
+        run: python scripts/update_epdk_public_stations.py
+      - name: Commit EPDK public snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/charging/epdk_public_stations.json.gz data/charging/epdk_public_snapshot_meta.json
+          if ! git diff --cached --quiet; then
+            git commit -m "data: verified EPDK public stations"
+            git push
+          fi

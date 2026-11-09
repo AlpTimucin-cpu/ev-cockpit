@@ -1,0 +1,37 @@
+name: EV Cockpit — ekran görselleri
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/ev-cockpit]
+    paths:
+      - 'media-engine/overlay/fermata/src/main/assets/evcockpit/navigator.html'
+      - 'docs/scripts/render_evcockpit_readme.py'
+      - '.github/workflows/render-cockpit-readme.yml'
+permissions:
+  contents: write
+concurrency:
+  group: evcockpit-readme-screenshots
+  cancel-in-progress: false
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ev-cockpit
+          persist-credentials: true
+      - name: Uygulamanın gerçek HTML ekran görsellerini oluştur
+        run: python3 docs/scripts/render_evcockpit_readme.py
+      - name: Commit generated PNG previews
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/*.png
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: ekran görsellerini güncelle"
+            git pull --rebase origin feature/ev-cockpit
+            git push origin HEAD:feature/ev-cockpit
+          fi
