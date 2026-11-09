@@ -125,6 +125,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_phase10_zip_integration.py' -v
           python3 -m unittest discover -s tests -p 'test_route_osrm_debug_optin.py' -v
           python3 -m unittest discover -s tests -p 'test_cockpit_dashboard_layout.py' -v
+          python3 -m unittest discover -s tests -p 'test_job3_release_policy.py' -v
 
       - name: Android lint (do not waive failures)
         id: lint
