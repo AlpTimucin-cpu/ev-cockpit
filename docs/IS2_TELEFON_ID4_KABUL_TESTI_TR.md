@@ -1,7 +1,7 @@
 # EV Cockpit — İş 2: Telefon + VW ID.4 kabul testi
 
 **Durum: TEST EDİLMEDİ.** Bu doküman gerçek araç test raporu değil, telefondan doldurulacak protokoldür.
-**APK:** 1.0.8-TEST, \`com.evcockpit.debug\`. **Temel commit:** \`e66fe8a368129d1529c56901305194477fbded01\` (İş 1 / PR #46).
+**APK:** 1.0.8-TEST, `com.evcockpit.debug`. **Temel commit:** `e66fe8a368129d1529c56901305194477fbded01` (İş 1 / PR #46).
 **Test ortamı:** Bilgisayar, adb, logcat ve DHU yok; yalnız Android telefon, Android Auto, araç ekranı ve uygulamanın Debug Tanılama bölümü kullanılabilir.
 
 ## 0. Mevcut kanıt / ön koşul (9 Kasım 2026)
@@ -16,7 +16,7 @@ Bu verilerle araçta bir arıza kanıtlanmadı. Dört EPDK durum değişikliği 
 3. Aracı güvenli biçimde park et, Android Auto'yu normal kablo/bağlantısıyla aç. Car Screen aktif görünene kadar bekle. **Bağlı görünmemesi = otomatik uygulama arızası değil**; Android Auto'da uygulamanın görünürlüğünü ve telefon izinlerini ayrıca kontrol et.
 4. OBD testine geçmeden önce yalnız kendine ait, önceden eşleştirilmiş ELM327 adaptörünün bağlı olduğundan emin ol. Servis yazma testi için **hiçbir ECU'ya yazma isteği gönderme**.
 
-**Doldurma kuralı:** Her satırdaki \`Bekliyor\` sonucunu **Geçti / Kaldı / Test edilemedi** olarak değiştir. \`Kaldı\` için tam semptom ve zamanı yaz. Koşul/izin yoksa **Test edilemedi** yaz; **Geçti** kabul etme. Her kod numarası için fotoğraf, ekran kaydı veya maskelenmiş Debug raporu sakla.
+**Doldurma kuralı:** Her satırdaki `Bekliyor` sonucunu **Geçti / Kaldı / Test edilemedi** olarak değiştir. `Kaldı` için tam semptom ve zamanı yaz. Koşul/izin yoksa **Test edilemedi** yaz; **Geçti** kabul etme. Her kod numarası için fotoğraf, ekran kaydı veya maskelenmiş Debug raporu sakla.
 
 | Ortam bilgisi | Test sahibi dolduracak |
 | --- | --- |
@@ -84,8 +84,8 @@ Bu verilerle araçta bir arıza kanıtlanmadı. Dört EPDK durum değişikliği 
 | --- | --- | --- | --- |
 | G1. Park halinde eşleştirilmiş adaptöre bağlan. | İzinli Bluetooth bağlantısında **CONNECTED**; yoksa DISCONNECTED / açık hata, BMS SoC **kullanılamıyor**. | Bekliyor | Telefon foto G1 + Debug OBD |
 | G2. Park halinde OBD bağlantısını kesip tekrar bağla. | Uygulama çökmez; durum geçişleri doğru, eski hız ölçümü güncelmiş gibi kullanılmaz. | Bekliyor | Önce/sonra Debug G2 |
-| G3. Yalnız mevcut otomatik hız okuması veya parkta kullanıcı seçimiyle izinli UDS \`0x22\` oku. | Maskeli \`410Dxx\` ya da izinli UDS yanıtının kısa öneki; VIN, adres, tam ECU yükü paylaşılmaz. DID/çarpan **doğrulanmadı**. | Bekliyor | Maskeli Debug G3 |
-| G4. ECU yazma koruması. | \`0x2E\`, \`0x31\`, \`0x11\`, \`0x27\` vb. tel katmanında **reddedilir**. **Araçta yazma komutu DENEME**; kanıt GitHub CI'daki \`ObdWireCommandPolicyTest\` + \`DiagnosticsHubTest\`tir. | Bekliyor | CI URL ve test sonucu G4; araçta yazma testi yapılmaz |
+| G3. Yalnız mevcut otomatik hız okuması veya parkta kullanıcı seçimiyle izinli UDS `0x22` oku. | Maskeli `410Dxx` ya da izinli UDS yanıtının kısa öneki; VIN, adres, tam ECU yükü paylaşılmaz. DID/çarpan **doğrulanmadı**. | Bekliyor | Maskeli Debug G3 |
+| G4. ECU yazma koruması. | `0x2E`, `0x31`, `0x11`, `0x27` vb. tel katmanında **reddedilir**. **Araçta yazma komutu DENEME**; kanıt GitHub CI'daki `ObdWireCommandPolicyTest` + `DiagnosticsHubTest`tir. | Bekliyor | CI URL ve test sonucu G4; araçta yazma testi yapılmaz |
 
 ## H — Video ve Android Auto sürüş güvenliği
 
@@ -108,6 +108,6 @@ Bu verilerle araçta bir arıza kanıtlanmadı. Dört EPDK durum değişikliği 
 | ID.4 / Android Auto testi | DOĞRULANMADI |
 | İmzalı Release kararı | **HAYIR** — kritik gerçek araç kabul kanıtları eksik |
 
-**Kanıt gönderme:** Test ID'siyle birlikte (ör. \`C3\`) “Geçti / Kaldı / Test edilemedi”, kısaca gözlem ve maskeli rapor/fotoğraf paylaş. Görselleri ve raporu göndermeden önce plaka, özel hedef, ev/iş koordinatı, VIN, MAC, kullanıcı hesapları ve diğer kişisel bilgileri gizle. Paylaşım tamamen senin kontrolündedir.
+**Kanıt gönderme:** Test ID'siyle birlikte (ör. `C3`) “Geçti / Kaldı / Test edilemedi”, kısaca gözlem ve maskeli rapor/fotoğraf paylaş. Görselleri ve raporu göndermeden önce plaka, özel hedef, ev/iş koordinatı, VIN, MAC, kullanıcı hesapları ve diğer kişisel bilgileri gizle. Paylaşım tamamen senin kontrolündedir.
 
-**Önemli ayrım:** \`main\` ve Release bu dokümanla değişmez. İş 3'e ancak İş 2 kabulünden ve ayrı onaydan sonra geçilecek.
+**Önemli ayrım:** `main` ve Release bu dokümanla değişmez. İş 3'e ancak İş 2 kabulünden ve ayrı onaydan sonra geçilecek.
