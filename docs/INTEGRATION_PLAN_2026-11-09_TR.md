@@ -2,7 +2,7 @@
 
 **Durum: PLAN. `main` DEĞİŞMEDİ, birleştirme YAPILMADI.**
 Bu rapor `feature/job2-phone-id4-uat-20261109` baz alınarak GitHub API ile doğrulandı:
-**34 açık PR**. `main` ile karşılaştırmada **1.967 commit ileri / 34 commit geri**,
+**34 açık PR** (İş 3 PR #48 açılmadan önce; şimdi **35**). `main` ile karşılaştırmada **1.967 commit ileri / 34 commit geri**,
 GitHub API'nin ilk **300 dosyalık** değişim kesitine ulaşan büyük bir ayrışma var.
 Bu sayılar doğrulama anına aittir; merge-uyumluluğu ispatlamaz.
 
