@@ -9,6 +9,7 @@ import androidx.car.app.validation.HostValidator
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.evcockpit.BuildConfig
+import com.evcockpit.diagnostics.DiagnosticsHub
 import com.evcockpit.domain.repository.RouteRepository
 import com.evcockpit.domain.repository.ChargingRepository
 import com.evcockpit.domain.repository.VehicleRepository
@@ -28,6 +29,7 @@ class EyaCarAppService : CarAppService() {
     @Inject lateinit var detours: OsrmRoadDetourRepository
     @Inject lateinit var weather: OpenMeteoWeatherRepository
     @Inject lateinit var continuity: CarNavigationContinuity
+    @Inject lateinit var diagnostics: DiagnosticsHub
     @Inject lateinit var welcome: WelcomeGreetingManager
     @Inject lateinit var ducking: AppAudioDucking
 
@@ -40,12 +42,12 @@ class EyaCarAppService : CarAppService() {
     override fun onCreateSession(): Session {
         // Shared singleton gate prevents duplicates if OBD connects as well.
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, diagnostics, ducking, welcome)
     }
 
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, diagnostics, ducking, welcome)
     }
 }
 
@@ -57,9 +59,10 @@ private class EyaCarSession(
     private val detours: OsrmRoadDetourRepository,
     private val weather: OpenMeteoWeatherRepository,
     private val continuity: CarNavigationContinuity,
+    private val diagnostics: DiagnosticsHub,
     private val ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Session() {
     override fun onCreateScreen(intent: Intent): Screen =
-        EyaCarNavigationScreen(carContext, routes, charging, vehicle, config, detours, weather, continuity, ducking, welcome)
+        EyaCarNavigationScreen(carContext, routes, charging, vehicle, config, detours, weather, continuity, diagnostics, ducking, welcome)
 }
