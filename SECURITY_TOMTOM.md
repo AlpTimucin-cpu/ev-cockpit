@@ -23,6 +23,16 @@ The uploaded `EvCockpitKeyBridge.java` and `evcockpit-tomtom-key.js` were **deli
 
 Every user of the distributed application should use **their own key**, rather than sharing one key with everyone. For a trusted multi-user deployment, a server proxy with rate limiting, authentication, and cost controls can be considered separately.
 
+## Historic main-branch TomTom key handling (prior to integration)
+
+The older Media Hub branch used `secrets.ID4_TOMTOM_API_KEY` and
+`patch_mola.py` with `assets/id4/traffic-config.js`, rather than the
+EV Cockpit-prefixed names above. The archived key handling is **not**
+a validation that prior APKs were secret-free. Treat any potentially
+embedded prior key as compromised and rotate it separately. The existing
+native Release signing hold must remain in place until credential and
+signing-certificate continuity are independently verified.
+
 ## Actions for earlier releases
 
 - **Rotate / revoke** the old key in the TomTom Developer dashboard. ChatGPT cannot perform this directly.
