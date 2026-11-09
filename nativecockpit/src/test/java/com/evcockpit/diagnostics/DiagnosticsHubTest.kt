@@ -112,6 +112,19 @@ class DiagnosticsHubTest {
         )))
     }
 
+    @Test fun mode01RawReadIsRecordedOnlyAsSafeThreeByteResponse() {
+        val hub = DiagnosticsHub()
+        hub.obdSpeedResponse("SEARCHING...\\r410D4A\\r>")
+        assertEquals("010D / 410D4A", hub.snapshot.value.obdRawMasked)
+        hub.obd(ObdConnectionState(phase = ObdPhase.CONNECTED))
+        assertEquals("010D / 410D4A", hub.snapshot.value.obdRawMasked)
+        hub.obdSpeedResponse("Authorization: Bearer secret")
+        assertEquals("010D / 410D4A", hub.snapshot.value.obdRawMasked)
+        assertFalse(hub.exportText().contains("Bearer"))
+        hub.obd(ObdConnectionState(phase = ObdPhase.DISCONNECTED))
+        assertEquals("Kullanılamıyor", hub.snapshot.value.obdRawMasked)
+    }
+
     @Test fun allEcuWritesAndUnapprovedRequestsStillRejectedAtWireBoundary() {
         listOf("2EF190", "31010000", "1101", "2701", "14FFFFFF",
             "04", "0902", "22F190", "3E00", "ATSHDEADBEEF").forEach {
