@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from zipfile import ZipFile
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "verify_youtube_filter_absent.py"
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts" / "verify_youtube_filter_absent.py"
 SPEC = importlib.util.spec_from_file_location("youtube_filter_guard", SCRIPT)
 guard = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
@@ -35,6 +36,17 @@ class YoutubeFilterGuardTests(unittest.TestCase):
             with ZipFile(apk, "w") as z:
                 z.writestr("classes.dex", b"dex\x00Lcom/example/YoutubeAdFilter;")
             self.assertTrue(guard.check_apk(apk))
+
+    def test_native_phone_webview_does_not_intercept_youtube_ads_or_inject_skips(self):
+        screen = (ROOT / "nativecockpit/src/main/java/com/evcockpit/presentation/media/MediaWebViewScreen.kt")
+        text = screen.read_text(encoding="utf-8")
+        self.assertNotIn("shouldInterceptRequest(", text)
+        self.assertNotIn("YoutubeAdFilter", text)
+        self.assertNotIn("ad-showing", text)
+        self.assertNotIn(".ytp-ad-skip", text)
+        self.assertIn("onReceivedSslError(", text)
+        self.assertIn("MediaSitePolicy.allows(", text)
+        self.assertIn("CookieManager.getInstance().flush()", text)
 
     def test_clean_dex_and_missing_apk_outcomes(self):
         with tempfile.TemporaryDirectory() as d:
