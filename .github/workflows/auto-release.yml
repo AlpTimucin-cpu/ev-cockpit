@@ -1,0 +1,17 @@
+# Historical one-click Release entrypoint. Intentionally disabled.
+# Previous public history exposed a signing credential. Do not reactivate
+# without certificate rotation, device acceptance and explicit owner approval.
+name: EV Cockpit - Legacy Auto Release (SECURITY HOLD)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  auto-release-disabled:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Historical release flow intentionally disabled
+        run: echo "SECURITY HOLD - no APK publishing"
