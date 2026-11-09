@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_video_tab">Video</string>
+    <string name="media_radio_tab">Radyo</string>
+    <string name="media_engine_open">Medya motorunu aç</string>
+    <string name="media_engine_unavailable_title">Medya motoru açılamadı</string>
+    <string name="media_engine_not_installed">Ayrı medya motoru uygulaması yüklü değil. Video sekmesinden dahili tarayıcıyı kullanabilirsiniz.</string>
+    <string name="media_engine_blocked">Medya motoru yüklü ancak Android başlatılmasına izin vermedi veya açılış etkinliği bulunamadı. Uygulama izinlerini ve iş profili kısıtlamalarını kontrol edin.</string>
+    <string name="radio_description">Türkiye radyo kanalları oy sayısına göre sıralanır. Yalnızca HTTPS yayınları listelenir. Bu ekran kapatılınca yayın durur.</string>
+    <string name="radio_search">Radyo veya müzik türü ara</string>
+    <string name="radio_results">%1$d / %2$d kanal</string>
+    <string name="radio_selected">Seçilen: %1$s</string>
+    <string name="radio_playback_error">Radyo yayını oynatılamadı. Tekrar deneyin veya başka kanal seçin.</string>
+    <string name="radio_load_error">Radyo kanalları yüklenemedi. İnternet bağlantısını kontrol edin.</string>
+    <string name="radio_empty">Uyumlu radyo kanalı bulunamadı.</string>
+    <string name="radio_play">Oynat</string>
+    <string name="radio_pause">Duraklat</string>
+    <string name="radio_stop">Durdur</string>
+    <string name="radio_refresh">Yenile</string>
+    <string name="radio_votes">%1$d oy</string>
+    <string name="radio_attribution">Radyo rehberi: Radio Browser. Yayın bağlantıları zamanla değişebilir.</string>
+    <string name="media_external_not_installed">Uygulama cihazda yüklü değil. Resmî uygulamayı yükledikten sonra tekrar deneyin.</string>
+    <string name="media_external_launch_blocked">Uygulama cihazda yüklü ancak Android tarafından açılamadı. İş profili, izinler veya devre dışı bırakılmış uygulama ayarlarını kontrol edin.</string>
+    <string name="ux_welcome_description">Gizliliğiniz önemli. Yalnızca ihtiyaç duyduğunuz izinleri açın.</string>
+    <string name="ux_location_title">Navigasyon için konum</string>
+    <string name="ux_location_reason">Gerçek konumunuzu ve rota yönlendirmesini gösterir. GPS yoksa konum uydurulmaz.</string>
+    <string name="ux_bluetooth_title">OBD adaptörü için Bluetooth</string>
+    <string name="ux_bluetooth_reason">Eşleştirilmiş ELM327 adaptörüne yalnızca siz bağlantı başlattığınızda erişilir.</string>
+    <string name="ux_notification_title">Bağlantı durumu bildirimleri</string>
+    <string name="ux_notification_reason">Bağlı cihaz hizmetinin durum bildirimlerini gösterir. Gizli arka plan sesi açmaz.</string>
+    <string name="ux_ready_title">Hazırsınız</string>
+    <string name="ux_ready_reason">Kokpiti açın. Atladığınız izinleri ilgili özelliği kullanırken verebilirsiniz.</string>
+    <string name="ux_permission_denied">İzin verilmedi. Atlayıp Android Ayarlarından daha sonra etkinleştirebilirsiniz.</string>
+    <string name="ux_already_granted">İzin zaten etkin.</string>
+    <string name="ux_open_cockpit">EV Cockpit uygulamasını aç</string>
+    <string name="ux_continue">Devam et</string>
+    <string name="ux_allow_permission">İzin ver</string>
+    <string name="ux_skip_permission">Şimdilik atla</string>
+    <string name="ux_finish_later">Kurulumu tamamlamadan devam et</string>
+    <string name="ux_obd_unavailable">OBD cihazı bağlı değil</string>
+    <string name="ux_obd_help">Batarya verisi için ELM327 adaptörünü takın. Bağlantı için dokunun.</string>
+    <string name="ux_battery_unavailable">Batarya verisi alınamadı</string>
+    <string name="ux_battery_help">OBD bağlantısı açık ancak geçerli batarya ölçümü yok. Tanılamayı kontrol edin.</string>
+    <string name="ux_gps_waiting">GPS sinyali bekleniyor</string>
+    <string name="ux_gps_help">Açık alana çıkın, Konum hizmetini açın ve yeniden deneyin.</string>
+    <string name="ux_sound_unavailable">Motor sesi kullanılamıyor</string>
+    <string name="ux_sound_help">Ses dosyası veya oynatıcı kullanılamıyor. Ses ayarlarına gitmek için dokunun.</string>
+    <string name="ux_tts_missing">Sesli asistan için Türkçe dil paketi gerekli</string>
+    <string name="ux_tts_help">Android Ayarları içinde Türkçe metin okuma sesini indirin ve tekrar deneyin.</string>
+    <string name="ux_open_tts_settings">Ses ayarlarını aç</string>
+    <string name="ux_tts_loading">Türkçe ses hazırlanıyor…</string>
+    <string name="ux_tts_ready">Türkçe ses hazır</string>
+    <string name="ux_tts_test">Türkçe sesi test et</string>
+    <string name="app_name" formatted="false">EV Cockpit</string>
+    <string name="native_arrival_soc_model_estimate" formatted="false">Varış batarya doluluğu · MODEL TAHMİNİ</string>
+    <string name="native_automatic_dc_candidates_model_estimate" formatted="false">Otomatik DC durak adayları · MODEL TAHMİNİ</string>
+    <string name="native_back_to_map" formatted="false">Haritaya dön</string>
+    <string name="native_battery" formatted="false">"BATARYA · "</string>
+    <string name="native_battery_current_raw_response_only_221e3d" formatted="false">Batarya akımı · yalnızca ham yanıt · 221E3D</string>
+    <string name="native_battery_state_of_charge_obd" formatted="false">Batarya doluluk oranı · OBD</string>
+    <string name="native_battery_state_of_charge_test" formatted="false">Batarya doluluk oranı · TEST</string>
+    <string name="native_battery_temperature" formatted="false">Batarya sıcaklığı</string>
+    <string name="native_bluetooth_classic_spp_elm327_pair_the_adapter_in_android_bluetooth_set" formatted="false">Bluetooth Classic SPP ELM327. Önce adaptörü Android Bluetooth ayarlarından eşleştirin.</string>
+    <string name="native_bms_soc_diagnostic_candidate_dashboard_soc_and_soh_are_different_quant" formatted="false">"BMS doluluk oranı (doğrulanmamış tanı adayı), gösterge doluluğu ve batarya sağlığı farklı büyüklüklerdir. "</string>
+    <string name="native_calculate_actual_road_route" formatted="false">Gerçek yol rotasını hesapla</string>
+    <string name="native_calculating_route" formatted="false">Rota hesaplanıyor…</string>
+    <string name="native_charging" formatted="false">Şarj</string>
+    <string name="native_charging_needed_model_estimate" formatted="false">Gereken şarj · MODEL TAHMİNİ</string>
+    <string name="native_charging_required_to_preserve_the_reserve" formatted="false">Güvenlik payını korumak için şarj gerekli</string>
+    <string name="native_clear_diagnostic_result" formatted="false">Tanılama sonucunu temizle</string>
+    <string name="native_clear_route" formatted="false">Rotayı temizle</string>
+    <string name="native_close" formatted="false">Kapat</string>
+    <string name="native_could_not_initialize_the_speech_engine" formatted="false">Seslendirme motoru başlatılamadı</string>
+    <string name="native_could_not_obtain_audio_focus" formatted="false">Ses odağı alınamadı</string>
+    <string name="native_dc_charging_stations_along_the_route" formatted="false">Rota üzerindeki DC şarj istasyonları</string>
+    <string name="native_departure" formatted="false">Kalkış</string>
+    <string name="native_destination" formatted="false">Varış noktası</string>
+    <string name="native_destination_address_or_city" formatted="false">Varış adresi veya şehir</string>
+    <string name="native_destination_area_current_weather_estimate" formatted="false">Varış bölgesi · Güncel hava tahmini</string>
+    <string name="native_destination_area_wind" formatted="false">Varış bölgesi · Rüzgâr</string>
+    <string name="native_destination_selected" formatted="false">Varış noktası seçildi</string>
+    <string name="native_disconnect_obd" formatted="false">OBD bağlantısını kes</string>
+    <string name="native_download_english_voice_data_from_settings_language_and_input_text_to_s" formatted="false">"Ayarlar &gt; Dil ve giriş &gt; Metin okuma bölümünden İngilizce ses verisini indirin. "</string>
+    <string name="native_electric_road_companion" formatted="false">EV COCKPIT</string>
+    <string name="native_english_speech_ready" formatted="false">İngilizce seslendirme hazır</string>
+    <string name="native_english_speech_test" formatted="false">İngilizce seslendirmeyi test et</string>
+    <string name="native_english_tts_data_missing" formatted="false">İngilizce TTS verisi eksik</string>
+    <string name="native_english_tts_data_missing_90a54a" formatted="false">İngilizce metin okuma verisi eksik</string>
+    <string name="native_epdk_filter" formatted="false">EPDK · Filtre</string>
+    <string name="native_epdk_records_are_stale" formatted="false">EPDK kayıtları güncel değil</string>
+    <string name="native_epdk_station_filters" formatted="false">EPDK istasyon filtreleri</string>
+    <string name="native_estimated_arrival_time" formatted="false">Tahmini varış saati</string>
+    <string name="native_estimated_drive_time" formatted="false">Tahmini sürüş süresi</string>
+    <string name="native_estimated_range_model_15_reserve" formatted="false">TAHMİNİ MENZİL · MODEL · %15 GÜVENLİK PAYI</string>
+    <string name="native_estimates_exclude_traffic_arrival_soc_is_not_calculated" formatted="false">"Tahminler trafiği içermez. Varış doluluk oranı hesaplanmıyor "</string>
+    <string name="native_experimental_meb_ecu_readings" formatted="false">Deneysel MEB ECU okumaları</string>
+    <string name="native_from" formatted="false">KALKIŞ</string>
+    <string name="native_getting_gps_location" formatted="false">GPS konumu alınıyor…</string>
+    <string name="native_hv_voltage" formatted="false">Yüksek gerilim voltajı</string>
+    <string name="native_in_app_media_browser" formatted="false">Uygulama içi medya tarayıcısı</string>
+    <string name="native_in_app_media_on_the_phone" formatted="false">Telefonda uygulama içi medya</string>
+    <string name="native_instantaneous_power" formatted="false">Anlık güç</string>
+    <string name="native_live_availability_price_and_road_access_are_unknown" formatted="false">Anlık müsaitlik, fiyat ve karayolu erişimi bilinmiyor.</string>
+    <string name="native_locations_selected_calculate_the_actual_osrm_route" formatted="false">Konumlar seçildi; gerçek OSRM rotasını hesaplayın</string>
+    <string name="native_maplibre_osrm_voice_guidance_step_7" formatted="false">MAPLIBRE · OSRM · SESLİ YÖNLENDİRME · ADIM 7</string>
+    <string name="native_maximum_battery_temperature_221e0e" formatted="false">Azami batarya sıcaklığı · 221E0E (doğrulanmadı)</string>
+    <string name="native_media" formatted="false">Medya</string>
+    <string name="native_mute_voice_guidance" formatted="false">Sesli yönlendirmeyi sustur</string>
+    <string name="native_navigation" formatted="false">NAVİGASYON</string>
+    <string name="native_no_paired_devices_this_screen_does_not_scan" formatted="false">Eşleştirilmiş cihaz yok. Bu ekran cihaz taraması yapmaz.</string>
+    <string name="native_no_validated_dc_station_within_5_km_of_the_route_line" formatted="false">Rota çizgisinin 5 km çevresinde doğrulanmış DC istasyonu yok.</string>
+    <string name="native_no_validated_ecu_response_received_data_was_not_used" formatted="false">Doğrulanmış ECU yanıtı alınamadı; veriler kullanılmadı.</string>
+    <string name="native_not_actual_vehicle_data_available_in_debug_builds_only" formatted="false">Gerçek araç verisi değil; yalnızca DEBUG derlemelerinde kullanılabilir.</string>
+    <string name="native_not_required_according_to_the_model" formatted="false">Modele göre gerekli değil</string>
+    <string name="native_obd_connection_and_meb_diagnostics" formatted="false">OBD bağlantısı ve MEB tanılaması</string>
+    <string name="native_obd_reading_no_more_than_10_seconds_old" formatted="false">OBD okuması · en fazla 10 saniyelik</string>
+    <string name="native_obd_soc_stale_disconnected" formatted="false">OBD doluluk verisi eski / bağlantı kesildi</string>
+    <string name="native_ok" formatted="false">Tamam</string>
+    <string name="native_openfreemap_openstreetmap" formatted="false">© OpenFreeMap · © OpenStreetMap</string>
+    <string name="native_origin" formatted="false">Başlangıç</string>
+    <string name="native_origin_address_or_city" formatted="false">Başlangıç adresi veya şehir</string>
+    <string name="native_origin_and_destination_have_not_been_selected" formatted="false">Başlangıç ve varış noktası seçilmedi</string>
+    <string name="native_origin_selected" formatted="false">Başlangıç noktası seçildi</string>
+    <string name="native_osrm_alternatives" formatted="false">OSRM alternatifleri (</string>
+    <string name="native_osrm_eta_is_a_model_excluding_traffic_charging_time_is_calculated_sepa" formatted="false">OSRM varış süresi trafik içermeyen bir tahmindir; şarj süresi ayrıca hesaplanır.</string>
+    <string name="native_photon_osm_addresses_actual_osrm_route_not_live_traffic" formatted="false">Photon / OSM adresleri · gerçek OSRM rotası · canlı trafik değil</string>
+    <string name="native_plan_an_actual_route_first" formatted="false">Önce gerçek bir rota planlayın</string>
+    <string name="native_preparing_english_speech" formatted="false">İngilizce seslendirme hazırlanıyor</string>
+    <string name="native_read_bms_state_of_charge_22028c" formatted="false">BMS doluluk adayı 22028C · doğrulanmadı</string>
+    <string name="native_red_green_lines_osrm_speed_profile_not_live_traffic" formatted="false">Kırmızı/yeşil çizgiler: OSRM hız profili · CANLI TRAFİK DEĞİL</string>
+    <string name="native_refresh" formatted="false">Yenile</string>
+    <string name="native_refresh_paired_devices_request_permission" formatted="false">Eşleştirilmiş cihazları yenile / izin iste</string>
+    <string name="native_remaining_gps" formatted="false">Kalan yol · GPS</string>
+    <string name="native_required_charge_model_estimate" formatted="false">Gereken şarj · MODEL TAHMİNİ</string>
+    <string name="native_route" formatted="false">Rota</string>
+    <string name="native_route_and_charging_plan" formatted="false">Rota ve şarj planı</string>
+    <string name="native_route_progress" formatted="false">ROTA İLERLEMESİ</string>
+    <string name="native_settings" formatted="false">Ayarlar</string>
+    <string name="native_sign_in_to_your_account_on_the_site_playback_support_depends_on_the_se" formatted="false">Web sitesindeki hesabınızla oturum açın. Oynatma desteği servise ve cihaza bağlıdır.</string>
+    <string name="native_simulation_mode_test_data_not_actual_location_obd" formatted="false">SİMÜLASYON MODU · TEST VERİSİ · GERÇEK KONUM/OBD DEĞİL</string>
+    <string name="native_simulation_test_data" formatted="false">SİMÜLASYON · TEST VERİSİ</string>
+    <string name="native_speed_measured" formatted="false">Hız · ölçülen</string>
+    <string name="native_start_from_my_current_gps_location" formatted="false">Mevcut GPS konumumdan başla</string>
+    <string name="native_status" formatted="false">"Durum: "</string>
+    <string name="native_test_only_while_parked_and_in_your_own_vehicle_queries_use_read_only_u" formatted="false">"Yalnızca kendi aracınızda ve park hâlindeyken test edin. Sorgular salt-okunur UDS 22 servisini kullanır. "</string>
+    <string name="native_test_waiting_for_osrm_maneuver" formatted="false">TEST · OSRM manevrası bekleniyor</string>
+    <string name="native_to" formatted="false">VARIŞ</string>
+    <string name="native_total_route_osrm" formatted="false">Toplam rota · OSRM</string>
+    <string name="native_try_again" formatted="false">Tekrar dene</string>
+    <string name="native_turquoise_ring_dc_within_5_km_of_route_not_driving_detour" formatted="false">Turkuaz halka: rotanın 5 km yakınındaki DC istasyonu (sürüş sapması değil)</string>
+    <string name="native_unmute_voice_guidance" formatted="false">Sesli yönlendirmeyi aç</string>
+    <string name="native_vehicle_information" formatted="false">Araç bilgileri</string>
+    <string name="native_video_is_unavailable_for_this_connection" formatted="false">Bu bağlantıda video kullanılamıyor.</string>
+    <string name="native_video_is_unavailable_on_this_screen" formatted="false">Bu ekranda video kullanılamıyor.</string>
+    <string name="native_voice" formatted="false">SES</string>
+    <string name="native_voice_guidance" formatted="false">Sesli yönlendirme</string>
+    <string name="native_waiting_for_gps_signal" formatted="false">GPS sinyali bekleniyor…</string>
+    <string name="native_waiting_for_maneuver" formatted="false">Manevra bekleniyor</string>
+    <string name="native_waiting_for_route" formatted="false">Rota bekleniyor</string>
+    <string name="native_weather_open_meteo_current_model_estimate_not_arrival_time_weather" formatted="false">Hava durumu: Open-Meteo · güncel model tahmini, varış saati tahmini değil</string>
+    <string name="cockpit_gps" formatted="false">Araç konumunu bul</string>
+    <string name="cockpit_estimated_range" formatted="false">Tahmini menzil · model</string>
+    <string name="cockpit_measurement_unavailable" formatted="false">Araç ölçümü kullanılamıyor</string>
+    <string name="cockpit_arrival" formatted="false">Varış saati</string>
+    <string name="cockpit_arrival_soc" formatted="false">Varış doluluk oranı · tahmin</string>
+    <string name="cockpit_plan_route" formatted="false">Rota planla</string>
+    <string name="cockpit_station_name" formatted="false">Şarj istasyonu</string>
+    <string name="cockpit_operator_unknown" formatted="false">İşletmeci belirtilmedi</string>
+    <string name="cockpit_address_unknown" formatted="false">Adres belirtilmedi</string>
+    <string name="cockpit_source_date_unknown" formatted="false">Kaynak tarihi bilinmiyor</string>
+    <string name="cockpit_filter_all" formatted="false">Tümü</string>
+    <string name="cockpit_filter_dc" formatted="false">DC</string>
+    <string name="cockpit_filter_route_ccs" formatted="false">Rota CCS</string>
+    <string name="cockpit_filter_route_dc" formatted="false">Rota DC</string>
+    <string name="cockpit_unknown_value" formatted="false">—</string>
+    <string name="cockpit_percent_symbol" formatted="false">%</string>
+    <string name="cockpit_distance_unit" formatted="false">km</string>
+    <string name="cockpit_voice_volume" formatted="false">Yönlendirme ses seviyesi</string>
+    <string name="cockpit_model_estimate" formatted="false">MODEL TAHMİNİ</string>
+    <string name="cockpit_socket_summary" formatted="false">%1$s · %2$s · %3$s</string>
+    <string name="cockpit_source_verified" formatted="false">EPDK: %1$s</string>
+    <string name="cockpit_station_count" formatted="false">EPDK · %1$d / %2$d</string>
+</resources>

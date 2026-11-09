@@ -5,5 +5,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories { google(); mavenCentral() }
 }
-rootProject.name = "ID4MediaHub"
+rootProject.name = "EvCockpit"
 include(":app")
+include(":evlite")
+include(":nativecockpit")

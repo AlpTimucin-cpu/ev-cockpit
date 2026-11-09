@@ -1,0 +1,33 @@
+name: EPDK Public Station API Read-only Probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/media-engine-migration]
+    paths:
+      - "scripts/epdk_station_probe.py"
+      - ".github/workflows/epdk-station-probe.yml"
+permissions:
+  contents: write
+jobs:
+  epdk-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe official EPDK GET body contract once
+        run: python scripts/epdk_station_probe.py
+      - name: Save SAFE response schema only (never raw EPDK records)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s data/charging/epdk_schema.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/charging/epdk_schema.json
+          if ! git diff --cached --quiet; then
+            git commit -m "data: EPDK public response schema observation"
+            git push
+          fi

@@ -1,0 +1,88 @@
+{
+  "checked_at_utc": "2026-10-17T21:35:56+00:00",
+  "source": "https://apigateway.epdk.gov.tr/sarjIstasyonlari",
+  "root_type": "dict",
+  "root_keys": [
+    "columnNames",
+    "data",
+    "elapsedTime",
+    "errors",
+    "message",
+    "numRows",
+    "result",
+    "statusCode",
+    "statusDescription"
+  ],
+  "arrays": [
+    {
+      "path": "columnNames",
+      "count": 15,
+      "field_names": []
+    },
+    {
+      "path": "errors",
+      "count": 0,
+      "field_names": []
+    },
+    {
+      "path": "data",
+      "count": 17026,
+      "field_names": [
+        "adres",
+        "boylam",
+        "dagitimSirketiOlumluGorusBelgeNumarasi",
+        "enlem",
+        "hizmetSekli",
+        "marka",
+        "olumluGorusVerenDagitimSirketiLisansNo",
+        "olumluGorusVerenDagitimSirketiLisansUnvani",
+        "sarjAgiIsletmecisiLisansNo",
+        "sarjAgiIsletmecisiUnvan",
+        "sarjIstasyonuAdi",
+        "sarjIstasyonuIsletmecisi",
+        "sarjIstasyonuNo",
+        "soketler",
+        "yesilSarjIstasyonuMu"
+      ]
+    }
+  ],
+  "objects": [],
+  "status_code": 200,
+  "row_count": 17026,
+  "result_type": "NoneType",
+  "result_length": null,
+  "result_json_type": null,
+  "service_categories": {
+    "HALKA_ACIK": 13118,
+    "OZEL": 3908
+  },
+  "coordinate_types": {
+    "enlem": "float",
+    "boylam": "float"
+  },
+  "socket_collection_type": "list",
+  "socket_example_count": 1,
+  "socket_field_names": [
+    "soketGucu",
+    "soketNo",
+    "soketTipi",
+    "soketTuru"
+  ],
+  "column_names": [
+    "sarjIstasyonuNo",
+    "sarjIstasyonuAdi",
+    "yesilSarjIstasyonuMu",
+    "hizmetSekli",
+    "sarjAgiIsletmecisiUnvan",
+    "sarjAgiIsletmecisiLisansNo",
+    "sarjIstasyonuIsletmecisi",
+    "marka",
+    "olumluGorusVerenDagitimSirketiLisansNo",
+    "olumluGorusVerenDagitimSirketiLisansUnvani",
+    "dagitimSirketiOlumluGorusBelgeNumarasi",
+    "soketler",
+    "adres",
+    "enlem",
+    "boylam"
+  ]
+}

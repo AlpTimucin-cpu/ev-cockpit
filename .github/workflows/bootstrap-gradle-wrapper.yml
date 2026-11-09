@@ -1,0 +1,69 @@
+name: Bootstrap verified Gradle Wrapper (one time)
+
+on:
+  push:
+    branches:
+      - feature/ev-cockpit
+    paths:
+      - .github/workflows/bootstrap-gradle-wrapper.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bootstrap-wrapper-feature-ev-cockpit
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    # Only generate from our explicitly maintained branch.
+    if: github.ref == 'refs/heads/feature/ev-cockpit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature source
+        uses: actions/checkout@v6
+        with:
+          ref: feature/ev-cockpit
+          persist-credentials: true
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Gradle 8.14.3
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14.3'
+          cache-provider: basic
+      - name: Generate and verify official wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle wrapper --gradle-version 8.14.3 --distribution-type bin --no-daemon
+          chmod +x gradlew
+          test -s gradle/wrapper/gradle-wrapper.jar
+          test -s gradle/wrapper/gradle-wrapper.properties
+          grep -Fq 'gradle-8.14.3-bin.zip' gradle/wrapper/gradle-wrapper.properties
+          # Official Gradle v8.14.3 source tree blob identity.
+          expected='1b33c55baabb587c669f562ae36f953de2481846'
+          actual="$(git hash-object gradle/wrapper/gradle-wrapper.jar)"
+          test "$actual" = "$expected" || {
+            echo "::error::Generated wrapper JAR differs from Gradle v8.14.3 official artifact"
+            exit 1
+          }
+          ./gradlew --version --no-daemon
+      - name: Commit only verified wrapper files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
+          if git diff --cached --quiet; then
+            echo "Wrapper is already committed"
+          else
+            git commit -m "build: pin official Gradle 8.14.3 wrapper"
+            git push origin HEAD:feature/ev-cockpit
+          fi

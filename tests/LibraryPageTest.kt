@@ -1,4 +1,4 @@
-package tr.id4.mediahub
+package com.evcockpit.mediahub
 
 fun main() {
     val items = (0 until 2500).toList()

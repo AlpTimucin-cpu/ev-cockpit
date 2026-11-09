@@ -1,0 +1,183 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name" formatted="false">EV Cockpit</string>
+    <string name="native_arrival_soc_model_estimate" formatted="false">Arrival SoC · MODEL/ESTIMATE</string>
+    <string name="native_automatic_dc_candidates_model_estimate" formatted="false">Automatic DC candidates · MODEL/ESTIMATE</string>
+    <string name="native_back_to_map" formatted="false">Back to map</string>
+    <string name="native_battery" formatted="false">"BATTERY · "</string>
+    <string name="native_battery_current_raw_response_only_221e3d" formatted="false">Battery current · raw response only · 221E3D</string>
+    <string name="native_battery_state_of_charge_obd" formatted="false">BATTERY SoC · OBD</string>
+    <string name="native_battery_state_of_charge_test" formatted="false">BATTERY SoC · TEST</string>
+    <string name="native_battery_temperature" formatted="false">Battery temperature</string>
+    <string name="native_bluetooth_classic_spp_elm327_pair_the_adapter_in_android_bluetooth_set" formatted="false">Bluetooth Classic SPP ELM327. Pair the adapter in Android Bluetooth settings first.</string>
+    <string name="native_bms_soc_diagnostic_candidate_dashboard_soc_and_soh_are_different_quant" formatted="false">"BMS SoC (diagnostic candidate), dashboard SoC, and SoH are different quantities. "</string>
+    <string name="native_calculate_actual_road_route" formatted="false">Calculate actual road route</string>
+    <string name="native_calculating_route" formatted="false">Calculating route…</string>
+    <string name="native_charging" formatted="false">Charging</string>
+    <string name="native_charging_needed_model_estimate" formatted="false">Charging needed · MODEL/ESTIMATE</string>
+    <string name="native_charging_required_to_preserve_the_reserve" formatted="false">Charging required to preserve the reserve</string>
+    <string name="native_clear_diagnostic_result" formatted="false">Clear diagnostic result</string>
+    <string name="native_clear_route" formatted="false">Clear route</string>
+    <string name="native_close" formatted="false">Close</string>
+    <string name="native_could_not_initialize_the_speech_engine" formatted="false">Could not initialize the speech engine</string>
+    <string name="native_could_not_obtain_audio_focus" formatted="false">Could not obtain audio focus</string>
+    <string name="native_dc_charging_stations_along_the_route" formatted="false">DC Charging Stations Along the Route</string>
+    <string name="native_departure" formatted="false">Departure</string>
+    <string name="native_destination" formatted="false">Destination</string>
+    <string name="native_destination_address_or_city" formatted="false">Destination address or city</string>
+    <string name="native_destination_area_current_weather_estimate" formatted="false">Destination area · Current weather estimate</string>
+    <string name="native_destination_area_wind" formatted="false">Destination area · Wind</string>
+    <string name="native_destination_selected" formatted="false">Destination selected</string>
+    <string name="native_disconnect_obd" formatted="false">Disconnect OBD</string>
+    <string name="native_download_english_voice_data_from_settings_language_and_input_text_to_s" formatted="false">"Download English voice data from Settings &gt; Language and input &gt; Text-to-speech. "</string>
+    <string name="native_electric_road_companion" formatted="false">EV COCKPIT</string>
+    <string name="native_english_speech_ready" formatted="false">English speech ready</string>
+    <string name="native_english_speech_test" formatted="false">English speech test</string>
+    <string name="native_english_tts_data_missing" formatted="false">English TTS Data Missing</string>
+    <string name="native_english_tts_data_missing_90a54a" formatted="false">English TTS data missing</string>
+    <string name="native_epdk_filter" formatted="false">EPDK · Filter</string>
+    <string name="native_epdk_records_are_stale" formatted="false">EPDK records are stale</string>
+    <string name="native_epdk_station_filters" formatted="false">EPDK station filters</string>
+    <string name="native_estimated_arrival_time" formatted="false">Estimated arrival time</string>
+    <string name="native_estimated_drive_time" formatted="false">Estimated drive time</string>
+    <string name="native_estimated_range_model_15_reserve" formatted="false">ESTIMATED RANGE · MODEL · 15% RESERVE</string>
+    <string name="native_estimates_exclude_traffic_arrival_soc_is_not_calculated" formatted="false">"Estimates exclude traffic. Arrival SoC is not calculated "</string>
+    <string name="native_experimental_meb_ecu_readings" formatted="false">Experimental MEB ECU readings</string>
+    <string name="native_from" formatted="false">FROM</string>
+    <string name="native_getting_gps_location" formatted="false">Getting GPS location…</string>
+    <string name="native_hv_voltage" formatted="false">HV voltage</string>
+    <string name="native_in_app_media_browser" formatted="false">In-app media browser</string>
+    <string name="native_in_app_media_on_the_phone" formatted="false">In-app media on the phone</string>
+    <string name="native_instantaneous_power" formatted="false">Instantaneous power</string>
+    <string name="native_live_availability_price_and_road_access_are_unknown" formatted="false">Live availability, price, and road access are unknown.</string>
+    <string name="native_locations_selected_calculate_the_actual_osrm_route" formatted="false">Locations selected; calculate the actual OSRM route</string>
+    <string name="native_maplibre_osrm_voice_guidance_step_7" formatted="false">MAPLIBRE · OSRM · VOICE GUIDANCE · STEP 7</string>
+    <string name="native_maximum_battery_temperature_221e0e" formatted="false">Maximum battery temperature · 221E0E</string>
+    <string name="native_media" formatted="false">Media</string>
+    <string name="native_mute_voice_guidance" formatted="false">Mute voice guidance</string>
+    <string name="native_navigation" formatted="false">NAVIGATION</string>
+    <string name="native_no_paired_devices_this_screen_does_not_scan" formatted="false">No paired devices. This screen does not scan.</string>
+    <string name="native_no_validated_dc_station_within_5_km_of_the_route_line" formatted="false">No validated DC station within 5 km of the route line.</string>
+    <string name="native_no_validated_ecu_response_received_data_was_not_used" formatted="false">No validated ECU response received; data was not used.</string>
+    <string name="native_not_actual_vehicle_data_available_in_debug_builds_only" formatted="false">Not actual vehicle data; available in DEBUG builds only.</string>
+    <string name="native_not_required_according_to_the_model" formatted="false">Not required according to the model</string>
+    <string name="native_obd_connection_and_meb_diagnostics" formatted="false">OBD Connection and MEB Diagnostics</string>
+    <string name="native_obd_reading_no_more_than_10_seconds_old" formatted="false">OBD reading · no more than 10 seconds old</string>
+    <string name="native_obd_soc_stale_disconnected" formatted="false">OBD SoC stale / disconnected</string>
+    <string name="native_ok" formatted="false">OK</string>
+    <string name="native_openfreemap_openstreetmap" formatted="false">© OpenFreeMap · © OpenStreetMap</string>
+    <string name="native_origin" formatted="false">Origin</string>
+    <string name="native_origin_address_or_city" formatted="false">Origin address or city</string>
+    <string name="native_origin_and_destination_have_not_been_selected" formatted="false">Origin and destination have not been selected</string>
+    <string name="native_origin_selected" formatted="false">Origin selected</string>
+    <string name="native_osrm_alternatives" formatted="false">OSRM alternatives (</string>
+    <string name="native_osrm_eta_is_a_model_excluding_traffic_charging_time_is_calculated_sepa" formatted="false">OSRM ETA is a model excluding traffic; charging time is calculated separately.</string>
+    <string name="native_photon_osm_addresses_actual_osrm_route_not_live_traffic" formatted="false">Photon / OSM addresses · actual OSRM route · not live traffic</string>
+    <string name="native_plan_an_actual_route_first" formatted="false">Plan an actual route first</string>
+    <string name="native_preparing_english_speech" formatted="false">Preparing English speech</string>
+    <string name="native_read_bms_state_of_charge_22028c" formatted="false">Read BMS state of charge · 22028C</string>
+    <string name="native_red_green_lines_osrm_speed_profile_not_live_traffic" formatted="false">Red/green lines: OSRM speed profile · NOT LIVE TRAFFIC</string>
+    <string name="native_refresh" formatted="false">Refresh</string>
+    <string name="native_refresh_paired_devices_request_permission" formatted="false">Refresh paired devices / request permission</string>
+    <string name="native_remaining_gps" formatted="false">Remaining · GPS</string>
+    <string name="native_required_charge_model_estimate" formatted="false">Required charge · MODEL/ESTIMATE</string>
+    <string name="native_route" formatted="false">Route</string>
+    <string name="native_route_and_charging_plan" formatted="false">Route and charging plan</string>
+    <string name="native_route_progress" formatted="false">ROUTE PROGRESS</string>
+    <string name="native_settings" formatted="false">Settings</string>
+    <string name="native_sign_in_to_your_account_on_the_site_playback_support_depends_on_the_se" formatted="false">Sign in to your account on the site. Playback support depends on the service and your device.</string>
+    <string name="native_simulation_mode_test_data_not_actual_location_obd" formatted="false">SIMULATION MODE · TEST DATA · NOT ACTUAL LOCATION/OBD</string>
+    <string name="native_simulation_test_data" formatted="false">SIMULATION · TEST DATA</string>
+    <string name="native_speed_measured" formatted="false">Speed · measured</string>
+    <string name="native_start_from_my_current_gps_location" formatted="false">Start from my current GPS location</string>
+    <string name="native_status" formatted="false">"Status: "</string>
+    <string name="native_test_only_while_parked_and_in_your_own_vehicle_queries_use_read_only_u" formatted="false">"Test ONLY while parked and in your own vehicle. Queries use read-only UDS service 22. "</string>
+    <string name="native_test_waiting_for_osrm_maneuver" formatted="false">TEST · waiting for OSRM maneuver</string>
+    <string name="native_to" formatted="false">TO</string>
+    <string name="native_total_route_osrm" formatted="false">Total route · OSRM</string>
+    <string name="native_try_again" formatted="false">Try again</string>
+    <string name="native_turquoise_ring_dc_within_5_km_of_route_not_driving_detour" formatted="false">Turquoise ring: DC within 5 km of route (not driving detour)</string>
+    <string name="native_unmute_voice_guidance" formatted="false">Unmute voice guidance</string>
+    <string name="native_vehicle_information" formatted="false">Vehicle information</string>
+    <string name="native_video_is_unavailable_for_this_connection" formatted="false">Video is unavailable for this connection.</string>
+    <string name="native_video_is_unavailable_on_this_screen" formatted="false">Video is unavailable on this screen.</string>
+    <string name="native_voice" formatted="false">VOICE</string>
+    <string name="native_voice_guidance" formatted="false">Voice guidance</string>
+    <string name="native_waiting_for_gps_signal" formatted="false">Waiting for GPS signal...</string>
+    <string name="native_waiting_for_maneuver" formatted="false">Waiting for maneuver</string>
+    <string name="native_waiting_for_route" formatted="false">Waiting for route</string>
+    <string name="native_weather_open_meteo_current_model_estimate_not_arrival_time_weather" formatted="false">Weather: Open-Meteo · current model estimate, not arrival-time weather</string>
+    <string name="cockpit_gps" formatted="false">Locate vehicle</string>
+    <string name="cockpit_estimated_range" formatted="false">Estimated range · model</string>
+    <string name="cockpit_measurement_unavailable" formatted="false">Vehicle measurement unavailable</string>
+    <string name="cockpit_arrival" formatted="false">Arrival time</string>
+    <string name="cockpit_arrival_soc" formatted="false">Arrival SoC · estimate</string>
+    <string name="cockpit_plan_route" formatted="false">Plan a route</string>
+    <string name="cockpit_station_name" formatted="false">Charging station</string>
+    <string name="cockpit_operator_unknown" formatted="false">Operator not specified</string>
+    <string name="cockpit_address_unknown" formatted="false">Address not specified</string>
+    <string name="cockpit_source_date_unknown" formatted="false">Source date unknown</string>
+    <string name="cockpit_filter_all" formatted="false">All</string>
+    <string name="cockpit_filter_dc" formatted="false">DC</string>
+    <string name="cockpit_filter_route_ccs" formatted="false">Route CCS</string>
+    <string name="cockpit_filter_route_dc" formatted="false">Route DC</string>
+    <string name="cockpit_unknown_value" formatted="false">—</string>
+    <string name="cockpit_percent_symbol" formatted="false">%</string>
+    <string name="cockpit_distance_unit" formatted="false">km</string>
+    <string name="cockpit_voice_volume" formatted="false">Guidance volume</string>
+    <string name="cockpit_model_estimate" formatted="false">MODEL/ESTIMATE</string>
+    <string name="cockpit_socket_summary">%1$s · %2$s · %3$s</string>
+    <string name="cockpit_source_verified">EPDK: %1$s</string>
+    <string name="cockpit_station_count">EPDK · %1$d / %2$d</string>
+    <string name="media_engine_open">Open Media Engine</string>
+    <string name="media_engine_unavailable_title">Media Engine unavailable</string>
+    <string name="media_engine_not_installed">Install the separate Media Engine application first. You can also choose YouTube below to use the in-app browser.</string>
+    <string name="media_engine_blocked">Android blocked the application launch. Check the installed application and its profile restrictions.</string>
+    <string name="media_video_tab">Video</string>
+    <string name="media_radio_tab">Radio</string>
+    <string name="radio_description">Popular stations in Türkiye, ranked by votes. HTTPS streams only. Playback stops when this screen closes.</string>
+    <string name="radio_selected">Selected: %1$s</string>
+    <string name="radio_playback_error">Unable to play this station. Retry or select another station.</string>
+    <string name="radio_load_error">Unable to load stations. Check your connection and try again.</string>
+    <string name="radio_empty">No compatible stations were found.</string>
+    <string name="radio_play">Play</string>
+    <string name="radio_pause">Pause</string>
+    <string name="radio_stop">Stop</string>
+    <string name="radio_refresh">Refresh</string>
+    <string name="radio_search">Search Turkish stations or genres</string>
+    <string name="radio_results">%1$d / %2$d stations</string>
+    <string name="radio_votes">%1$d votes</string>
+    <string name="radio_attribution">Station directory: Radio Browser · Stream availability may change.</string>
+    <string name="media_external_not_installed">The application is not installed on this device. Install the official application to continue.</string>
+    <string name="media_external_launch_blocked">The application is installed but Android could not launch it. Check app availability, disabled apps, and profile restrictions.</string>
+    <string name="ux_welcome_description">Your privacy matters. Enable only permissions you need.</string>
+    <string name="ux_location_title">Location for navigation</string>
+    <string name="ux_location_reason">Shows your real position and supports route guidance. No location is invented without GPS.</string>
+    <string name="ux_bluetooth_title">Bluetooth for your OBD adapter</string>
+    <string name="ux_bluetooth_reason">Accesses a paired ELM327 adapter only when you choose to connect and read vehicle data.</string>
+    <string name="ux_notification_title">Connection status notifications</string>
+    <string name="ux_notification_reason">Displays status notifications for the connected-device foreground service. Does not enable hidden background playback.</string>
+    <string name="ux_ready_title">Ready to drive</string>
+    <string name="ux_ready_reason">Open the cockpit. Skipped permissions can be granted when you use their features.</string>
+    <string name="ux_permission_denied">Permission was not granted. You can skip it and enable it later in Android Settings.</string>
+    <string name="ux_already_granted">Permission already enabled.</string>
+    <string name="ux_open_cockpit">Open EV Cockpit</string>
+    <string name="ux_continue">Continue</string>
+    <string name="ux_allow_permission">Allow permission</string>
+    <string name="ux_skip_permission">Skip for now</string>
+    <string name="ux_finish_later">Use the app without completing setup</string>
+    <string name="ux_obd_unavailable">OBD adapter not connected</string>
+    <string name="ux_obd_help">Connect your ELM327 adapter to read battery data. Tap for connections.</string>
+    <string name="ux_battery_unavailable">Battery data unavailable</string>
+    <string name="ux_battery_help">The OBD link is active but no valid battery reading was received. Check diagnostics.</string>
+    <string name="ux_gps_waiting">Waiting for GPS signal</string>
+    <string name="ux_gps_help">Move into an open area, enable Location and tap to retry.</string>
+    <string name="ux_sound_unavailable">Engine sound unavailable</string>
+    <string name="ux_sound_help">Audio resources or playback are unavailable. Tap for sound settings.</string>
+    <string name="ux_tts_missing">Turkish speech pack required</string>
+    <string name="ux_tts_help">Install Turkish text-to-speech data in Android Settings, then try again.</string>
+    <string name="ux_open_tts_settings">Open speech settings</string>
+    <string name="ux_tts_loading">Preparing Turkish speech…</string>
+    <string name="ux_tts_ready">Turkish speech ready</string>
+    <string name="ux_tts_test">Test Turkish speech</string>
+</resources>

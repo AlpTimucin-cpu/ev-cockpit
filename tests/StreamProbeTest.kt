@@ -1,4 +1,4 @@
-package tr.id4.mediahub
+package com.evcockpit.mediahub
 
 fun main() {
     check(StreamProbe.classify(200).status == StreamStatus.SERVER_RESPONDS)

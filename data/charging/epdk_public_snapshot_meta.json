@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "source_url": "https://apigateway.epdk.gov.tr/sarjIstasyonlari",
+  "verified_at_utc": "2026-10-17T21:58:05+00:00",
+  "all_rows_count": 17026,
+  "public_rows_count": 13118,
+  "geocoded_public_rows_count": 13118,
+  "prices_included": false,
+  "live_status_included": false,
+  "compressed_bytes": 1213382
+}

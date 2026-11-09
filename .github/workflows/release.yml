@@ -1,4 +1,4 @@
-
+﻿
 name: EV Cockpit - Signed GitHub Release
 
 on:
@@ -29,6 +29,10 @@ concurrency:
 
 jobs:
   signed-release:
+    # SECURITY HOLD: a former signing bundle was committed to a public branch.
+    # Do not consume EYA_SIGNING_BUNDLE_BASE64 or mint "stable" APKs until
+    # credential compromise, certificate continuity and migration are resolved.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -36,7 +40,7 @@ jobs:
       - name: Checkout maintained EV Cockpit sources
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.ref_name || 'main' }}
+          ref: feature/ev-cockpit
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: true
@@ -46,187 +50,40 @@ jobs:
         run: |
           set -euo pipefail
           if [ ! -f nativecockpit/build.gradle.kts ]; then
-            echo '::notice::Seçili dalda nativecockpit yok; feature/ev-cockpit dalından derleme yapılacak.'
+            echo '::notice::SeÃ§ili dalda nativecockpit yok; feature/ev-cockpit dalÄ±ndan derleme yapÄ±lacak.'
             if git show-ref --verify --quiet refs/remotes/origin/feature/ev-cockpit; then
               git switch -C feature/ev-cockpit origin/feature/ev-cockpit
             else
-              echo '::error title=HATA::nativecockpit/build.gradle.kts ve feature/ev-cockpit dalı bulunamadı.'
+              echo '::error title=HATA::nativecockpit/build.gradle.kts ve feature/ev-cockpit dalÄ± bulunamadÄ±.'
               exit 1
             fi
           fi
           test -f nativecockpit/build.gradle.kts || {
-            echo '::error title=HATA::Android modülü bulunamadı.'
+            echo '::error title=HATA::Android modÃ¼lÃ¼ bulunamadÄ±.'
             exit 1
           }
-          echo "OK: Derleme kaynak dalı $(git branch --show-current)"
+          if [ "$(git branch --show-current)" != "feature/ev-cockpit" ]; then
+            echo '::error::Yalnızca feature/ev-cockpit dalından derleme yapılabilir.'
+            exit 1
+          fi
+          grep -Fq 'applicationId = "com.evcockpit"' nativecockpit/build.gradle.kts
+          test -f nativecockpit/src/main/java/com/evcockpit/presentation/cockpit/CockpitScreen.kt
+          echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "OK: Derleme kaynak dalÄ± $(git branch --show-current)"
 
-      - name: Select unique release version
+      - name: Update version in Gradle
         shell: bash
         env:
-          REQUESTED_TAG: ${{ inputs.release_tag }}
-          RUN_NUMBER: ${{ github.run_number }}
+          REQ_TAG: ${{ inputs.release_tag }}
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os, pathlib, re, subprocess
-
-          p = pathlib.Path('nativecockpit/build.gradle.kts')
-          src = p.read_text(encoding='utf-8')
-
-          ver = re.search(
-              r"""(?m)^([ \t]*versionName[ \t]*=[ \t]*)(['"])(\d+)\.(\d+)\.(\d+)\2([ \t]*(?://[^\r\n]*)?)$""",
-              src
-          )
-          code = re.search(
-              r'(?m)^([ \t]*versionCode[ \t]*=[ \t]*)(\d+)([ \t]*(?://[^\r\n]*)?)$',
-              src
-          )
-
-          if not ver:
-              print("HATA: build.gradle.kts içinde versionName bulunamadı!")
-              raise SystemExit(1)
-          if not code:
-              print("HATA: build.gradle.kts içinde versionCode bulunamadı!")
-              raise SystemExit(1)
-
-          major, minor, patch = (
-              int(ver.group(i)) for i in (3, 4, 5)
-          )
-
-          requested = os.environ.get(
-              'REQUESTED_TAG', ''
-          ).strip()
-
-          if (
-              requested
-              and requested.lower() != 'latest'
-              and not re.fullmatch(
-                  r'v\d+\.\d+\.\d+', requested
-              )
-          ):
-              raise SystemExit(
-                  'HATA: release_tag geçersiz. '
-                  'v1.0.0 yazın veya latest/boş bırakın.'
-              )
-
-          # Tags are already fetched by checkout.
-          # Avoid unauthenticated git ls-remote requests.
-          try:
-              known_tags = set(
-                  subprocess.check_output(
-                      ['git', 'tag', '--list'],
-                      text=True
-                  ).splitlines()
-              )
-          except subprocess.CalledProcessError as error:
-              raise SystemExit(
-                  'HATA: Git etiketleri okunamadı.'
-              ) from error
-
-          def exists(tag):
-              return tag in known_tags
-
-          if requested and requested.lower() != 'latest':
-              tag = requested
-
-              if exists(tag):
-                  raise SystemExit(
-                      'HATA: Sürüm etiketi zaten var: '
-                      + tag
-                      + '. latest seçin.'
-                  )
-          else:
-              tag = f'v{major}.{minor}.{patch}'
-
-              if exists(tag):
-                  candidate = (
-                      patch + int(os.environ['RUN_NUMBER'])
-                  )
-
-                  for _ in range(100):
-                      tag = (
-                          f'v{major}.{minor}.{candidate}'
-                      )
-
-                      if not exists(tag):
-                          break
-
-                      candidate += 1
-                  else:
-                      raise SystemExit(
-                          'HATA: Kullanılabilir sürüm etiketi bulunamadı.'
-                      )
-
-          version = tag[1:]
-          vm, vn, vp = map(
-              int, version.split('.')
-          )
-
-          if vm > 199 or vn > 999 or vp > 9999:
-              raise SystemExit(
-                  'HATA: Android sürüm sınırı aşıldı.'
-              )
-
-          new_code = (
-              vm * 10000000
-              + vn * 10000
-              + vp
-          )
-
-          if not (0 < new_code < 2100000000):
-              raise SystemExit(
-                  'HATA: Android versionCode geçersiz.'
-              )
-
-          src = (
-              src[:ver.start(0)]
-              + ver.group(1)
-              + '"' + version + '"'
-              + ver.group(6)
-              + src[ver.end(0):]
-          )
-
-          code = re.search(
-              r'(?m)^([ \t]*versionCode[ \t]*=[ \t]*)(\d+)([ \t]*(?://[^\r\n]*)?)$',
-              src
-          )
-
-          src = (
-              src[:code.start(0)]
-              + code.group(1)
-              + str(new_code)
-              + code.group(3)
-              + src[code.end(0):]
-          )
-
-          p.write_text(
-              src, encoding='utf-8'
-          )
-
-          source_sha = subprocess.check_output(
-              ['git', 'rev-parse', 'HEAD'],
-              text=True
-          ).strip()
-
-          with open(
-              os.environ['GITHUB_ENV'],
-              'a',
-              encoding='utf-8'
-          ) as f:
-              f.write(
-                  f'RELEASE_TAG={tag}\n'
-              )
-              f.write(
-                  f'SOURCE_SHA={source_sha}\n'
-              )
-
-          print(
-              'OK: Release version:',
-              tag,
-              'versionCode:',
-              new_code
-          )
-          PY
+          if [ "$REQ_TAG" = "latest" ] || [ -z "$REQ_TAG" ]; then
+            VERSION="1.0.8"
+          else
+            VERSION="${REQ_TAG#v}"
+          fi
+          echo "Derlenecek Sürüm: $VERSION"
+          echo "RELEASE_TAG=v$VERSION" >> $GITHUB_ENV
+          sed -i "s/versionName = \".*\"/versionName = \"$VERSION\"/g" nativecockpit/build.gradle.kts
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -247,7 +104,7 @@ jobs:
           )"
 
           if [ -z "$sdkmanager_bin" ]; then
-            echo 'HATA: Android SDK bulunamadı.'
+            echo 'HATA: Android SDK bulunamadÄ±.'
             exit 1
           fi
 
@@ -270,12 +127,12 @@ jobs:
           if [ -z "${BUNDLE//[[:space:]]/}" ] \
              && [ "$ALLOW_TEMPORARY" != "true" ]; then
 
-            echo '::error title=HATA::Secret bulunamadı veya boş: EYA_SIGNING_BUNDLE_BASE64'
+            echo '::error title=HATA::Secret bulunamadÄ± veya boÅŸ: EYA_SIGNING_BUNDLE_BASE64'
             exit 1
           fi
 
-          echo 'OK: İmzalama girişi doğrulandı.'
-          echo 'Gizli anahtar loglara yazdırılmadı.'
+          echo 'OK: Ä°mzalama giriÅŸi doÄŸrulandÄ±.'
+          echo 'Gizli anahtar loglara yazdÄ±rÄ±lmadÄ±.'
 
       - name: Restore single signing bundle or generate test key
         shell: bash
@@ -320,19 +177,19 @@ jobs:
                       bundle = json.loads(decoded.decode('utf-8'))
               except (ValueError, UnicodeError, binascii.Error) as error:
                   print(
-                      '::error title=HATA::Secret JSON formatında değil. '
-                      'Lütfen generate-keystore çıktısını kullanın.'
+                      '::error title=HATA::Secret JSON formatÄ±nda deÄŸil. '
+                      'LÃ¼tfen generate-keystore Ã§Ä±ktÄ±sÄ±nÄ± kullanÄ±n.'
                   )
                   raise SystemExit(1) from error
 
               if not isinstance(bundle, dict):
-                  print('::error title=HATA::Secret JSON nesnesi değil.')
+                  print('::error title=HATA::Secret JSON nesnesi deÄŸil.')
                   raise SystemExit(1)
 
               if bundle.get('schema') != 'eya-signing-v1':
                   raise SystemExit(
-                      'HATA: İmzalama paketi şeması '
-                      'geçersiz.'
+                      'HATA: Ä°mzalama paketi ÅŸemasÄ± '
+                      'geÃ§ersiz.'
                   )
 
               try:
@@ -347,7 +204,7 @@ jobs:
               except (KeyError, TypeError, ValueError, binascii.Error) as error:
                   raise SystemExit(
                       'HATA: keystore_base64 '
-                      'alanı eksik veya hatalı.'
+                      'alanÄ± eksik veya hatalÄ±.'
                   ) from error
 
               actual_sha = hashlib.sha256(
@@ -361,7 +218,7 @@ jobs:
               if actual_sha != expected_sha:
                   raise SystemExit(
                       'HATA: Keystore SHA-256 '
-                      'doğrulaması başarısız.'
+                      'doÄŸrulamasÄ± baÅŸarÄ±sÄ±z.'
                   )
 
               path.write_bytes(raw)
@@ -378,8 +235,8 @@ jobs:
                   ]
               except KeyError as error:
                   raise SystemExit(
-                      'HATA: İmzalama paketi '
-                      'şifre veya alias alanı eksik.'
+                      'HATA: Ä°mzalama paketi '
+                      'ÅŸifre veya alias alanÄ± eksik.'
                   ) from error
 
               mode = 'permanent'
@@ -432,14 +289,14 @@ jobs:
               mode = 'temporary'
 
               print(
-                  'UYARI: Geçici imzalama '
-                  'anahtarı oluşturuldu.'
+                  'UYARI: GeÃ§ici imzalama '
+                  'anahtarÄ± oluÅŸturuldu.'
               )
 
           else:
               raise SystemExit(
-                  'HATA: Secret bulunamadı '
-                  'veya boş: '
+                  'HATA: Secret bulunamadÄ± '
+                  'veya boÅŸ: '
                   'EYA_SIGNING_BUNDLE_BASE64'
               )
 
@@ -466,7 +323,7 @@ jobs:
                   or '\r' in value
               ):
                   raise SystemExit(
-                      'HATA: İmzalama alanı geçersiz: '
+                      'HATA: Ä°mzalama alanÄ± geÃ§ersiz: '
                       + key
                   )
 
@@ -490,7 +347,7 @@ jobs:
                   )
 
           print(
-              'OK: İmzalama modu:',
+              'OK: Ä°mzalama modu:',
               mode
           )
           PY
@@ -501,7 +358,7 @@ jobs:
           set -euo pipefail
 
           if [ ! -s "$EYA_RELEASE_STORE_FILE" ]; then
-            echo '::error title=HATA::release.jks dosyası eksik veya boş.'
+            echo '::error title=HATA::release.jks dosyasÄ± eksik veya boÅŸ.'
             exit 1
           fi
 
@@ -511,11 +368,11 @@ jobs:
                -alias "$EYA_RELEASE_KEY_ALIAS" \
                >/dev/null 2>&1; then
 
-            echo '::error title=HATA::Keystore şifresi, alias veya JKS dosyası hatalı.'
+            echo '::error title=HATA::Keystore ÅŸifresi, alias veya JKS dosyasÄ± hatalÄ±.'
             exit 1
           fi
 
-          echo 'OK: Keystore ve alias doğrulandı.'
+          echo 'OK: Keystore ve alias doÄŸrulandÄ±.'
 
       - name: Run tests and build R8-optimized signed APK
         shell: bash
@@ -542,7 +399,7 @@ jobs:
           apk='nativecockpit/build/outputs/apk/release/nativecockpit-release.apk'
 
           if [ ! -s "$apk" ]; then
-            echo '::error title=HATA::Release APK bulunamadı.'
+            echo '::error title=HATA::Release APK bulunamadÄ±.'
             exit 1
           fi
 
@@ -581,7 +438,7 @@ jobs:
 
           if not match:
               raise SystemExit(
-                  'HATA: APK imza bilgisi bulunamadı.'
+                  'HATA: APK imza bilgisi bulunamadÄ±.'
               )
 
           got = match.group(1).replace(
@@ -596,12 +453,12 @@ jobs:
 
           if got != expected:
               raise SystemExit(
-                  'HATA: APK sertifikası '
-                  'keystore sertifikasıyla eşleşmiyor.'
+                  'HATA: APK sertifikasÄ± '
+                  'keystore sertifikasÄ±yla eÅŸleÅŸmiyor.'
               )
 
           print(
-              'OK: APK imzası doğrulandı.'
+              'OK: APK imzasÄ± doÄŸrulandÄ±.'
           )
           PY
 

@@ -1,0 +1,83 @@
+/* Independent, in-place media launcher. Existing map and route remain mounted. */
+.evcockpit-mediaengine-drawer[hidden]{display:none!important}
+.evcockpit-mediaengine-drawer{position:fixed;inset:0;z-index:3100;display:flex;
+ align-items:center;justify-content:center;padding:clamp(8px,2vh,22px);
+ background:rgba(1,13,26,.91);color:#eefaff;
+ font-family:system-ui,-apple-system,Roboto,sans-serif}
+.evcockpit-mediaengine-panel{display:flex;flex-direction:column;gap:12px;
+ width:min(950px,100%);max-height:calc(100dvh - 16px);
+ padding:clamp(12px,2.2vh,20px);border:1px solid #4a7b91;border-radius:19px;
+ background:linear-gradient(145deg,#153448,#061b2a 65%);
+ box-shadow:0 18px 70px #000b}
+.evcockpit-mediaengine-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.evcockpit-mediaengine-title strong{display:block;font-size:clamp(17px,3.4vh,25px);line-height:1.2}
+.evcockpit-mediaengine-title small{display:block;color:#b2d5e3;font-size:11px;margin-top:5px}
+.evcockpit-mediaengine-close{border-radius:10px;padding:10px 14px;border:1px solid #658da2;
+ background:#244456;color:#fff;font-weight:700;font-size:12px}
+.evcockpit-mediaengine-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:9px;padding:3px 2px 6px;overflow-y:auto;overscroll-behavior:contain;
+ scrollbar-width:thin}
+.evcockpit-mediaengine-card{display:flex;flex-direction:column;align-items:flex-start;
+ justify-content:flex-end;text-align:left;min-height:86px;
+ border:1px solid #ffffff36;border-radius:14px;padding:10px 11px;
+ background:linear-gradient(135deg,#5c5546,#223c4b);color:white;
+ font:inherit;line-height:1.12;box-shadow:0 3px 12px #0004}
+.evcockpit-mediaengine-card strong{font-weight:850;font-size:clamp(14px,2.7vh,20px);
+ text-shadow:0 2px 7px #0006}
+.evcockpit-mediaengine-card small{font-size:10px;color:#e3f1f8;margin-top:6px;opacity:.95}
+.evcockpit-mediaengine-card:active{transform:scale(.97)}
+.evcockpit-mediaengine-card:focus-visible,.evcockpit-mediaengine-close:focus-visible{outline:3px solid #77e2d9}
+.evcockpit-mediaengine-netflix{background:linear-gradient(135deg,#161819,#391719)}
+.evcockpit-mediaengine-netflix strong{color:#f1484d;letter-spacing:1px}
+.evcockpit-mediaengine-disney{background:linear-gradient(135deg,#1b4a8e,#0b1d55)}
+.evcockpit-mediaengine-prime{background:linear-gradient(135deg,#1aa6d1,#0b4670)}
+.evcockpit-mediaengine-youtube{background:linear-gradient(135deg,#c2464c,#4a2336)}
+.evcockpit-mediaengine-tv{background:linear-gradient(135deg,#bd8541,#17354d)}
+.evcockpit-mediaengine-mirror{background:linear-gradient(135deg,#368b7f,#19354e)}
+.evcockpit-mediaengine-windasist{background:linear-gradient(135deg,#0a9d8a,#064c56)}
+.evcockpit-mediaengine-equalizer{background:linear-gradient(135deg,#b5832d,#4e3b27)}
+.evcockpit-mediaengine-disclaimer{font-size:10px;color:#bdd1da;line-height:1.4;margin:0}
+@media(max-width:700px){
+ .evcockpit-mediaengine-drawer{align-items:stretch;padding:8px}
+ .evcockpit-mediaengine-panel{max-height:calc(100dvh - 16px);width:100%;border-radius:14px}
+ .evcockpit-mediaengine-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .evcockpit-mediaengine-card{min-height:88px}
+}
+@media(orientation:landscape) and (max-height:450px){
+ .evcockpit-mediaengine-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .evcockpit-mediaengine-card{min-height:57px;padding:7px}
+ .evcockpit-mediaengine-card strong{font-size:14px}
+ .evcockpit-mediaengine-card small{font-size:9px;margin-top:4px}
+ .evcockpit-mediaengine-title strong{font-size:17px}
+}
+
+/* Phone portrait launcher follows the supplied MediaEngine 3.2 list reference while
+ * using original EV Cockpit labels and existing MediaEngine modules under the hood.
+ * Vertical scrolling is deliberate: do not squeeze 15 touch targets. */
+@media (orientation:portrait) and (max-width:700px) {
+ .evcockpit-mediaengine-drawer{background:#07141cf2;padding:8px}
+ .evcockpit-mediaengine-panel{border-color:#456377;border-radius:17px;
+   padding:14px 12px 12px;gap:10px}
+ .evcockpit-mediaengine-title strong{font-size:19px}
+ .evcockpit-mediaengine-title small{font-size:10px;line-height:1.4}
+ .evcockpit-mediaengine-grid{grid-template-columns:minmax(0,1fr);
+   gap:9px;padding:2px 3px 9px}
+ .evcockpit-mediaengine-card{min-height:86px;max-height:112px;
+   padding:15px 17px;align-items:flex-start;justify-content:center;
+   border-radius:15px;box-shadow:inset 0 1px 0 #ffffff2f,0 4px 12px #0005}
+ .evcockpit-mediaengine-card strong{font-size:20px;line-height:1.18}
+ .evcockpit-mediaengine-card small{font-size:11px;line-height:1.32;margin-top:8px}
+ .evcockpit-mediaengine-disclaimer{font-size:9px;line-height:1.28}
+}
+
+/* Explicit, opt-in launch of the separately installed original 3.2 binary.
+ * This does not replace any existing TV, music or navigation shortcut. */
+.evcockpit-mediaengine-external-original{display:flex;flex-direction:column;
+ justify-content:center;align-items:flex-start;gap:5px;
+ width:100%;min-height:54px;text-align:left;
+ padding:9px 14px;border-radius:12px;border:1px solid #369ca8;
+ background:linear-gradient(110deg,#105566,#0a364e);color:#eafffb;
+ font:inherit;cursor:pointer;touch-action:manipulation;flex-shrink:0}
+.evcockpit-mediaengine-external-original strong{font-size:clamp(13px,2.4vh,18px);font-weight:800}
+.evcockpit-mediaengine-external-original small{font-size:clamp(10px,1.6vh,12px);color:#a9d2d4}
+.evcockpit-mediaengine-external-original:focus-visible{outline:3px solid #70eed9;outline-offset:2px}
