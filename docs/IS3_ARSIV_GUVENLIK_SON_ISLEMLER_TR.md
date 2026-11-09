@@ -9,14 +9,14 @@ arşivi bulundu:
 
 | Kök dosya | Git blob SHA | Git'te bayt |
 | --- | --- | ---: |
-| \`EV_Cockpit_v0.8_Source.zip\` | \`480e143f5d0e48ca309f6b4075d6d75732fdc79b\` | 49.559 |
-| \`EV_Cockpit_Legacy_Source_v0.8.zip\` | \`ca680dd2ca018a306d46e15e3a84acca591ce2cb\` | 49.422 |
+| `EV_Cockpit_v0.8_Source.zip` | `480e143f5d0e48ca309f6b4075d6d75732fdc79b` | 49.559 |
+| `EV_Cockpit_Legacy_Source_v0.8.zip` | `ca680dd2ca018a306d46e15e3a84acca591ce2cb` | 49.422 |
 
 Bunlar farklı dosyalardır; **aynı kaynak kodu oldukları varsayılmaz**.
-İkisi de eski v0.8 dönemine aittir; yeni \`nativecockpit\` için
+İkisi de eski v0.8 dönemine aittir; yeni `nativecockpit` için
 karşılık gelen güncel kaynak veya imzalı Release olarak sunulamaz.
 
-\`scripts/audit_legacy_archives.py\` ikisini **çıkarıp çalıştırmadan**:
+`scripts/audit_legacy_archives.py` ikisini **çıkarıp çalıştırmadan**:
 ZIP dizin/traversal, bozuk CRC, şifreli giriş, sembolik bağlantı,
 yıkıcı sıkıştırma oranı, açık özel anahtar dosyası ve seçili yüksek
 güvenli token örüntüleri yönünden inceler. Her biri için **gerçek
@@ -25,23 +25,23 @@ SHA-256, sıkıştırılmış bayt, giriş sayısı ve redakte bulgu kodları**
 iddia edilmez.
 
 **Denetim çıktısı:** GitHub Actions > ilgili Debug çalışması >
-Artifacts > \`native-phase0-reports\` >
-\`build/legacy-source-archives-audit.json\`. Rapor üretilmeden hiçbir
+Artifacts > `native-phase0-reports` >
+`build/legacy-source-archives-audit.json`. Rapor üretilmeden hiçbir
 ZIP'in Releases'e taşındığı veya güvenli bulunduğu iddia edilmez.
 
 ## 2. Arşivi telefondan taşıma — doğrulama sonrası
 
 1. Kaynak ZIP'i **aynı GitHub commit'inden** telefona indir;
-   \`EV_Cockpit_v0.8_Source.zip\` dosyasını
-   \`EV_Cockpit_Legacy_Source_v0.8.zip\` ile karıştırma.
+   `EV_Cockpit_v0.8_Source.zip` dosyasını
+   `EV_Cockpit_Legacy_Source_v0.8.zip` ile karıştırma.
 2. Önce ilgili Actions raporundaki **her iki ZIP için PASS**, bayt
-   boyutları ve SHA-256 değerlerini kontrol et. Herhangi bir \`BLOCK\`
+   boyutları ve SHA-256 değerlerini kontrol et. Herhangi bir `BLOCK`
    durumunda işlem durur; bulgu yok sayılmaz.
 3. GitHub mobil tarayıcıda depo > **Releases** > **Draft a new release**.
    İmza/üretim sürümü adı kullanma. Açıklamaya
-   \`LEGACY SOURCE ARCHIVE (v0.8) — NOT APK, NOT CURRENT NATIVECOCKPIT\`
+   `LEGACY SOURCE ARCHIVE (v0.8) — NOT APK, NOT CURRENT NATIVECOCKPIT`
    ve kaynak commit SHA'sını yaz. Yeni tag gerekiyorsa anlamlı
-   \`legacy-source-v0.8\` türü ayrı bir ad seç; mevcut \`v1.0.2\`
+   `legacy-source-v0.8` türü ayrı bir ad seç; mevcut `v1.0.2`
    üretim APK'sının kaynaklarıyla eşdeğer olduğunu iddia etme.
 4. **Publish release** düğmesine basma. Önce ZIP'i taslağa ekle
    (mobil tarayıcıda gerekirse **Masaüstü site** görünümü) ve
@@ -69,9 +69,9 @@ Depo: https://github.com/AlpTimucin-cpu/ev-cockpit
 > MapLibre/OSRM, Android Auto, EPDK charging, Open-Meteo forecasts and
 > read-only ELM327 diagnostics. Preview; vehicle acceptance not verified.
 
-**Topics:** \`android\`, \`kotlin\`, \`jetpack-compose\`,
-\`android-auto\`, \`maplibre\`, \`electric-vehicles\`, \`osrm\`,
-\`open-meteo\`, \`obd2\`, \`ev-charging\`.
+**Topics:** `android`, `kotlin`, `jetpack-compose`,
+`android-auto`, `maplibre`, `electric-vehicles`, `osrm`,
+`open-meteo`, `obd2`, `ev-charging`.
 
 Bunları kaydettikten sonra GitHub'ın About bölümünde gerçekten
 göründüğünü kontrol et. Asistanın yerinize kaydetmesi bu bağlantıda
@@ -96,21 +96,21 @@ desteklenmediği için **güncellendi denmez**.
   özel anahtarı geri çekmez.
 - Android **imza özel anahtarı** kamuya açıldıysa güvenilir Release
   anahtarı olarak bir daha kullanma. Yeni sertifikayla aynı
-  \`applicationId\`'yi sideload güncellemek imza uyumsuzluğu
+  `applicationId`'yi sideload güncellemek imza uyumsuzluğu
   nedeniyle başarısız olabilir; Google Play App Signing kullanılıyorsa
   ilgili resmi anahtar yükseltme süreçleri ayrı incelenmelidir.
   Yeni kimlik/anahtar geçişi sahibin açık onayı olmadan yapılmaz.
 - Gerçek ID.4 Android Auto ekranı/GPS/OBD/ses için İş 2 A–H
-  testleri tamamlanana kadar Release kilidi \`if: false\` **kalır**.
-  Eski \`auto-release.yml\` de kapalı kalır.
+  testleri tamamlanana kadar Release kilidi `if: false` **kalır**.
+  Eski `auto-release.yml` de kapalı kalır.
 
 ## 5. Başarılı olmasının ne anlama gelmediği
 
 Arşiv ZIP denetiminin geçmesi; kodun derlendiğini, Android Auto
 Play uygunluğunu, ID.4 BMS SoC'nin doğrulandığını veya eski
-\`v1.0.0\` / \`v1.0.2\` APK'larının güvenli olduğunu **göstermez**.
+`v1.0.0` / `v1.0.2` APK'larının güvenli olduğunu **göstermez**.
 Mevcut taslak entegrasyon PR #51 merge edilmedi ve yeni üretim
 Release yayımlanmadı.
 
-Geri alma: yeni arşiv denetimi PR'ını kapat; \`main\`, PR #51,
+Geri alma: yeni arşiv denetimi PR'ını kapat; `main`, PR #51,
 GitHub Releases ve kökteki her iki ZIP aynen kalır.
