@@ -103,6 +103,7 @@ internal object CarWeatherPresentationPolicy {
 
 /** Foreground-only cadence. No Doze-exempt alarms or background location. */
 internal class CarWeatherRefreshGate {
+    companion object { const val AUTOMATIC_REFRESH_MS = 30L * 60_000L }
     private var activeRouteId: String? = null
     private var lastAttemptAtMs: Long? = null
 
@@ -127,7 +128,7 @@ internal class CarWeatherRefreshGate {
         }
         if (!hasVerifiedGpsRouteProgress) return false
         val previous = lastAttemptAtMs ?: return true
-        val interval = if (manual) 60_000L else 30L * 60_000L
+        val interval = if (manual) 60_000L else AUTOMATIC_REFRESH_MS
         return nowMs >= previous && nowMs - previous >= interval
     }
 

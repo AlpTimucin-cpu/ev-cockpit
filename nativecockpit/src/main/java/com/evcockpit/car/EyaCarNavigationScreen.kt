@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import com.evcockpit.domain.model.GpsFix
+import com.evcockpit.diagnostics.DiagnosticsHub
 import com.evcockpit.domain.model.RouteWeatherState
 import com.evcockpit.domain.model.ChargingCatalog
 import com.evcockpit.domain.model.RoadDetourCatalog
@@ -76,11 +77,12 @@ class EyaCarNavigationScreen(
     private val detours: OsrmRoadDetourRepository,
     private val weather: OpenMeteoWeatherRepository,
     private val continuity: CarNavigationContinuity,
+    private val diagnostics: DiagnosticsHub,
     ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Screen(context) {
     private val tracker = CarGpsTracker(context.applicationContext)
-    private val surface = EyaCarMapSurface(context)
+    private val surface = EyaCarMapSurface(context, diagnostics)
     private val manager = context.getCarService(NavigationManager::class.java)
     private val voice = NativeVoiceGuide(context.applicationContext, ducking)
     private val voicePrefs = VoicePreference(context.applicationContext)
@@ -152,6 +154,7 @@ class EyaCarNavigationScreen(
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 if (closed || work != null) return // avoid duplicate GPS/ticker collectors
+                diagnostics.carScreen(true)
                 manager.setNavigationManagerCallback(callbacks)
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(surface)
                 tracker.start()
@@ -206,6 +209,7 @@ class EyaCarNavigationScreen(
                     }.collect { (r, f, now) ->
                         route = r
                         fix = f
+                        diagnostics.gps(f, now)
                         resetWeatherForRoute(r?.routeId)
                         surface.update(r, f)
                         if (chargingVisible && lastChargingFixTimestamp != f?.recordedAtMillis) {
@@ -261,6 +265,7 @@ class EyaCarNavigationScreen(
                 }
             }
             override fun onStop(owner: LifecycleOwner) {
+                diagnostics.carScreen(false)
                 // The host may disconnect or replace its Session. Keep only the
                 // user-started location service; host IPC and voice stop here.
                 detachForHost()
@@ -275,6 +280,7 @@ class EyaCarNavigationScreen(
                 runCatching { manager.clearNavigationManagerCallback() }
             }
             override fun onDestroy(owner: LifecycleOwner) {
+                diagnostics.carScreen(false)
                 detachForHost()
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
@@ -345,6 +351,7 @@ class EyaCarNavigationScreen(
             gate.clear()
             loadingGate.clear()
             speechPolicy.reset()
+            diagnostics.carReattached()
             Log.i("EyaCarNavigation", "Navigation host reattached to verified route")
             invalidate()
         } catch (error: RuntimeException) {

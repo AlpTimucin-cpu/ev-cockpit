@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import com.evcockpit.domain.model.ObdPhase
+import com.evcockpit.diagnostics.DiagnosticsHub
 import com.evcockpit.domain.repository.ObdConnectionController
 import com.evcockpit.presentation.voice.WelcomeGreetingManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 class ObdForegroundService : Service() {
     @Inject lateinit var obd: ObdConnectionController
     @Inject lateinit var welcome: WelcomeGreetingManager
+    @Inject lateinit var diagnostics: DiagnosticsHub
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var connectionMonitor: Job? = null
 
@@ -73,6 +75,7 @@ class ObdForegroundService : Service() {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
             )
         } else startForeground(NOTIFICATION_ID, notification)
+        diagnostics.foregroundService(location = false, active = true)
 
         connectionMonitor?.cancel()
         connectionMonitor = scope.launch {
@@ -106,6 +109,7 @@ class ObdForegroundService : Service() {
     override fun onDestroy() {
         connectionMonitor?.cancel()
         scope.cancel()
+        diagnostics.foregroundService(location = false, active = false)
         welcome.onObdDisconnected()
         // Preserve the real connection error so the user can read it after
         // the foreground notification disappears.

@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.evcockpit.MainActivity
+import com.evcockpit.diagnostics.DiagnosticsHub
 import com.evcockpit.R
 import com.evcockpit.domain.model.validRouteGeometry
 import com.evcockpit.domain.repository.RouteRepository
@@ -46,6 +47,7 @@ import kotlinx.coroutines.launch
 class NavigationLocationService : Service() {
     @Inject lateinit var routes: RouteRepository
     @Inject lateinit var continuity: CarNavigationContinuity
+    @Inject lateinit var diagnostics: DiagnosticsHub
 
     private val ownerToken = Any()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -116,6 +118,7 @@ class NavigationLocationService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
+        diagnostics.foregroundService(location = true, active = true)
         if (trackJob != null) return START_NOT_STICKY
         trackedRouteId = routeId
         val gps = CarGpsTracker(applicationContext)
@@ -142,6 +145,7 @@ class NavigationLocationService : Service() {
                 val usable = fix?.takeIf { gpsEnabled && it.usable(now) &&
                     it.accuracyMeters <= 35f }
                 continuity.serviceGps(routeId, ownerToken, usable, now)
+                diagnostics.gps(usable, now)
                 val phase = continuity.state.value.phase
                 if (phase != lastNotificationState) {
                     lastNotificationState = phase
@@ -203,6 +207,7 @@ class NavigationLocationService : Service() {
         tracker = null
         scope.cancel()
         continuity.serviceEnded(ownerToken)
+        diagnostics.foregroundService(location = true, active = false)
         super.onDestroy()
     }
 

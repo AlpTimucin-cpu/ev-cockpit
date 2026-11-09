@@ -49,6 +49,7 @@ import com.evcockpit.domain.usecase.Elm327Session
 import com.evcockpit.domain.usecase.ElmSessionPhase
 import com.evcockpit.domain.usecase.ObdDiagnosticSafetyPolicy
 import com.evcockpit.domain.repository.VehicleRepository
+import com.evcockpit.diagnostics.DiagnosticsHub
 
 /**
  * Bluetooth Classic ELM327 SPP. All traffic is serialized in one worker:
@@ -59,7 +60,8 @@ import com.evcockpit.domain.repository.VehicleRepository
  */
 @Singleton
 class Elm327VehicleRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val diagnostics: DiagnosticsHub
 ) : VehicleRepository, ObdConnectionController {
     private val adapter: BluetoothAdapter? =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
@@ -256,8 +258,10 @@ class Elm327VehicleRepository @Inject constructor(
             // Poll the vehicle's SAE speed *before* slow MEB UDS reads.
             // A rejected manufacturer DID can take seconds; speed must not wait.
             try {
-                val speed = ElmSpeedParser.decode(protocol.readRawOnce("010D"))
+                val rawSpeed = protocol.readRawOnce("010D")
+                val speed = ElmSpeedParser.decode(rawSpeed)
                 if (speed != null) {
+                    diagnostics.obdSpeedResponse(rawSpeed)
                     val now = System.currentTimeMillis()
                     _telemetry.value = VehicleTelemetry(speedKmh = TimedValue(speed, now))
                     _engineering.value = _engineering.value.copy(speedKmh = TimedValue(speed, now))
@@ -294,6 +298,7 @@ class Elm327VehicleRepository @Inject constructor(
                         _connection.value = _connection.value.copy(
                             diagnosticBusy = false, diagnosticResult = parsed, error = null
                         )
+                        diagnostics.obd(_connection.value)
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (fatal: ObdProtocolRestoreException) {
