@@ -70,6 +70,7 @@ class DiagnosticsHub @Inject constructor() {
     }
     private val mode01Response = Regex("""(?i)(?:^|[^A-F0-9])41\s*0D\s*([A-F0-9]{2})(?![A-F0-9])""")
     private val ring = ArrayDeque<String>(MAX_LINES)
+    private var lastSpeedLogMillis = 0L
     private val mutable = MutableStateFlow(DiagnosticsSnapshot())
     val snapshot: StateFlow<DiagnosticsSnapshot> = mutable.asStateFlow()
 
@@ -225,7 +226,11 @@ class DiagnosticsHub @Inject constructor() {
         val safe = "010D / 410D" + speedByte
         if (mutable.value.obdRawMasked == safe) return
         mutable.value = mutable.value.copy(obdRawMasked = safe)
-        event(DiagnosticEvent.OBD_READ_OBSERVED)
+        val now = System.currentTimeMillis()
+        if (now - lastSpeedLogMillis >= 30_000L) {
+            lastSpeedLogMillis = now
+            event(DiagnosticEvent.OBD_READ_OBSERVED, now)
+        }
     }
 
     /** Only allowlisted read-only 0x22 UDS responses, at most eight hex bytes. */
