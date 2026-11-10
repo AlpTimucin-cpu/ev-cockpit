@@ -371,8 +371,10 @@ fun CockpitScreen(
                     // on short landscape phones. Wider displays retain detailed status.
                     if (compactDashboard) {
                         Row(
+                            // Keep MapLibre logo/attribution visible below this strip.
                             modifier = Modifier.align(Alignment.BottomCenter)
-                                .fillMaxWidth().padding(5.dp),
+                                .fillMaxWidth()
+                                .padding(start = 6.dp, end = 6.dp, bottom = 36.dp),
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             AssistPill(gpsStatus, onGpsClick,
@@ -386,7 +388,8 @@ fun CockpitScreen(
                         }
                     } else {
                         Column(
-                            modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+                            modifier = Modifier.align(Alignment.BottomStart)
+                                .padding(start = 8.dp, bottom = 36.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             if (route?.routeId != null) {
