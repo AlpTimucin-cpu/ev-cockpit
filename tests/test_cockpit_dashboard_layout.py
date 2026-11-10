@@ -34,13 +34,19 @@ class CockpitDashboardLayoutTest(unittest.TestCase):
         self.assertIn('Metric("SoC · deneysel DID"', details)
         self.assertNotIn('Metric("BMS doluluk"', details)
 
-    def test_map_statuses_are_stacked_not_overlaid_on_navigation(self):
+    def test_compact_map_statuses_have_one_touchable_row_and_large_layout_keeps_stack(self):
         screen = source("presentation/cockpit/CockpitScreen.kt")
-        overlays = screen.split("// Weather and GPS/voice badges share one stacked edge group.", 1)[1]
+        overlays = screen.split(
+            "// A single reachable status strip avoids overlays fighting for map space", 1
+        )[1]
+        self.assertIn("Modifier.align(Alignment.BottomCenter)", overlays)
+        self.assertIn("Modifier.weight(1f), compact = true", overlays)
         self.assertIn("Modifier.align(Alignment.BottomStart)", overlays)
         self.assertIn("verticalArrangement = Arrangement.spacedBy(6.dp)", overlays)
         self.assertIn("modifier = Modifier.widthIn(max = 220.dp)", overlays)
-        self.assertIn("maxLines = 1, overflow = TextOverflow.Ellipsis", screen)
+        self.assertIn("modifier.height(if (compact) 44.dp else 36.dp)", overlays)
+        self.assertIn("maxLines = 1,", overlays)
+        self.assertIn("overflow = TextOverflow.Ellipsis", overlays)
 
     def test_soc_data_origin_is_verification_policy(self):
         nav = source("presentation/navigation/NavigationViewModel.kt")
