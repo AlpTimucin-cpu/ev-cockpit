@@ -59,6 +59,20 @@ class CockpitDashboardLayoutTest(unittest.TestCase):
         self.assertIn("MapLibreCockpit(", screen)
         self.assertIn("if (obdConnection.phase == ObdPhase.CONNECTED) state else state.copy(", screen)
 
+    def test_recenter_requires_live_fix_and_is_not_continuous_tracking(self):
+        screen = source("presentation/cockpit/CockpitScreen.kt")
+        map_code = source("presentation/map/MapLibreCockpit.kt")
+        self.assertIn("enabled = state.gpsFix?.usable(nowMs) == true", screen)
+        self.assertIn('contentDescription = "Konumuma dön"', screen)
+        self.assertIn("recenterRequestId = recenterRequestId", screen)
+        self.assertIn("recenterRequestId > handledRecenterRequestId", map_code)
+        self.assertIn("fix.usable(System.currentTimeMillis())", map_code.replace(
+            "it.usable(System.currentTimeMillis())", "fix.usable(System.currentTimeMillis())"
+        ))
+        self.assertIn("CameraUpdateFactory.newLatLngZoom(", map_code)
+        self.assertIn(".padding(bottom = 8.dp, end = 16.dp)", map_code)
+        self.assertNotIn('"EPDK · ${stations.size} istasyon', map_code)
+
     def test_soc_data_origin_is_verification_policy(self):
         nav = source("presentation/navigation/NavigationViewModel.kt")
         self.assertIn("VerifiedBatterySocPolicy.read(telemetry, now)", nav)

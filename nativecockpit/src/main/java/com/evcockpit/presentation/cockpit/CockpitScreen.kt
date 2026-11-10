@@ -123,6 +123,8 @@ fun CockpitScreen(
     var selectedPage by rememberSaveable { mutableIntStateOf(0) } // 0 = Harita, 1 = Medya
     // User-controlled phone-only view. Never changes navigation, telemetry or car projection.
     var mapFocused by rememberSaveable { mutableStateOf(false) }
+    // Request ID, not a fabricated GPS fix; map reacts only to the driver's tap.
+    var recenterRequestId by rememberSaveable { mutableIntStateOf(0) }
     var settings by remember { mutableStateOf(false) }
     var engineeringOpen by remember { mutableStateOf(false) }
     var voiceSettings by remember { mutableStateOf(false) }
@@ -353,6 +355,7 @@ fun CockpitScreen(
                     // The route is always visible on the driving page.
                     MapLibreCockpit(
                         gpsFix = state.gpsFix,
+                        recenterRequestId = recenterRequestId,
                         routePoints = route?.routePoints.orEmpty(),
                         stations = chargingUi.allStations,
                         plannedStopIds = (automaticChargePlan.plan as? AutomaticChargePlan.Estimate)
@@ -364,6 +367,20 @@ fun CockpitScreen(
                         onStationTapped = { station = it },
                         modifier = Modifier.fillMaxSize()
                     )
+                    IconButton(
+                        onClick = { recenterRequestId++ },
+                        enabled = state.gpsFix?.usable(nowMs) == true,
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                            .padding(end = 8.dp)
+                            .size(48.dp)
+                            .background(Color(0xE50A1728), RoundedCornerShape(12.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GpsFixed,
+                            contentDescription = "Konumuma dön",
+                            tint = if (state.gpsFix?.usable(nowMs) == true) NeonGreen else SoftText
+                        )
+                    }
                     NavigationGlassCard(
                         route = route,
                         loading = loadStatus is RouteLoadStatus.Loading,
