@@ -104,7 +104,8 @@ fun MapLibreCockpit(
     var activeStyle by remember { mutableStateOf<Style?>(null) }
     var fallback by remember { mutableStateOf(false) }
     var centeredOnRealGps by remember { mutableStateOf(false) }
-    var handledRecenterRequestId by remember { mutableIntStateOf(0) }
+    // A newly created MapView must not replay a tap from a previous instance.
+    var handledRecenterRequestId by remember { mutableIntStateOf(recenterRequestId) }
     var fittedRouteKey by remember { mutableStateOf<Int?>(null) }
     // This object follows the lifecycle of the ONE MapView.
     val carAnimator = remember(context) { VehicleMarkerAnimator() }

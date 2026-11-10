@@ -66,9 +66,8 @@ class CockpitDashboardLayoutTest(unittest.TestCase):
         self.assertIn('contentDescription = "Konumuma dön"', screen)
         self.assertIn("recenterRequestId = recenterRequestId", screen)
         self.assertIn("recenterRequestId > handledRecenterRequestId", map_code)
-        self.assertIn("fix.usable(System.currentTimeMillis())", map_code.replace(
-            "it.usable(System.currentTimeMillis())", "fix.usable(System.currentTimeMillis())"
-        ))
+        self.assertIn("it.usable(System.currentTimeMillis())", map_code)
+        self.assertIn("mutableIntStateOf(recenterRequestId)", map_code)
         self.assertIn("CameraUpdateFactory.newLatLngZoom(", map_code)
         self.assertIn(".padding(bottom = 8.dp, end = 16.dp)", map_code)
         self.assertNotIn('"EPDK · ${stations.size} istasyon', map_code)
