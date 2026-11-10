@@ -8,4 +8,11 @@ package com.evcockpit.presentation.cockpit
 internal object CockpitLayoutPolicy {
     fun isCompact(widthDp: Float, heightDp: Float): Boolean =
         widthDp < 760f || heightDp < 400f
+
+    /** A focused map is always the only weighted child in its driving row. */
+    fun mapWeight(compact: Boolean, focused: Boolean): Float = when {
+        focused -> 1f
+        compact -> .67f
+        else -> .64f
+    }
 }

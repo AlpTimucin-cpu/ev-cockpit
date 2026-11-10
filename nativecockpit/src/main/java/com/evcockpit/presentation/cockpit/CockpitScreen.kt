@@ -121,6 +121,8 @@ fun CockpitScreen(
     var journeySheet by remember { mutableStateOf(false) }
     var charging by remember { mutableStateOf(false) }
     var selectedPage by rememberSaveable { mutableIntStateOf(0) } // 0 = Harita, 1 = Medya
+    // User-controlled phone-only view. Never changes navigation, telemetry or car projection.
+    var mapFocused by rememberSaveable { mutableStateOf(false) }
     var settings by remember { mutableStateOf(false) }
     var engineeringOpen by remember { mutableStateOf(false) }
     var voiceSettings by remember { mutableStateOf(false) }
@@ -327,19 +329,25 @@ fun CockpitScreen(
                     ),
                 horizontalArrangement = Arrangement.spacedBy(if (compactDashboard) 6.dp else 12.dp)
             ) {
-                TelemetryLeftPanel(
-                    data = displayState,
-                    connected = obdConnection.phase == ObdPhase.CONNECTED,
-                    compact = compactDashboard,
-                    obdStatus = obdStatus,
-                    soundUnavailable = soundUnavailable,
-                    onConnect = { settings = true; onObdRefresh() },
-                    onEngineering = { engineeringOpen = true },
-                    onSoundSettings = onOpenSoundSettings,
-                    modifier = Modifier.weight(if (compactDashboard) .33f else .36f).fillMaxHeight()
-                )
+                if (!mapFocused) {
+                    TelemetryLeftPanel(
+                        data = displayState,
+                        connected = obdConnection.phase == ObdPhase.CONNECTED,
+                        compact = compactDashboard,
+                        obdStatus = obdStatus,
+                        soundUnavailable = soundUnavailable,
+                        onConnect = { settings = true; onObdRefresh() },
+                        onEngineering = { engineeringOpen = true },
+                        onSoundSettings = onOpenSoundSettings,
+                        modifier = Modifier.weight(
+                            if (compactDashboard) .33f else .36f
+                        ).fillMaxHeight()
+                    )
+                }
                 Box(
-                    Modifier.weight(if (compactDashboard) .67f else .64f).fillMaxHeight()
+                    Modifier.weight(
+                        CockpitLayoutPolicy.mapWeight(compactDashboard, mapFocused)
+                    ).fillMaxHeight()
                         .background(Navy, RoundedCornerShape(14.dp))
                 ) {
                     // The route is always visible on the driving page.
@@ -357,8 +365,10 @@ fun CockpitScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                     NavigationGlassCard(
-                        route,
-                        loadStatus is RouteLoadStatus.Loading,
+                        route = route,
+                        loading = loadStatus is RouteLoadStatus.Loading,
+                        mapFocused = mapFocused,
+                        onToggleFocus = { mapFocused = !mapFocused },
                         onOpen = {
                             if (route?.routeId == null) routePlanner = true
                             else journeySheet = true
@@ -918,8 +928,12 @@ private fun SummaryMetricRow(
 
 @Composable
 private fun NavigationGlassCard(
-    route: RouteSnapshot?, loading: Boolean,
-    onOpen: () -> Unit, modifier: Modifier = Modifier
+    route: RouteSnapshot?,
+    loading: Boolean,
+    mapFocused: Boolean,
+    onToggleFocus: () -> Unit,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         modifier.clickable(onClick = onOpen),
@@ -929,8 +943,27 @@ private fun NavigationGlassCard(
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text("NAVİGASYON", color = NeonGreen,
-                style = MaterialTheme.typography.labelSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("NAVİGASYON", modifier = Modifier.weight(1f),
+                    color = NeonGreen, style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1)
+                // Child control handles its own tap; route summary keeps the parent action.
+                TextButton(
+                    onClick = onToggleFocus,
+                    modifier = Modifier.heightIn(min = 40.dp)
+                ) {
+                    Text(
+                        if (mapFocused) "Göstergeler" else "Haritayı büyüt",
+                        color = NeonGreen,
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
+                }
+            }
             Text(
                 route?.nextTurnInstruction?.takeIf { it.isNotBlank() }
                     ?: if (loading) "Rota hesaplanıyor…" else "Rota çizmek için dokunun",

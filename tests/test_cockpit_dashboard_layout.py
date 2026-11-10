@@ -49,6 +49,16 @@ class CockpitDashboardLayoutTest(unittest.TestCase):
         self.assertIn("maxLines = 1,", overlays)
         self.assertIn("overflow = TextOverflow.Ellipsis", overlays)
 
+    def test_map_focus_is_reversible_and_preserves_source_guard(self):
+        screen = source("presentation/cockpit/CockpitScreen.kt")
+        self.assertIn("var mapFocused by rememberSaveable", screen)
+        self.assertIn("if (!mapFocused) {", screen)
+        self.assertIn("CockpitLayoutPolicy.mapWeight(compactDashboard, mapFocused)", screen)
+        self.assertIn("onToggleFocus = { mapFocused = !mapFocused }", screen)
+        self.assertIn('if (mapFocused) "Göstergeler" else "Haritayı büyüt"', screen)
+        self.assertIn("MapLibreCockpit(", screen)
+        self.assertIn("if (obdConnection.phase == ObdPhase.CONNECTED) state else state.copy(", screen)
+
     def test_soc_data_origin_is_verification_policy(self):
         nav = source("presentation/navigation/NavigationViewModel.kt")
         self.assertIn("VerifiedBatterySocPolicy.read(telemetry, now)", nav)
