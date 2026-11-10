@@ -42,6 +42,7 @@ class CockpitDashboardLayoutTest(unittest.TestCase):
         self.assertIn("Modifier.align(Alignment.BottomCenter)", overlays)
         self.assertIn("Modifier.weight(1f), compact = true", overlays)
         self.assertIn("Modifier.align(Alignment.BottomStart)", overlays)
+        self.assertIn("bottom = 36.dp", overlays)  # MapLibre attribution/logo stays visible
         self.assertIn("verticalArrangement = Arrangement.spacedBy(6.dp)", overlays)
         self.assertIn("modifier = Modifier.widthIn(max = 220.dp)", overlays)
         self.assertIn("modifier.height(if (compact) 44.dp else 36.dp)", overlays)
