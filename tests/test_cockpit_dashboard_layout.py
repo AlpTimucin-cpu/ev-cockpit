@@ -59,6 +59,20 @@ class CockpitDashboardLayoutTest(unittest.TestCase):
         self.assertIn("MapLibreCockpit(", screen)
         self.assertIn("if (obdConnection.phase == ObdPhase.CONNECTED) state else state.copy(", screen)
 
+    def test_navigation_card_actions_are_independent_on_small_landscape(self):
+        screen = source("presentation/cockpit/CockpitScreen.kt")
+        card = screen.split("private fun NavigationGlassCard(", 1)[1].split(
+            "private fun AssistPill(", 1
+        )[0]
+        self.assertIn("compact = compactDashboard", screen)
+        self.assertIn("modifier = modifier,", card)
+        self.assertNotIn("modifier.clickable(onClick = onOpen)", card)
+        self.assertIn("TextButton(", card)
+        self.assertIn("onClick = onToggleFocus", card)
+        self.assertIn(".clickable(onClick = onOpen)", card)
+        self.assertIn("heightIn(min = 48.dp)", card)
+        self.assertIn("maxLines = if (compact) 1 else 2", card)
+
     def test_recenter_requires_live_fix_and_is_not_continuous_tracking(self):
         screen = source("presentation/cockpit/CockpitScreen.kt")
         map_code = source("presentation/map/MapLibreCockpit.kt")

@@ -384,6 +384,7 @@ fun CockpitScreen(
                     NavigationGlassCard(
                         route = route,
                         loading = loadStatus is RouteLoadStatus.Loading,
+                        compact = compactDashboard,
                         mapFocused = mapFocused,
                         onToggleFocus = { mapFocused = !mapFocused },
                         onOpen = {
@@ -947,31 +948,42 @@ private fun SummaryMetricRow(
 private fun NavigationGlassCard(
     route: RouteSnapshot?,
     loading: Boolean,
+    compact: Boolean,
     mapFocused: Boolean,
     onToggleFocus: () -> Unit,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // The focus toggle and route summary own independent touch targets. A
+    // clickable Surface parent would surround the nested TextButton.
     Surface(
-        modifier.clickable(onClick = onOpen),
+        modifier = modifier,
         color = Color(0xCF0A1728),
         shape = RoundedCornerShape(14.dp),
         shadowElevation = 4.dp
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(
+            Modifier.padding(
+                horizontal = if (compact) 8.dp else 14.dp,
+                vertical = if (compact) 4.dp else 8.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 3.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("NAVİGASYON", modifier = Modifier.weight(1f),
-                    color = NeonGreen, style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1)
-                // Child control handles its own tap; route summary keeps the parent action.
+                Text(
+                    "NAVİGASYON",
+                    modifier = Modifier.weight(1f),
+                    color = NeonGreen,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
                 TextButton(
                     onClick = onToggleFocus,
-                    modifier = Modifier.heightIn(min = 40.dp)
+                    modifier = Modifier.heightIn(min = 48.dp)
                 ) {
                     Text(
                         if (mapFocused) "Göstergeler" else "Haritayı büyüt",
@@ -981,18 +993,33 @@ private fun NavigationGlassCard(
                     )
                 }
             }
-            Text(
-                route?.nextTurnInstruction?.takeIf { it.isNotBlank() }
-                    ?: if (loading) "Rota hesaplanıyor…" else "Rota çizmek için dokunun",
-                color = Color.White, style = MaterialTheme.typography.titleSmall,
-                maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
-            val arrival = route?.estimatedArrivalEpochMs?.let(CockpitFormat::eta)
-            val left = route?.remainingKm?.let(CockpitFormat::distance)
-            if (arrival != null || left != null) Text(
-                listOfNotNull(left, arrival?.let { "Varış $it" }).joinToString(" · "),
-                color = SoftText, style = MaterialTheme.typography.labelSmall
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(onClick = onOpen),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    route?.nextTurnInstruction?.takeIf { it.isNotBlank() }
+                        ?: if (loading) "Rota hesaplanıyor…" else "Rota çizmek için dokunun",
+                    color = Color.White,
+                    style = if (compact) MaterialTheme.typography.bodyMedium
+                            else MaterialTheme.typography.titleSmall,
+                    maxLines = if (compact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val arrival = route?.estimatedArrivalEpochMs?.let(CockpitFormat::eta)
+                val left = route?.remainingKm?.let(CockpitFormat::distance)
+                if (arrival != null || left != null) {
+                    Text(
+                        listOfNotNull(left, arrival?.let { "Varış $it" }).joinToString(" · "),
+                        color = SoftText,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }
