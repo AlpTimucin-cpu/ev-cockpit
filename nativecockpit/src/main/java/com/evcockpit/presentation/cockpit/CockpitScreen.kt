@@ -952,7 +952,7 @@ private fun AssistPill(
     compact: Boolean = false
 ) {
     Surface(
-        modifier = modifier.heightIn(min = if (compact) 44.dp else 36.dp)
+        modifier = modifier.height(if (compact) 44.dp else 36.dp)
             .clickable(onClick = onClick),
         color = Color(0xE50A1728), shape = RoundedCornerShape(10.dp)
     ) {
