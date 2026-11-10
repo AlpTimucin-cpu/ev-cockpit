@@ -305,7 +305,9 @@ fun MapLibreCockpit(
         // Explicit provider attribution additionally to MapLibre's native attribution.
         Text(stringResource(R.string.native_openfreemap_openstreetmap),
             color = Color(0xFFD6E2EB), fontSize = 10.sp,
-            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
+            // The parent cockpit already applies WindowInsets.safeDrawing.
+            // Double navigationBarsPadding would raise this over the status strip.
+            modifier = Modifier.align(Alignment.BottomEnd)
                 .padding(bottom = 8.dp, end = 16.dp)
                 .background(Color(0xB9091B2A), RoundedCornerShape(6.dp))
                 .clickable {

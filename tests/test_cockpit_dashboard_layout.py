@@ -70,6 +70,7 @@ class CockpitDashboardLayoutTest(unittest.TestCase):
         self.assertIn("mutableIntStateOf(recenterRequestId)", map_code)
         self.assertIn("CameraUpdateFactory.newLatLngZoom(", map_code)
         self.assertIn(".padding(bottom = 8.dp, end = 16.dp)", map_code)
+        self.assertNotIn("Modifier.align(Alignment.BottomEnd).navigationBarsPadding()", map_code)
         self.assertNotIn('"EPDK · ${stations.size} istasyon', map_code)
 
     def test_soc_data_origin_is_verification_policy(self):
