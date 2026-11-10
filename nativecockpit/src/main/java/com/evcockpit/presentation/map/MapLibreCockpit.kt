@@ -82,6 +82,7 @@ private const val WEATHER_LAYER = "eya-weather-markers"
 @Composable
 fun MapLibreCockpit(
     gpsFix: GpsFix?,
+    recenterRequestId: Int = 0,
     routePoints: List<GeoCoordinate>,
     stations: List<ChargingStation>,
     plannedStopIds: Set<String> = emptySet(),
@@ -95,7 +96,6 @@ fun MapLibreCockpit(
     val owner = LocalLifecycleOwner.current
     // Map callback must never capture stale Compose lists/lambdas.
     val stationIndex = remember(stations) { stations.associateBy { it.id } }
-    val dcStationCount = remember(stations) { stations.count { it.hasDc } }
     val latestStationIndex by rememberUpdatedState(stationIndex)
     val latestViewport by rememberUpdatedState(onViewportChanged)
     val latestTap by rememberUpdatedState(onStationTapped)
@@ -104,6 +104,8 @@ fun MapLibreCockpit(
     var activeStyle by remember { mutableStateOf<Style?>(null) }
     var fallback by remember { mutableStateOf(false) }
     var centeredOnRealGps by remember { mutableStateOf(false) }
+    // A newly created MapView must not replay a tap from a previous instance.
+    var handledRecenterRequestId by remember { mutableIntStateOf(recenterRequestId) }
     var fittedRouteKey by remember { mutableStateOf<Int?>(null) }
     // This object follows the lifecycle of the ONE MapView.
     val carAnimator = remember(context) { VehicleMarkerAnimator() }
@@ -277,6 +279,20 @@ fun MapLibreCockpit(
         }
     }
 
+    // A driver's explicit one-shot recenter never enables synthetic GPS or
+    // continuous camera following that would override a manually panned map.
+    LaunchedEffect(recenterRequestId, activeStyle, gpsFix) {
+        if (recenterRequestId > handledRecenterRequestId && activeStyle != null) {
+            handledRecenterRequestId = recenterRequestId
+            gpsFix?.takeIf { it.usable(System.currentTimeMillis()) }?.let { fix ->
+                mapObject?.animateCamera(CameraUpdateFactory.newLatLngZoom(
+                    LatLng(fix.coordinate.latitude, fix.coordinate.longitude), 14.5
+                ))
+                centeredOnRealGps = true
+            }
+        }
+    }
+
     Box(modifier.background(Color(0xFF0A0F1A))) {
         AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
         if (!mapStatus.startsWith("Map ready")) {
@@ -284,21 +300,15 @@ fun MapLibreCockpit(
                 .background(Color(0xDF0B2032), RoundedCornerShape(12.dp))
                 .padding(14.dp), color = Color.White, fontSize = 12.sp)
         }
-        if (stations.isNotEmpty()) {
-            Text(
-                "EPDK · ${stations.size} istasyon · $dcStationCount DC",
-                color = Color(0xFF39FF88), fontSize = 11.sp,
-                modifier = Modifier.align(Alignment.BottomStart)
-                    .navigationBarsPadding().padding(start = 12.dp, bottom = 76.dp)
-                    .background(Color(0xEA081320), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 7.dp)
-            )
-        }
+        // The EPDK station totals remain on the Charging panel, avoiding overlap
+        // between long station counts and the driving status strip on small screens.
         // Explicit provider attribution additionally to MapLibre's native attribution.
         Text(stringResource(R.string.native_openfreemap_openstreetmap),
             color = Color(0xFFD6E2EB), fontSize = 10.sp,
-            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding()
-                .padding(bottom = 72.dp, end = 16.dp)
+            // The parent cockpit already applies WindowInsets.safeDrawing.
+            // Double navigationBarsPadding would raise this over the status strip.
+            modifier = Modifier.align(Alignment.BottomEnd)
+                .padding(bottom = 8.dp, end = 16.dp)
                 .background(Color(0xB9091B2A), RoundedCornerShape(6.dp))
                 .clickable {
                     val uri = android.net.Uri.parse("https://www.openstreetmap.org/copyright")

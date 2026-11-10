@@ -73,7 +73,16 @@ assert "protocol.close()" in repo
 assert "withContext(Dispatchers.IO) { runSession(device) }" in repo
 assert "_telemetry.value = VehicleTelemetry()" in repo
 assert "ObdPhase.CONNECTED" in fg
-assert "ux_obd_unavailable" in cockpit and "ux_gps_waiting" in cockpit
+# Check the live status policy, not the name of a translated display string.
+# Connected/disconnected presentation must retain the existing OBD mask.
+status_policy = read("presentation/cockpit/DashboardStatusPolicy.kt")
+assert "DashboardStatusPolicy.gpsLabel(state.gpsFix, nowMs)" in cockpit
+assert "DashboardStatusPolicy.obdLabel(obdConnection.phase)" in cockpit
+assert "if (obdConnection.phase == ObdPhase.CONNECTED) state else state.copy(" in cockpit
+assert "fix?.usable(nowMillis) == true" in status_policy
+assert 'else "GPS bekleniyor"' in status_policy
+assert 'ObdPhase.ERROR -> "OBD hatası"' in status_policy
+assert 'ObdPhase.CONNECTING -> "OBD bağlanıyor"' in status_policy
 
 assert "isMinifyEnabled = true" in gradle
 assert "isShrinkResources = true" in gradle

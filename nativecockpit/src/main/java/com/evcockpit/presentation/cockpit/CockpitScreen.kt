@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -106,10 +107,24 @@ fun CockpitScreen(
         socSourceLabel = null
     )
     val route = state.route ?: routeState.routeResult
+    val nowMs = System.currentTimeMillis()
+    val gpsStatus = DashboardStatusPolicy.gpsLabel(state.gpsFix, nowMs)
+    val obdStatus = DashboardStatusPolicy.obdLabel(obdConnection.phase)
+    val weatherAge = if (route?.routeId != null && weatherUi.routeId == route.routeId)
+        weatherUi.ageMinutes(nowMs) else null
+    val weatherStatus = DashboardStatusPolicy.weatherLabel(
+        loading = weatherUi.loading && weatherUi.routeId == route?.routeId,
+        hasData = weatherUi.routeId == route?.routeId && weatherUi.points.isNotEmpty(),
+        ageMinutes = weatherAge
+    )
     var routePlanner by remember { mutableStateOf(false) }
     var journeySheet by remember { mutableStateOf(false) }
     var charging by remember { mutableStateOf(false) }
     var selectedPage by rememberSaveable { mutableIntStateOf(0) } // 0 = Harita, 1 = Medya
+    // User-controlled phone-only view. Never changes navigation, telemetry or car projection.
+    var mapFocused by rememberSaveable { mutableStateOf(false) }
+    // Request ID, not a fabricated GPS fix; map reacts only to the driver's tap.
+    var recenterRequestId by rememberSaveable { mutableIntStateOf(0) }
     var settings by remember { mutableStateOf(false) }
     var engineeringOpen by remember { mutableStateOf(false) }
     var voiceSettings by remember { mutableStateOf(false) }
@@ -294,10 +309,12 @@ fun CockpitScreen(
     }
 
     // Fixed bottom navigation. Media is a separate page, not a third HUD column.
-    Column(
+    BoxWithConstraints(
         Modifier.fillMaxSize().background(Ink)
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
+        val compactDashboard = CockpitLayoutPolicy.isCompact(maxWidth.value, maxHeight.value)
+        Column(Modifier.fillMaxSize()) {
         if (selectedPage == 1) {
             MediaHomeScreen(
                 phoneAllowed = phoneMediaAllowed,
@@ -308,24 +325,37 @@ fun CockpitScreen(
         } else {
             Row(
                 Modifier.fillMaxWidth().weight(1f)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(
+                        horizontal = if (compactDashboard) 6.dp else 10.dp,
+                        vertical = if (compactDashboard) 4.dp else 8.dp
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(if (compactDashboard) 6.dp else 12.dp)
             ) {
-                TelemetryLeftPanel(
-                    data = displayState,
-                    connected = obdConnection.phase == ObdPhase.CONNECTED,
-                    onConnect = { settings = true; onObdRefresh() },
-                    onEngineering = { engineeringOpen = true },
-                    onSoundSettings = onOpenSoundSettings,
-                    modifier = Modifier.weight(.36f).fillMaxHeight()
-                )
+                if (!mapFocused) {
+                    TelemetryLeftPanel(
+                        data = displayState,
+                        connected = obdConnection.phase == ObdPhase.CONNECTED,
+                        compact = compactDashboard,
+                        obdStatus = obdStatus,
+                        soundUnavailable = soundUnavailable,
+                        onConnect = { settings = true; onObdRefresh() },
+                        onEngineering = { engineeringOpen = true },
+                        onSoundSettings = onOpenSoundSettings,
+                        modifier = Modifier.weight(
+                            if (compactDashboard) .33f else .36f
+                        ).fillMaxHeight()
+                    )
+                }
                 Box(
-                    Modifier.weight(.64f).fillMaxHeight()
+                    Modifier.weight(
+                        CockpitLayoutPolicy.mapWeight(compactDashboard, mapFocused)
+                    ).fillMaxHeight()
                         .background(Navy, RoundedCornerShape(14.dp))
                 ) {
                     // The route is always visible on the driving page.
                     MapLibreCockpit(
                         gpsFix = state.gpsFix,
+                        recenterRequestId = recenterRequestId,
                         routePoints = route?.routePoints.orEmpty(),
                         stations = chargingUi.allStations,
                         plannedStopIds = (automaticChargePlan.plan as? AutomaticChargePlan.Estimate)
@@ -337,58 +367,73 @@ fun CockpitScreen(
                         onStationTapped = { station = it },
                         modifier = Modifier.fillMaxSize()
                     )
+                    IconButton(
+                        onClick = { recenterRequestId++ },
+                        enabled = state.gpsFix?.usable(nowMs) == true,
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                            .padding(end = 8.dp)
+                            .size(48.dp)
+                            .background(Color(0xE50A1728), RoundedCornerShape(12.dp))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GpsFixed,
+                            contentDescription = "Konumuma dön",
+                            tint = if (state.gpsFix?.usable(nowMs) == true) NeonGreen else SoftText
+                        )
+                    }
                     NavigationGlassCard(
-                        route,
-                        loadStatus is RouteLoadStatus.Loading,
+                        route = route,
+                        loading = loadStatus is RouteLoadStatus.Loading,
+                        compact = compactDashboard,
+                        mapFocused = mapFocused,
+                        onToggleFocus = { mapFocused = !mapFocused },
                         onOpen = {
                             if (route?.routeId == null) routePlanner = true
                             else journeySheet = true
                         },
                         modifier = Modifier.align(Alignment.TopCenter)
-                            .fillMaxWidth(.87f).padding(top = 10.dp)
+                            .fillMaxWidth(if (compactDashboard) .94f else .87f)
+                            .padding(top = if (compactDashboard) 5.dp else 10.dp)
                     )
-                    // Weather and GPS/voice badges share one stacked edge group.
-                    // Previously the weather pill was an unaligned Box child and
-                    // could overlap the navigation card and other controls.
-                    Column(
-                        modifier = Modifier.align(Alignment.BottomStart)
-                            .padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        if (route?.routeId != null) {
-                            val age = if (weatherUi.routeId == route.routeId)
-                                weatherUi.ageMinutes(System.currentTimeMillis()) else null
-                            val title = when {
-                                weatherUi.loading -> "Hava yükleniyor"
-                                age == null -> "Hava verisi yok"
-                                age > 30L -> "Hava eski · " + age + " dk"
-                                else -> "Hava · " + age + " dk önce"
-                            }
-                            AssistPill(
-                                "$title · Yenile",
-                                onRefreshWeather,
-                                modifier = Modifier.widthIn(max = 220.dp)
-                            )
-                        }
+                    // A single reachable status strip avoids overlays fighting for map space
+                    // on short landscape phones. Wider displays retain detailed status.
+                    if (compactDashboard) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            // Keep MapLibre logo/attribution visible below this strip.
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(start = 6.dp, end = 6.dp, bottom = 36.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            AssistPill(
-                                if (state.gpsFix == null)
-                                    stringResource(R.string.ux_gps_waiting)
-                                else "GPS aktif",
-                                onGpsClick
-                            )
-                            AssistPill(
-                                if (voiceEnabled) "Ses açık" else "Ses kapalı",
-                                onVoiceToggle
-                            )
+                            AssistPill(gpsStatus, onGpsClick,
+                                modifier = Modifier.weight(1f), compact = true)
+                            AssistPill(if (voiceEnabled) "Ses açık" else "Ses kapalı",
+                                onVoiceToggle, modifier = Modifier.weight(1f), compact = true)
+                            if (route?.routeId != null) {
+                                AssistPill(weatherStatus, onRefreshWeather,
+                                    modifier = Modifier.weight(1f), compact = true)
+                            }
                         }
-                        if (soundUnavailable) AssistPill(
-                            "Motor sesi kullanılamıyor",
-                            onOpenSoundSettings,
-                            modifier = Modifier.widthIn(max = 220.dp)
-                        )
+                    } else {
+                        Column(
+                            modifier = Modifier.align(Alignment.BottomStart)
+                                .padding(start = 8.dp, bottom = 36.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (route?.routeId != null) {
+                                AssistPill("$weatherStatus · Yenile", onRefreshWeather,
+                                    modifier = Modifier.widthIn(max = 220.dp))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                AssistPill(gpsStatus, onGpsClick)
+                                AssistPill(if (voiceEnabled) "Ses açık" else "Ses kapalı",
+                                    onVoiceToggle)
+                            }
+                            if (soundUnavailable) {
+                                AssistPill("Motor sesi kullanılamıyor", onOpenSoundSettings,
+                                    modifier = Modifier.widthIn(max = 220.dp))
+                            }
+                        }
                     }
                 }
             }
@@ -396,6 +441,7 @@ fun CockpitScreen(
         SnackbarHost(hostState = snackbar)
         CockpitDock(
             selectedPage = selectedPage,
+            compact = compactDashboard,
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 2.dp),
             onRoute = {
@@ -409,6 +455,7 @@ fun CockpitScreen(
             // not the unrelated Bluetooth OBD diagnostic dialog.
             onSettings = onOpenSoundSettings
         )
+        }
     }
 }
 
@@ -582,6 +629,7 @@ private fun ArrivalHud(route: RouteSnapshot?, state: CockpitUiState, loading: Bo
 private fun CockpitDock(
     modifier: Modifier = Modifier,
     selectedPage: Int,
+    compact: Boolean,
     onRoute: () -> Unit,
     onCharging: () -> Unit,
     onMedia: () -> Unit,
@@ -589,7 +637,7 @@ private fun CockpitDock(
 ) {
     // Four primary destinations only. Diagnostics lives in TelemetryLeftPanel.
     NavigationBar(
-        modifier = modifier.height(64.dp),
+        modifier = modifier.height(if (compact) 58.dp else 64.dp),
         containerColor = Navy,
         tonalElevation = 0.dp,
         windowInsets = WindowInsets(0)
@@ -692,6 +740,9 @@ private fun HardwareNotice(title: String, detail: String, onClick: () -> Unit) {
 private fun TelemetryLeftPanel(
     data: CockpitUiState,
     connected: Boolean,
+    compact: Boolean,
+    obdStatus: String,
+    soundUnavailable: Boolean,
     onConnect: () -> Unit,
     onEngineering: () -> Unit,
     onSoundSettings: () -> Unit,
@@ -703,6 +754,57 @@ private fun TelemetryLeftPanel(
             .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        if (compact) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("SÜRÜŞ", color = NeonGreen,
+                    style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                Text(obdStatus,
+                    color = if (connected) NeonGreen else SoftText,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                CompactMetricTile("HIZ · OBD", CockpitFormat.speed(if (connected) data.speedKmh else null),
+                    modifier = Modifier.weight(1f))
+                CompactMetricTile("SoC · BMS", CockpitFormat.percent(if (connected) data.socPercent else null),
+                    modifier = Modifier.weight(1f))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                CompactMetricTile("GÜÇ · OBD", CockpitFormat.power(if (connected) data.powerKw else null),
+                    modifier = Modifier.weight(1f))
+                CompactMetricTile("MENZİL · TAHMİN",
+                    CockpitFormat.distance(if (connected && data.socPercent != null)
+                        data.estimatedRangeKm else null), modifier = Modifier.weight(1f))
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TextButton(onClick = onEngineering, modifier = Modifier.weight(1f)) {
+                    Text("Teknik", fontSize = 11.sp, maxLines = 1)
+                }
+                TextButton(
+                    onClick = if (connected) onSoundSettings else onConnect,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (connected) "Ses" else "OBD bağlan",
+                        fontSize = 11.sp, maxLines = 1)
+                }
+            }
+            Text("— = doğrulanmış veri yok. Menzil model tahminidir.",
+                style = MaterialTheme.typography.labelSmall, color = SoftText,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (soundUnavailable) {
+                TextButton(onClick = onSoundSettings, modifier = Modifier.fillMaxWidth()) {
+                    Text("Motor sesi kullanılamıyor · Ayarlar", fontSize = 10.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        } else {
         Text(
             "ARAÇ · SÜRÜŞ ÖZETİ",
             color = NeonGreen,
@@ -711,8 +813,8 @@ private fun TelemetryLeftPanel(
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            if (connected) "ELM327 bağlı · geçerli okumalar"
-            else stringResource(R.string.ux_obd_unavailable),
+            if (connected) "ELM327 bağlı · ölçümler uygun olduğunda gösterilir"
+            else obdStatus,
             color = SoftText,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 2
@@ -770,6 +872,22 @@ private fun TelemetryLeftPanel(
             style = MaterialTheme.typography.labelSmall,
             maxLines = 4
         )
+        }
+    }
+}
+
+@Composable
+private fun CompactMetricTile(title: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier.background(Navy, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(title, color = SoftText, fontSize = 9.sp, lineHeight = 11.sp,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = if (value.startsWith("—")) SoftText else Color.White,
+            fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium,
+            maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -828,31 +946,80 @@ private fun SummaryMetricRow(
 
 @Composable
 private fun NavigationGlassCard(
-    route: RouteSnapshot?, loading: Boolean,
-    onOpen: () -> Unit, modifier: Modifier = Modifier
+    route: RouteSnapshot?,
+    loading: Boolean,
+    compact: Boolean,
+    mapFocused: Boolean,
+    onToggleFocus: () -> Unit,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    // The focus toggle and route summary own independent touch targets. A
+    // clickable Surface parent would surround the nested TextButton.
     Surface(
-        modifier.clickable(onClick = onOpen),
+        modifier = modifier,
         color = Color(0xCF0A1728),
         shape = RoundedCornerShape(14.dp),
         shadowElevation = 4.dp
     ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text("NAVİGASYON", color = NeonGreen,
-                style = MaterialTheme.typography.labelSmall)
-            Text(
-                route?.nextTurnInstruction?.takeIf { it.isNotBlank() }
-                    ?: if (loading) "Rota hesaplanıyor…" else "Rota çizmek için dokunun",
-                color = Color.White, style = MaterialTheme.typography.titleSmall,
-                maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
-            val arrival = route?.estimatedArrivalEpochMs?.let(CockpitFormat::eta)
-            val left = route?.remainingKm?.let(CockpitFormat::distance)
-            if (arrival != null || left != null) Text(
-                listOfNotNull(left, arrival?.let { "Varış $it" }).joinToString(" · "),
-                color = SoftText, style = MaterialTheme.typography.labelSmall
-            )
+        Column(
+            Modifier.padding(
+                horizontal = if (compact) 8.dp else 14.dp,
+                vertical = if (compact) 4.dp else 8.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 3.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "NAVİGASYON",
+                    modifier = Modifier.weight(1f),
+                    color = NeonGreen,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+                TextButton(
+                    onClick = onToggleFocus,
+                    modifier = Modifier.heightIn(min = 48.dp)
+                ) {
+                    Text(
+                        if (mapFocused) "Göstergeler" else "Haritayı büyüt",
+                        color = NeonGreen,
+                        fontSize = 11.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(onClick = onOpen),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    route?.nextTurnInstruction?.takeIf { it.isNotBlank() }
+                        ?: if (loading) "Rota hesaplanıyor…" else "Rota çizmek için dokunun",
+                    color = Color.White,
+                    style = if (compact) MaterialTheme.typography.bodyMedium
+                            else MaterialTheme.typography.titleSmall,
+                    maxLines = if (compact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val arrival = route?.estimatedArrivalEpochMs?.let(CockpitFormat::eta)
+                val left = route?.remainingKm?.let(CockpitFormat::distance)
+                if (arrival != null || left != null) {
+                    Text(
+                        listOfNotNull(left, arrival?.let { "Varış $it" }).joinToString(" · "),
+                        color = SoftText,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }
@@ -861,16 +1028,27 @@ private fun NavigationGlassCard(
 private fun AssistPill(
     text: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        color = Color(0xD90A1728), shape = RoundedCornerShape(10.dp)
+        modifier = modifier.height(if (compact) 44.dp else 36.dp)
+            .clickable(onClick = onClick),
+        color = Color(0xE50A1728), shape = RoundedCornerShape(10.dp)
     ) {
-        Text(text, color = SoftText,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp))
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .padding(horizontal = if (compact) 4.dp else 10.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text, color = SoftText,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

@@ -19,7 +19,13 @@ rules = read("nativecockpit/proguard-rules.pro")
 
 assert "if (validSoc != null)" in hud
 assert "if (number != unknownValue)" in hud
-assert "HardwareNotice(" in hud and "ux_obd_unavailable" in hud and "ux_gps_waiting" in hud
+# Dashboard now uses a verified status policy rather than literal resource IDs.
+status = read("nativecockpit/src/main/java/com/evcockpit/presentation/cockpit/DashboardStatusPolicy.kt")
+assert "if (obdConnection.phase == ObdPhase.CONNECTED) state else state.copy(" in hud
+assert "DashboardStatusPolicy.gpsLabel(state.gpsFix, nowMs)" in hud
+assert "DashboardStatusPolicy.obdLabel(obdConnection.phase)" in hud
+assert "fix?.usable(nowMillis) == true" in status
+assert 'else "GPS bekleniyor"' in status
 assert "vehicleRepository.telemetry" in app and "obd.connection" in app
 assert "speed = if (connection.phase == ObdPhase.CONNECTED)" in app
 assert "now - speedAtMs in 0L..10_000L" in sound
