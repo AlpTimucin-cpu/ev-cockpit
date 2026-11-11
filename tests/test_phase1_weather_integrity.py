@@ -43,6 +43,7 @@ class WeatherIntegrityTest(unittest.TestCase):
         sheet = source("presentation/weather/WeatherDetailSheet.kt")
         car = source("car/CarWeatherPresentationPolicy.kt")
         self.assertIn("WeatherDetailSheet(", cockpit)
+        self.assertIn("weatherUi.ageMinutes(nowMs)?.let { it <= 45L } == true", cockpit)
         self.assertIn("© Open-Meteo", sheet)
         self.assertIn("MODEL/TAHMİN", sheet)
         self.assertIn("atLocalTime(point.forecastEtaEpochMs)", sheet)

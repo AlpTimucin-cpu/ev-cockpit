@@ -34,6 +34,8 @@ Tarih: 11 Kasım 2026. Durum: DRAFT; gerçek telefon/ID.4 onayı bekleniyor.
 ## Telefon ve Android Auto
 - Telefon: Hava ayrıntı sayfası; güncel model saat/sıcaklık/rüzgâr,
   rota nokta saati ve yağış olasılığı, açık kaynak etiketi.
+  Saatlik harita ikonları tahminin yaşı 45 dakikayı aşarsa
+  kaldırılır; eski veri yalnız yaş etiketiyle ayrıntıda kalır.
 - Araç: mevcut Car App Library Pane/MapWithContentTemplate düzeni;
   host ConstraintManager satır limiti, video/WebView yok.
   İki Pane eyleminden biri "Havayı yenile" (açık manuel istek),

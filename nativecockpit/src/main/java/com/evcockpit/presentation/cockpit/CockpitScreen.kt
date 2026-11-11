@@ -371,8 +371,13 @@ fun CockpitScreen(
                         stations = chargingUi.allStations,
                         plannedStopIds = (automaticChargePlan.plan as? AutomaticChargePlan.Estimate)
                             ?.stops?.map { it.station.id }?.toSet().orEmpty(),
+                        // Keep stale forecasts readable in the details sheet,
+                        // but never render expired prediction icons as live map weather.
                         weatherPoints = weatherUi.points
-                            .takeIf { weatherUi.routeId == route?.routeId }.orEmpty(),
+                            .takeIf {
+                                weatherUi.routeId == route?.routeId &&
+                                    weatherUi.ageMinutes(nowMs)?.let { it <= 45L } == true
+                            }.orEmpty(),
                         speedProfile = route?.profileSpeeds.orEmpty(),
                         onViewportChanged = onMapViewport,
                         onStationTapped = { station = it },
