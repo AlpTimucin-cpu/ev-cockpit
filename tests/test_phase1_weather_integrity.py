@@ -33,6 +33,8 @@ class WeatherIntegrityTest(unittest.TestCase):
         self.assertIn("SharingStarted.WhileSubscribed", vm)
         self.assertIn("weather.routeWeather(projected, fix.coordinate, manual = manual)", vm)
         self.assertIn("weather.routeWeather(matched, fix.coordinate, manual = manual)", car)
+        self.assertIn('setTitle("Havayı yenile")', car)
+        self.assertIn("maybeRefreshWeather(route, fix, System.currentTimeMillis(), manual = true)", car)
         self.assertIn("weatherAttemptMillis = atMillis", hub)
         self.assertNotIn("ACCESS_BACKGROUND_LOCATION", vm)
 

@@ -708,10 +708,12 @@ class EyaCarNavigationScreen(
             }
         }
         if (!route?.routeId.isNullOrBlank()) {
-            pane.addAction(Action.Builder().setTitle("Rota şarjları")
+            // Two Pane actions maximum: explicit refresh + return. Charging
+            // remains reachable from the navigation screen.
+            pane.addAction(Action.Builder().setTitle("Havayı yenile")
                 .setOnClickListener {
-                    weatherVisible = false
-                    showChargingList()
+                    maybeRefreshWeather(route, fix, System.currentTimeMillis(), manual = true)
+                    invalidate()
                 }.build())
         }
         pane.addAction(Action.Builder().setTitle("Rotaya dön")

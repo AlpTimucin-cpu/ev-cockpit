@@ -92,9 +92,10 @@ class OpenMeteoWeatherRepository @Inject constructor(
             val now = System.currentTimeMillis()
             val cached = _latestForecast.value
             if (!manual && cached.routeId == route.routeId &&
-                cached.points.isNotEmpty() &&
-                cached.fetchedAtMillis?.let { now >= it &&
-                    now - it < 30L * 60_000L } == true
+                (cached.points.isNotEmpty() || cached.current != null) &&
+                (cached.fetchedAtMillis ?: cached.currentFetchedAtMillis)?.let {
+                    now >= it && now - it < 30L * 60_000L
+                } == true
             ) return@withLock Result.success(cached)
 
             val sites = withContext(Dispatchers.Default) {

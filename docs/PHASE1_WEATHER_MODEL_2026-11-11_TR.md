@@ -36,6 +36,8 @@ Tarih: 11 Kasım 2026. Durum: DRAFT; gerçek telefon/ID.4 onayı bekleniyor.
   rota nokta saati ve yağış olasılığı, açık kaynak etiketi.
 - Araç: mevcut Car App Library Pane/MapWithContentTemplate düzeni;
   host ConstraintManager satır limiti, video/WebView yok.
+  İki Pane eyleminden biri "Havayı yenile" (açık manuel istek),
+  diğeri "Rotaya dön"; şarj listesi navigasyon menüsünden ulaşılır.
   Hem güncel model hem saatlik rota varsa host limiti paylaşılır.
 - Resmî MGM MeteoUYARI kamu sayfası:
   https://www.mgm.gov.tr/meteouyari/turkiye.aspx ;
