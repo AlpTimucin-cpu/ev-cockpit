@@ -88,6 +88,20 @@ class DiagnosticsHubTest {
         assertFalse(hub.snapshot.value.locationFgsActive)
     }
 
+    @Test fun weatherDiagnosticEvidenceMasksAllExceptUtcAndBoundedCount() {
+        val hub = DiagnosticsHub()
+        hub.weatherEvidence("2026-11-11T06:00:00Z", 8)
+        assertEquals("2026-11-11T06:00:00Z", hub.snapshot.value.weatherCurrentModelUtc)
+        assertEquals(8, hub.snapshot.value.weatherRoutePointCount)
+        hub.weatherEvidence("Bearer secret 38.123456", 9)
+        assertEquals("2026-11-11T06:00:00Z", hub.snapshot.value.weatherCurrentModelUtc)
+        assertEquals(8, hub.snapshot.value.weatherRoutePointCount)
+        hub.weatherEvidence("https://untrusted.example/coords", 2)
+        assertNull(hub.snapshot.value.weatherCurrentModelUtc)
+        assertEquals(2, hub.snapshot.value.weatherRoutePointCount)
+        assertFalse(hub.exportText().contains("38.123456"))
+    }
+
     @Test fun rawObdIsAllowedReadOnlyHeaderAndTruncatedNeverFullPayload() {
         val hub = DiagnosticsHub()
         val report = MebDiagnosticReport(

@@ -181,6 +181,10 @@ internal fun diagnosticReport(
         appendLine("Son hava yenileme denemesi: " + stamp(state.weatherAttemptMillis))
         appendLine("Son başarılı hava verisi: " + stamp(state.weatherReceivedMillis))
         appendLine("Hava sonucu: " + state.weatherOutcome)
+        appendLine("Hava güncel MODEL geçerliliği (UTC): " +
+            (state.weatherCurrentModelUtc ?: "kullanılamıyor"))
+        appendLine("Hava rota tahmin noktası (son başarılı istek): " +
+            (state.weatherRoutePointCount?.toString() ?: "kullanılamıyor"))
         appendLine("Hava otomatik aralığı (Android Auto ön planda): " +
             CarWeatherRefreshGate.AUTOMATIC_REFRESH_MS / 60_000L + " dk")
         appendLine("Son EPDK veri zamanı (UTC): " +

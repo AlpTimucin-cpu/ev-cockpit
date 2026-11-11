@@ -46,6 +46,7 @@ import com.evcockpit.presentation.route.RouteJourneySheet
 import com.evcockpit.presentation.route.RoutePlannerUiState
 import com.evcockpit.presentation.voice.NativeVoiceGuide
 import com.evcockpit.presentation.voice.TtsPackageWarningDialog
+import com.evcockpit.presentation.weather.WeatherDetailSheet
 
 /** One full-size map, with compact overlays for the essential driving information. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,15 +112,19 @@ fun CockpitScreen(
     val gpsStatus = DashboardStatusPolicy.gpsLabel(state.gpsFix, nowMs)
     val obdStatus = DashboardStatusPolicy.obdLabel(obdConnection.phase)
     val weatherAge = if (route?.routeId != null && weatherUi.routeId == route.routeId)
-        weatherUi.ageMinutes(nowMs) else null
+        weatherUi.ageMinutes(nowMs) ?: weatherUi.currentAgeMinutes(nowMs)
+    else if (route?.routeId == null) weatherUi.currentAgeMinutes(nowMs) else null
     val weatherStatus = DashboardStatusPolicy.weatherLabel(
-        loading = weatherUi.loading && weatherUi.routeId == route?.routeId,
-        hasData = weatherUi.routeId == route?.routeId && weatherUi.points.isNotEmpty(),
+        loading = weatherUi.loading,
+        hasData = (route?.routeId != null && weatherUi.routeId == route.routeId &&
+            weatherUi.points.isNotEmpty()) ||
+            (weatherUi.current != null && weatherUi.currentFetchedAtMillis != null),
         ageMinutes = weatherAge
     )
     var routePlanner by remember { mutableStateOf(false) }
     var journeySheet by remember { mutableStateOf(false) }
     var charging by remember { mutableStateOf(false) }
+    var weatherDetails by remember { mutableStateOf(false) }
     var selectedPage by rememberSaveable { mutableIntStateOf(0) } // 0 = Harita, 1 = Medya
     // User-controlled phone-only view. Never changes navigation, telemetry or car projection.
     var mapFocused by rememberSaveable { mutableStateOf(false) }
@@ -224,6 +229,12 @@ fun CockpitScreen(
         confirmButton = {
             TextButton(onClick = { voiceSettings = false }) { Text(stringResource(R.string.native_close)) }
         }
+    )
+    if (weatherDetails) WeatherDetailSheet(
+        state = weatherUi,
+        routeId = route?.routeId,
+        onRefresh = onRefreshWeather,
+        onDismiss = { weatherDetails = false }
     )
     if (charging) ModalBottomSheet(
         onDismissRequest = { charging = false }, containerColor = Navy
@@ -360,8 +371,13 @@ fun CockpitScreen(
                         stations = chargingUi.allStations,
                         plannedStopIds = (automaticChargePlan.plan as? AutomaticChargePlan.Estimate)
                             ?.stops?.map { it.station.id }?.toSet().orEmpty(),
+                        // Keep stale forecasts readable in the details sheet,
+                        // but never render expired prediction icons as live map weather.
                         weatherPoints = weatherUi.points
-                            .takeIf { weatherUi.routeId == route?.routeId }.orEmpty(),
+                            .takeIf {
+                                weatherUi.routeId == route?.routeId &&
+                                    weatherUi.ageMinutes(nowMs)?.let { it <= 45L } == true
+                            }.orEmpty(),
                         speedProfile = route?.profileSpeeds.orEmpty(),
                         onViewportChanged = onMapViewport,
                         onStationTapped = { station = it },
@@ -409,10 +425,8 @@ fun CockpitScreen(
                                 modifier = Modifier.weight(1f), compact = true)
                             AssistPill(if (voiceEnabled) "Ses açık" else "Ses kapalı",
                                 onVoiceToggle, modifier = Modifier.weight(1f), compact = true)
-                            if (route?.routeId != null) {
-                                AssistPill(weatherStatus, onRefreshWeather,
-                                    modifier = Modifier.weight(1f), compact = true)
-                            }
+                            AssistPill(weatherStatus, { weatherDetails = true },
+                                modifier = Modifier.weight(1f), compact = true)
                         }
                     } else {
                         Column(
@@ -420,10 +434,9 @@ fun CockpitScreen(
                                 .padding(start = 8.dp, bottom = 36.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            if (route?.routeId != null) {
-                                AssistPill("$weatherStatus · Yenile", onRefreshWeather,
-                                    modifier = Modifier.widthIn(max = 220.dp))
-                            }
+                            AssistPill("$weatherStatus · Ayrıntı",
+                                { weatherDetails = true },
+                                modifier = Modifier.widthIn(max = 220.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 AssistPill(gpsStatus, onGpsClick)
                                 AssistPill(if (voiceEnabled) "Ses açık" else "Ses kapalı",

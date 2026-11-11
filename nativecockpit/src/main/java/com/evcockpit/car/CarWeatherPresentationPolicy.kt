@@ -40,16 +40,23 @@ internal object CarWeatherPresentationPolicy {
             age >= 30L -> "Open-Meteo TAHMİN · ${age} dk önce · güncelleme bekleniyor"
             else -> "Open-Meteo TAHMİN · ${age} dk önce"
         }
-        if (state.points.isEmpty()) return CarWeatherPresentation(
-            provenance = status,
-            message = state.error?.take(120) ?: if (state.loading)
-                "Rota geçiş saatlerine göre tahmin yükleniyor."
-            else "Bu rota için hava tahmini bulunamadı."
-        )
         if (hostLimit <= 0) return CarWeatherPresentation(
             provenance = status,
             message = "Araç ekranı hava durumu satırı gösteremiyor."
         )
+        val rows = mutableListOf<CarWeatherRow>()
+        val currentAge = state.currentAgeMinutes(nowMs)
+        state.current?.takeIf { current ->
+            currentAge != null && current.coordinate.valid() &&
+                current.temperatureC.isFinite() &&
+                current.windSpeedKmh.isFinite() &&
+                current.weatherCode in 0..99
+        }?.let { current ->
+            rows += CarWeatherRow(
+                title = "Şu anki GPS · MODEL · ${currentAge} dk önce",
+                description = description(current)
+            )
+        }
         val total = state.routeLengthKm?.takeIf { it.isFinite() && it > 0.0 }
         val safe = state.points.asSequence()
             .filter { point ->
@@ -63,7 +70,7 @@ internal object CarWeatherPresentationPolicy {
                     point.weatherCode in 0..99
             }
             .sortedBy { it.distanceFromStartKm }
-            .take(hostLimit)
+            .take((hostLimit - rows.size).coerceAtLeast(0))
             .map { point ->
                 val waypoint = if (total != null &&
                     kotlin.math.abs(point.distanceFromStartKm - total) < 0.2) {
@@ -79,11 +86,15 @@ internal object CarWeatherPresentationPolicy {
                     description = description(point)
                 )
             }.toList()
+        rows += safe
         return CarWeatherPresentation(
-            rows = safe,
+            rows = rows,
             provenance = status,
-            message = if (safe.isEmpty()) "Geçiş saatine ait doğrulanabilir tahmin yok."
-                else null
+            message = if (rows.isEmpty())
+                state.error?.take(120) ?: if (state.loading)
+                    "Hava modeli yükleniyor."
+                else "Model verisi kullanılamıyor."
+            else null
         )
     }
 

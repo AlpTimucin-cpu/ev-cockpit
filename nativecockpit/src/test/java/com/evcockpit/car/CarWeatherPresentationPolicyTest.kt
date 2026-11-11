@@ -90,6 +90,31 @@ class CarWeatherPresentationPolicyTest {
         assertTrue(spoken.contains("kar yağışlı"))
     }
 
+    @Test fun currentGpsModelUsesHostLimitAndExplicitProvenance() {
+        val current = point(km = 0.0, code = 3, eta = null)
+        val data = state().copy(
+            current = current, currentFetchedAtMillis = now - 7 * 60_000L
+        )
+        val one = CarWeatherPresentationPolicy.display(data, "osrm-123", now, 1)
+        assertEquals(1, one.rows.size)
+        assertTrue(one.rows.first().title.contains("MODEL"))
+        assertTrue(one.rows.first().title.contains("7 dk önce"))
+        val three = CarWeatherPresentationPolicy.display(data, "osrm-123", now, 3)
+        assertEquals(3, three.rows.size)
+        assertTrue(three.rows.drop(1).all { it.title.contains("tahmini geçiş") })
+    }
+
+    @Test fun currentOnlyModelNeverInventsRouteForecast() {
+        val data = state().copy(
+            points = emptyList(), fetchedAtMillis = null,
+            current = point(km = 0.0, eta = null),
+            currentFetchedAtMillis = now - 12 * 60_000L
+        )
+        val shown = CarWeatherPresentationPolicy.display(data, "osrm-123", now, 2)
+        assertEquals(1, shown.rows.size)
+        assertNull(shown.message)
+    }
+
     @Test fun automaticRefreshIsThirtyMinutesAndRequiresGpsProof() {
         val gate = CarWeatherRefreshGate()
         assertFalse(gate.shouldRefresh("route", false, now))

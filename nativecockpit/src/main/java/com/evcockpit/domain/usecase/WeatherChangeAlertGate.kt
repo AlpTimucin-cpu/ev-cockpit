@@ -50,25 +50,19 @@ internal class WeatherChangeAlertGate {
         }
         val strongest = nearFuture.maxByOrNull(::severity)
         val current = strongest?.let(::severity) ?: 0
-        val increased = current > previousSeverity && current >= 2
+        val increased = current > previousSeverity && current >= 1
         previousSeverity = current
         return strongest.takeIf { increased }
     }
 
-    internal fun severity(point: WeatherWaypoint): Int {
-        val weather = when (point.weatherCode) {
-            95, 96, 99 -> 4
-            65, 67, 75, 82, 86 -> 3
-            45, 48, 61, 63, 66, 71, 73, 77, 80, 81, 85 -> 2
-            51, 53, 55, 56, 57 -> 1
-            else -> 0
-        }
-        val wind = when {
-            point.windSpeedKmh >= 75.0 -> 4
-            point.windSpeedKmh >= 50.0 -> 3
-            point.windSpeedKmh >= 35.0 -> 2
-            else -> 0
-        }
-        return maxOf(weather, wind)
+    /** Domain buckets: normal=0, rain/fog=1, snow=2, storm=3. */
+    internal fun severity(point: WeatherWaypoint): Int = when {
+        point.weatherCode in setOf(95, 96, 99) || point.windSpeedKmh >= 75.0 -> 3
+        point.weatherCode in setOf(71, 73, 75, 77, 85, 86) -> 2
+        point.weatherCode in setOf(
+            45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82
+        ) || point.windSpeedKmh >= 50.0 -> 1
+        else -> 0
     }
+
 }

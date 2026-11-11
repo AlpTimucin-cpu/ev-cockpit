@@ -38,10 +38,16 @@ data class RouteWeatherState(
     val points: List<WeatherWaypoint> = emptyList(),
     val loading: Boolean = false,
     val fetchedAtMillis: Long? = null,
-    val error: String? = null
+    val error: String? = null,
+    /** Current-location Open-Meteo MODEL; never a measured weather-station observation. */
+    val current: WeatherWaypoint? = null,
+    val currentFetchedAtMillis: Long? = null
 ) {
     fun ageMinutes(nowMs: Long): Long? =
         fetchedAtMillis?.takeIf { nowMs >= it }?.let { (nowMs - it) / 60_000L }
+
+    fun currentAgeMinutes(nowMs: Long): Long? =
+        currentFetchedAtMillis?.takeIf { nowMs >= it }?.let { (nowMs - it) / 60_000L }
 
     val destination: WeatherWaypoint? get() = points.lastOrNull()?.takeIf {
         routeLengthKm != null && kotlin.math.abs(it.distanceFromStartKm - routeLengthKm) < 0.2
