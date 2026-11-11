@@ -26,8 +26,10 @@ Tarih: 11 Kasım 2026. Durum: DRAFT; gerçek telefon/ID.4 onayı bekleniyor.
 - WorkManager asgari 15 dk ama Doze tam zamanı garanti etmez:
   https://developer.android.com/reference/androidx/work/PeriodicWorkRequest .
   Arka plan GPS, exact alarm veya uyandırma servisi eklenmedi.
-- Debug Tanılama'da son gerçek deneme / son başarı zaman damgası.
-  Koordinat, VIN, MAC ve API anahtarı günlüğe yazılmaz.
+- Debug Tanılama'da son gerçek deneme / son başarı zaman damgası,
+  ayrıca allowlist UTC güncel MODEL saati ve son başarılı rota
+  tahmin noktası sayısı (0..8). Koordinat, VIN, MAC, rota ID
+  ve API anahtarı günlüğe yazılmaz.
 - Yağmur/sis (1), kar (2), fırtına (3) risk artışı; tekrar etmez.
   Manevra sesi öncelikli, hava uyarısı en fazla 2 dakika bekler.
 

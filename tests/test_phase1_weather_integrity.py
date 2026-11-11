@@ -36,6 +36,13 @@ class WeatherIntegrityTest(unittest.TestCase):
         self.assertIn('setTitle("Havayı yenile")', car)
         self.assertIn("maybeRefreshWeather(route, fix, System.currentTimeMillis(), manual = true)", car)
         self.assertIn("weatherAttemptMillis = atMillis", hub)
+        self.assertIn("safeUtc.matches(it)", hub)
+        self.assertIn("routePointCount !in 0..8", hub)
+        self.assertIn("diagnostics.weatherEvidence(", source("data/weather/OpenMeteoWeatherRepository.kt"))
+        debug = (ROOT / "nativecockpit/src/debug/java/com/evcockpit/diagnostics/"
+                 "DebugDiagnosticsEntry.kt").read_text(encoding="utf-8")
+        self.assertIn("Hava güncel MODEL geçerliliği (UTC):", debug)
+        self.assertIn("Hava rota tahmin noktası", debug)
         self.assertNotIn("ACCESS_BACKGROUND_LOCATION", vm)
 
     def test_phone_and_car_keep_source_and_template_limits(self):

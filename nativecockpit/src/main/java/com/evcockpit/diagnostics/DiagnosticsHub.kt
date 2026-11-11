@@ -50,6 +50,9 @@ data class DiagnosticsSnapshot(
     val weatherAttemptMillis: Long? = null,
     val weatherReceivedMillis: Long? = null,
     val weatherOutcome: String = "Kullanılamıyor",
+    /** Safe model UTC instant only: no coordinate, station, route ID or account data. */
+    val weatherCurrentModelUtc: String? = null,
+    val weatherRoutePointCount: Int? = null,
     val chargeSnapshotUtc: String? = null,
     val chargingStatus: String = "Kullanılamıyor",
     val obdStatus: String = "DISCONNECTED",
@@ -182,6 +185,17 @@ class DiagnosticsHub @Inject constructor() {
         )
         event(if (success) DiagnosticEvent.WEATHER_SUCCEEDED
               else DiagnosticEvent.WEATHER_FAILED, atMillis)
+    }
+
+    /** Only an allowlisted UTC timestamp and an integer in 0..8 may be exported. */
+    @Synchronized
+    fun weatherEvidence(currentModelUtc: String?, routePointCount: Int) {
+        if (!BuildConfig.DEBUG || routePointCount !in 0..8) return
+        val safeModelTime = currentModelUtc?.takeIf { safeUtc.matches(it) }
+        mutable.value = mutable.value.copy(
+            weatherCurrentModelUtc = safeModelTime,
+            weatherRoutePointCount = routePointCount
+        )
     }
 
     @Synchronized

@@ -162,6 +162,7 @@ class OpenMeteoWeatherRepository @Inject constructor(
                 error = error
             )
             _latestForecast.value = fetched
+            diagnostics.weatherEvidence(current?.observedAt, forecasts.size)
             diagnostics.weatherFinished(true, receivedAt)
             Result.success(fetched)
         } catch (cancel: CancellationException) {
@@ -197,6 +198,7 @@ class OpenMeteoWeatherRepository @Inject constructor(
         val receivedAt = System.currentTimeMillis()
         val current = CurrentWeatherParser.match(root, coordinate, receivedAt)
             ?: throw IOException("Güncel konum model saati veya değerleri geçersiz")
+        diagnostics.weatherEvidence(current.observedAt, 0)
         diagnostics.weatherFinished(true, receivedAt, "güncel konum MODEL")
         Result.success(current)
     } catch (cancel: CancellationException) {
