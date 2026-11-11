@@ -58,6 +58,7 @@ import com.evcockpit.presentation.cockpit.CockpitScreen
 import com.evcockpit.presentation.cockpit.CockpitTheme
 import com.evcockpit.presentation.media.enterOwnVideoPipWhenParked
 import com.evcockpit.presentation.navigation.NavigationViewModel
+import com.evcockpit.presentation.onboarding.WelcomeOnboarding
 import com.evcockpit.presentation.settings.SettingsScreen
 import com.evcockpit.presentation.settings.SettingsViewModel
 import com.evcockpit.presentation.sound.ActiveSoundManager
@@ -255,6 +256,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val context = LocalContext.current
+            val wizardPreferences = remember(context) {
+                context.getSharedPreferences("ev_cockpit_permissions_v1", Context.MODE_PRIVATE)
+            }
+            var permissionWizardOpen by rememberSaveable {
+                mutableStateOf(!wizardPreferences.getBoolean("completed", false))
+            }
             val fused = remember(context) {
                 LocationServices.getFusedLocationProviderClient(context.applicationContext)
             }
@@ -427,8 +434,22 @@ class MainActivity : ComponentActivity() {
                                 carNavigationState = carNavigationState,
                                 onRetryCarNavigation = ::retryCarNavigationTracking,
                                 onStopCarNavigation = ::stopCarNavigationTracking,
-                                onClose = { audioSettingsOpen = false }
+                                onClose = { audioSettingsOpen = false },
+                                onOpenPermissions = {
+                                    audioSettingsOpen = false
+                                    permissionWizardOpen = true
+                                }
                             )
+                        }
+                        // The original onboarding existed but was never wired to
+                        // the launch Activity. This overlay is phone-only and can
+                        // be reopened from Settings after skipping a permission.
+                        if (permissionWizardOpen) {
+                            WelcomeOnboarding(onFinish = {
+                                wizardPreferences.edit()
+                                    .putBoolean("completed", true).apply()
+                                permissionWizardOpen = false
+                            })
                         }
                     }
                 }

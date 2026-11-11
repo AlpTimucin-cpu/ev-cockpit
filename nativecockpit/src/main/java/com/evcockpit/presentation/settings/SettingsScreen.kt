@@ -57,7 +57,8 @@ fun SettingsScreen(
     carNavigationState: CarContinuityState,
     onRetryCarNavigation: () -> Unit,
     onStopCarNavigation: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onOpenPermissions: () -> Unit
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val voices by viewModel.voiceOptions.collectAsStateWithLifecycle()
@@ -110,6 +111,12 @@ fun SettingsScreen(
                 Text("Araç ve Servis Ayarları", style = MaterialTheme.typography.titleLarge)
                 if (BuildConfig.DEBUG) {
                     DebugDiagnosticsEntry(diagnosticsHub)
+                }
+                OutlinedButton(
+                    onClick = onOpenPermissions,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Konum, Bluetooth ve bildirim izinlerini kontrol et")
                 }
                 HorizontalDivider()
                 Text("Android Auto · Arka plan GPS", style = MaterialTheme.typography.titleMedium)

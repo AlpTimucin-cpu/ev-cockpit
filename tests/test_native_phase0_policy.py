@@ -91,6 +91,33 @@ class NativePhase0SourcePolicyTest(unittest.TestCase):
         self.assertIn("freshVehicleSpeedKmh != null", video_policy)
         self.assertIn("phoneNotProjected && userConfirmedParked && obdConnected", video_policy)
 
+    def test_phone_permission_wizard_is_connected_and_precise_only(self):
+        source = MODULE / "src/main/java/com/evcockpit"
+        activity = (source / "MainActivity.kt").read_text(encoding="utf-8")
+        wizard = (source / "presentation/onboarding/WelcomeOnboarding.kt").read_text(
+            encoding="utf-8"
+        )
+        readiness = (source / "presentation/onboarding/PermissionReadiness.kt").read_text(
+            encoding="utf-8"
+        )
+        settings = (source / "presentation/settings/SettingsScreen.kt").read_text(
+            encoding="utf-8"
+        )
+        debug = (MODULE / "src/debug/java/com/evcockpit/diagnostics/DebugDiagnosticsEntry.kt"
+                 ).read_text(encoding="utf-8")
+        self.assertIn("WelcomeOnboarding(onFinish =", activity)
+        self.assertIn('getBoolean("completed", false)', activity)
+        self.assertIn('putBoolean("completed", true)', activity)
+        self.assertIn("onOpenPermissions = {", activity)
+        self.assertIn("onClick = onOpenPermissions", settings)
+        self.assertIn("grants[Manifest.permission.ACCESS_FINE_LOCATION] == true", wizard)
+        self.assertIn("Manifest.permission.ACCESS_COARSE_LOCATION", wizard)
+        self.assertIn("PermissionSnapshot.read(context).missingCapabilities()", debug)
+        self.assertIn("preciseLocationGranted && deviceLocationEnabled", readiness)
+        self.assertIn("Yalnız yaklaşık konum verildi", readiness)
+        self.assertNotIn("CircularProgressIndicator(", wizard)
+        self.assertIn("Bu adımı geç", wizard)
+
     def test_actual_native_module_and_pinned_wrapper(self):
         settings = (ROOT / "settings.gradle.kts").read_text(encoding="utf-8")
         wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text(encoding="utf-8")

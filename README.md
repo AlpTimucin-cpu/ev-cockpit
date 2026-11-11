@@ -5,7 +5,7 @@ verified or approved production Android Auto release.** Maintained source uses
 Kotlin, Jetpack Compose, MapLibre, OSRM road routing and the Android for Cars
 App Library 1.7.0.
 
-## Source of truth (9 November 2026)
+## Source of truth (11 November 2026)
 
 - **Before any integration merge**, `main` is the old Media Hub baseline.
   The proposed integration is a **draft PR**, not yet a published release.
@@ -17,6 +17,12 @@ App Library 1.7.0.
   [Debug diagnostics](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/46),
   [phone/vehicle acceptance protocol](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/47)
   and the Job 3 security/release-verification PR stacked on top.
+- The current **unmerged integration chain** is [#51 clean native snapshot](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/51) →
+  [#52 archive safety gate](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/52) →
+  [#53 adaptive landscape](https://github.com/AlpTimucin-cpu/ev-cockpit/pull/53).
+  The Phase 0 permission review is also stacked in a separate draft branch;
+  none of these features exists in the current `main` APK.
+  See [Phase 0 acceptance and integration plan](docs/PHASE0_FOUNDATION_2026-11-11_TR.md).
 - **Physical Volkswagen ID.4 and Android Auto host acceptance remains NOT
   VERIFIED.** The owner is testing without a computer, ADB, logcat or DHU.
   Real phone/vehicle evidence is tracked in
@@ -39,6 +45,10 @@ App Library 1.7.0.
   Route weather is a forecast from Open-Meteo, refreshed at **most every 30
   minutes while the foreground Android Auto screen has valid route+GPS**.
   Doze, lost connectivity or host pause can delay the next attempt.
+- The Phase 0 phone permission wizard requests **foreground precise** location,
+  paired Bluetooth and notifications in user-initiated steps. Missing grants
+  remain visible as feature limitations; a successful permission check does
+  not certify a GPS fix, an ELM327 connection or an Android Auto session.
 - The Debug diagnostic view holds at most 500 redacted **application** events,
   not operating-system logcat; copy/share only after inspecting the report.
 
