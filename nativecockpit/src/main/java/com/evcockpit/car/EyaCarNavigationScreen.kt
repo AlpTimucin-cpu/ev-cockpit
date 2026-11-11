@@ -571,7 +571,7 @@ class EyaCarNavigationScreen(
             if (weatherVisible) invalidate()
         }
         weatherJob = scope.launch {
-            val result = weather.routeWeather(matched)
+            val result = weather.routeWeather(matched, fix.coordinate, manual = manual)
             if (routes.currentRoute.value?.routeId != routeId || weatherRouteId != routeId)
                 return@launch
             weatherState = result.fold(

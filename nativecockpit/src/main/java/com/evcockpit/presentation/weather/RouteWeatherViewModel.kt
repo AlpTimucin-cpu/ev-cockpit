@@ -14,8 +14,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Active-screen forecasts. Android Doze cannot guarantee 30-minute WorkManager
- * execution; there is intentionally no background location polling here.
+ * Foreground-observed 30-minute refresh. No WorkManager/background GPS:
+ * Doze cannot guarantee any fixed 30-minute update time.
+ * Each new route ID triggers an immediate model request once real GPS exists.
  */
 @HiltViewModel
 class RouteWeatherViewModel @Inject constructor(
@@ -25,64 +26,81 @@ class RouteWeatherViewModel @Inject constructor(
 ) : ViewModel() {
     private val refreshRequests = Channel<Unit>(Channel.CONFLATED)
 
-    /** Explicit user action: never start a periodic job or ask for background GPS. */
     fun refresh() {
         refreshRequests.trySend(Unit)
     }
 
     val uiState: StateFlow<RouteWeatherState> = routes.currentRoute
+        .distinctUntilChangedBy { it?.routeId }
         .flatMapLatest { route ->
             flow {
-                if (route?.routeId.isNullOrBlank()) {
-                    emit(RouteWeatherState())
-                    return@flow
-                }
-                val activeRoute = requireNotNull(route)
-                val routeId = requireNotNull(activeRoute.routeId)
+                val routeId = route?.routeId
                 val progress = RouteProgressTracker()
                 var previous: RouteWeatherState? = null
+                var manual = false
                 emit(RouteWeatherState(routeId = routeId, loading = true))
 
                 while (true) {
-                    val now = System.currentTimeMillis()
-                    val fix = locations.gpsFix.value?.takeIf { it.usable(now) }
+                    val startedAt = System.currentTimeMillis()
+                    val fix = locations.gpsFix.value?.takeIf {
+                        it.usable(startedAt) && it.accuracyMeters <= 35f
+                    }
                     if (fix == null) {
                         emit(previous?.copy(
                             loading = false,
-                            error = "Güncel GPS yok; önceki hava tahmini korunuyor"
+                            error = "Hassas GPS yok; son model verisi korunuyor"
                         ) ?: RouteWeatherState(
                             routeId = routeId,
-                            error = "Hava tahmini için güncel ve hassas GPS konumu gerekli"
+                            error = "Güncel ve hassas GPS gerekli; hava kullanılamıyor"
                         ))
-                        // No synthetic starting position and no hot-loop while GPS is missing.
-                        locations.gpsFix.first { it?.usable(System.currentTimeMillis()) == true }
+                        locations.gpsFix.first {
+                            it?.usable(System.currentTimeMillis()) == true &&
+                                it.accuracyMeters <= 35f
+                        }
                         continue
                     }
-                    val projected = progress.enrich(activeRoute, fix, now)
-                    val result = if (projected?.validProgress() != null) {
-                        weather.routeWeather(projected)
-                    } else Result.failure(IllegalStateException(
-                        "Araç konumu gerçek OSRM rotasına güvenle eşleştirilemiyor"
-                    ))
+                    val result = if (routeId == null || route == null) {
+                        weather.currentAt(fix.coordinate).map { current ->
+                            RouteWeatherState(
+                                current = current,
+                                currentFetchedAtMillis = System.currentTimeMillis()
+                            )
+                        }
+                    } else {
+                        val projected = progress.enrich(route, fix, startedAt)
+                        if (projected?.validProgress() != null) {
+                            weather.routeWeather(projected, fix.coordinate, manual = manual)
+                        } else {
+                            weather.currentAt(fix.coordinate).map { current ->
+                                RouteWeatherState(
+                                    routeId = routeId,
+                                    current = current,
+                                    currentFetchedAtMillis = System.currentTimeMillis(),
+                                    error = "OSRM rota eşleşmesi yok; geçiş tahmini kullanılamıyor"
+                                )
+                            }
+                        }
+                    }
                     val next = result.fold(
                         onSuccess = { it },
                         onFailure = { failure ->
-                            previous?.copy(
-                                loading = false,
-                                error = "Hava güncellenemedi: ${failure.message.orEmpty()}. " +
-                                    "Son alınan tahmin gösteriliyor"
-                            ) ?: RouteWeatherState(
-                                routeId = routeId,
-                                error = "Hava tahmini alınamadı: ${failure.message.orEmpty()}"
-                            )
+                            val message = "Open-Meteo modeli güncellenemedi: " +
+                                failure.message.orEmpty().take(100) + "."
+                            previous?.copy(loading = false, error = message) ?:
+                                RouteWeatherState(routeId = routeId, error = message)
                         }
                     )
-                    previous = next.takeIf { it.points.isNotEmpty() }
+                    previous = next.takeIf { it.current != null || it.points.isNotEmpty() }
                     emit(next)
-                    // Thirty minutes only while observed; manual refresh wakes early.
-                    withTimeoutOrNull(30 * 60_000L) { refreshRequests.receive() }
+                    // Automatic: >=30 minutes between attempt START times, even on
+                    // HTTP failures. Manual refresh is explicit and may be earlier.
+                    val elapsed = (System.currentTimeMillis() - startedAt).coerceAtLeast(0L)
+                    val remaining = (30L * 60_000L - elapsed).coerceAtLeast(0L)
+                    manual = withTimeoutOrNull(remaining) {
+                        refreshRequests.receive()
+                        true
+                    } == true
                 }
             }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), RouteWeatherState())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), RouteWeatherState())
 }

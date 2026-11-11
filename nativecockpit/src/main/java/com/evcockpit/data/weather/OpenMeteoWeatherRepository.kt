@@ -16,6 +16,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -32,7 +34,8 @@ internal interface OpenMeteoService {
         @Query("latitude") latitudes: String,
         @Query("longitude") longitudes: String,
         @Query("current") fields: String = "temperature_2m,wind_speed_10m,weather_code",
-        @Query("current_weather") legacy: Boolean = true
+        @Query("timezone") timezone: String = "GMT",
+        @Query("timeformat") timeFormat: String = "unixtime"
     ): Response<JsonElement>
 
     @GET("v1/forecast")
@@ -45,7 +48,8 @@ internal interface OpenMeteoService {
         @Query("timeformat") timeFormat: String = "unixtime",
         @Query("forecast_days") forecastDays: Int = 7,
         @Query("temperature_unit") temperatureUnit: String = "celsius",
-        @Query("wind_speed_unit") windUnit: String = "kmh"
+        @Query("wind_speed_unit") windUnit: String = "kmh",
+        @Query("current") currentFields: String = "temperature_2m,wind_speed_10m,weather_code"
     ): Response<JsonElement>
 }
 
@@ -59,6 +63,9 @@ class OpenMeteoWeatherRepository @Inject constructor(
     // transforms model output into live meteorological observations.
     private val _latestForecast = MutableStateFlow(RouteWeatherState())
     val latestForecast: StateFlow<RouteWeatherState> = _latestForecast
+    // Serialize foreground phone/AA requests to avoid duplicate API calls
+    // and preserve the 30-minute per-route automatic cadence.
+    private val routeMutex = Mutex()
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -75,64 +82,93 @@ class OpenMeteoWeatherRepository @Inject constructor(
      * Query Open-Meteo hourly FORECAST for ETA at up to eight GPS-grounded
      * points on the remaining route. A missing GPS projection yields no guess.
      */
-    suspend fun routeWeather(route: RouteSnapshot): Result<RouteWeatherState> = try {
-        diagnostics.weatherAttempt()
-        val sites = withContext(Dispatchers.Default) {
-            RouteForecastPolicy.sample(route, System.currentTimeMillis())
-        }
-        if (sites.isEmpty()) throw IllegalArgumentException(
-            "Güncel GPS rota ilerlemesi veya OSRM süre tahmini bulunamadı"
-        )
-        val response = withContext(Dispatchers.IO) {
-            val latitudes = sites.joinToString(",") {
-                String.format(Locale.US, "%.5f", it.coordinate.latitude)
+    suspend fun routeWeather(
+        route: RouteSnapshot,
+        actualGpsCoordinate: GeoCoordinate,
+        manual: Boolean = false
+    ): Result<RouteWeatherState> = routeMutex.withLock {
+        try {
+            require(actualGpsCoordinate.valid()) { "Güncel GPS koordinatı doğrulanamadı" }
+            val now = System.currentTimeMillis()
+            val cached = _latestForecast.value
+            if (!manual && cached.routeId == route.routeId &&
+                cached.points.isNotEmpty() &&
+                cached.fetchedAtMillis?.let { now >= it &&
+                    now - it < 30L * 60_000L } == true
+            ) return@withLock Result.success(cached)
+
+            val sites = withContext(Dispatchers.Default) {
+                RouteForecastPolicy.sample(route, now)
             }
-            val longitudes = sites.joinToString(",") {
-                String.format(Locale.US, "%.5f", it.coordinate.longitude)
+            if (sites.isEmpty()) throw IllegalArgumentException(
+                "Güncel GPS rota ilerlemesi veya OSRM süre tahmini bulunamadı"
+            )
+            // The first request coordinate comes from actual, fresh GPS;
+            // the following <=8 coordinates are GPS-snapped OSRM model ETAs.
+            // Open-Meteo accepts multiple coordinates in a single HTTP call.
+            val allCoordinates = listOf(actualGpsCoordinate) + sites.map { it.coordinate }
+            diagnostics.weatherAttempt()
+            val response = withContext(Dispatchers.IO) {
+                val latitudes = allCoordinates.joinToString(",") {
+                    String.format(Locale.US, "%.5f", it.latitude)
+                }
+                val longitudes = allCoordinates.joinToString(",") {
+                    String.format(Locale.US, "%.5f", it.longitude)
+                }
+                val root = appConfig.configuration.first().endpoints.weatherBaseUrl
+                BoundedNetworkRetry.io {
+                    api(root).hourlyForecast(latitudes, longitudes)
+                }
             }
-            val root = appConfig.configuration.first().endpoints.weatherBaseUrl
-            BoundedNetworkRetry.io {
-                api(root).hourlyForecast(latitudes, longitudes)
+            if (!response.isSuccessful) {
+                response.errorBody()?.close()
+                throw IOException("Open-Meteo HTTP ${response.code()}")
             }
-        }
-        if (!response.isSuccessful) {
-            response.errorBody()?.close()
-            throw IOException("Open-Meteo HTTP ${response.code()}")
-        }
-        val data = response.body()?.takeUnless { it.isJsonNull }
-            ?: throw IOException("Open-Meteo boş yanıt döndürdü")
-        val objects = when {
-            data.isJsonArray -> data.asJsonArray.map {
-                it.takeIf { element -> element.isJsonObject }?.asJsonObject
+            val data = response.body()?.takeUnless { it.isJsonNull }
+                ?: throw IOException("Open-Meteo boş yanıt döndürdü")
+            val objects = when {
+                data.isJsonArray -> data.asJsonArray.map {
+                    it.takeIf { element -> element.isJsonObject }?.asJsonObject
+                }
+                data.isJsonObject -> listOf(data.asJsonObject)
+                else -> throw IOException("Open-Meteo beklenmeyen JSON yanıtı")
             }
-            data.isJsonObject -> listOf(data.asJsonObject)
-            else -> throw IOException("Open-Meteo beklenmeyen JSON yanıtı")
+            if (objects.size != allCoordinates.size) {
+                throw IOException("Open-Meteo yanıtındaki konum sayısı eşleşmiyor")
+            }
+            val receivedAt = System.currentTimeMillis()
+            val current = objects.first()?.let {
+                CurrentWeatherParser.match(it, actualGpsCoordinate, receivedAt)
+            }
+            val forecasts = sites.mapIndexedNotNull { index, site ->
+                objects[index + 1]?.let { HourlyForecastParser.match(site, it) }
+            }
+            if (forecasts.isEmpty() && current == null) {
+                throw IOException("Güncel veya saatlik hava modeli doğrulanamadı")
+            }
+            val error = when {
+                forecasts.size != sites.size -> "Bazı geçiş saatlerine ait hava tahmini alınamadı"
+                current == null -> "Güncel konum hava modeli alınamadı"
+                else -> null
+            }
+            val fetched = RouteWeatherState(
+                routeId = route.routeId,
+                routeLengthKm = sites.last().distanceFromStartKm,
+                current = current,
+                currentFetchedAtMillis = receivedAt.takeIf { current != null },
+                points = forecasts,
+                fetchedAtMillis = receivedAt.takeIf { forecasts.isNotEmpty() },
+                error = error
+            )
+            _latestForecast.value = fetched
+            diagnostics.weatherFinished(true, receivedAt)
+            Result.success(fetched)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: Exception) {
+            diagnostics.weatherFinished(false)
+            Result.failure(error)
         }
-        if (objects.size != sites.size) {
-            throw IOException("Hava tahmini konum sayısı rota örnekleriyle uyuşmuyor")
-        }
-        val forecasts = sites.mapIndexedNotNull { i, site ->
-            objects[i]?.let { HourlyForecastParser.match(site, it) }
-        }
-        if (forecasts.isEmpty()) throw IOException(
-            "Geçiş saatleri için doğrulanabilir saatlik hava tahmini bulunamadı"
-        )
-        val fetched = RouteWeatherState(
-            routeId = route.routeId,
-            routeLengthKm = sites.last().distanceFromStartKm,
-            points = forecasts,
-            fetchedAtMillis = System.currentTimeMillis(),
-            error = if (forecasts.size != sites.size)
-                "Bazı rota noktalarının geçiş saati tahmini alınamadı" else null
-        )
-        _latestForecast.value = fetched
-        diagnostics.weatherFinished(true, fetched.fetchedAtMillis ?: System.currentTimeMillis())
-        Result.success(fetched)
-    } catch (cancel: CancellationException) {
-        throw cancel
-    } catch (error: Exception) {
-        diagnostics.weatherFinished(false)
-        Result.failure(error)
     }
 
     /**
@@ -141,6 +177,7 @@ class OpenMeteoWeatherRepository @Inject constructor(
      */
     suspend fun currentAt(coordinate: GeoCoordinate): Result<WeatherWaypoint> = try {
         require(coordinate.valid()) { "Geçersiz GPS konumu" }
+        diagnostics.weatherAttempt()
         val response = withContext(Dispatchers.IO) {
             val root = appConfig.configuration.first().endpoints.weatherBaseUrl
             BoundedNetworkRetry.io {
@@ -154,41 +191,18 @@ class OpenMeteoWeatherRepository @Inject constructor(
             response.errorBody()?.close()
             throw IOException("Open-Meteo HTTP ${response.code()}")
         }
-        val root = response.body()?.takeUnless { it.isJsonNull }?.asJsonObject
-            ?: throw IOException("Open-Meteo boş sonuç döndürdü")
-        val current = root.getAsJsonObject("current")
-        val legacy = root.getAsJsonObject("current_weather")
-        val temperature = current?.safeNumber("temperature_2m")
-            ?: legacy?.safeNumber("temperature")
-        val wind = current?.safeNumber("wind_speed_10m")
-            ?: legacy?.safeNumber("windspeed")
-        val code = current?.safeNumber("weather_code")
-            ?: legacy?.safeNumber("weathercode")
-        val time = current?.get("time")?.asString ?: legacy?.get("time")?.asString
-        if (temperature == null || temperature !in -90.0..65.0 ||
-            wind == null || wind !in 0.0..350.0 ||
-            code == null || code !in 0.0..100.0 || time.isNullOrBlank()
-        ) throw IOException("Open-Meteo geçersiz hava ölçümü")
-        Result.success(
-            WeatherWaypoint(
-                coordinate = coordinate,
-                distanceFromStartKm = 0.0,
-                temperatureC = temperature,
-                windSpeedKmh = wind,
-                weatherCode = code.toInt(),
-                observedAt = time
-            )
-        )
+        val root = response.body()?.takeIf { it.isJsonObject }?.asJsonObject
+            ?: throw IOException("Open-Meteo güncel model yanıtı bulunamadı")
+        val receivedAt = System.currentTimeMillis()
+        val current = CurrentWeatherParser.match(root, coordinate, receivedAt)
+            ?: throw IOException("Güncel konum model saati veya değerleri geçersiz")
+        diagnostics.weatherFinished(true, receivedAt, "güncel konum MODEL")
+        Result.success(current)
     } catch (cancel: CancellationException) {
         throw cancel
     } catch (error: Exception) {
+        diagnostics.weatherFinished(false)
         Result.failure(error)
-    }
-
-    private fun JsonObject.safeNumber(field: String): Double? = try {
-        get(field)?.takeUnless { it.isJsonNull }?.asDouble?.takeIf { it.isFinite() }
-    } catch (_: RuntimeException) {
-        null
     }
 
     companion object {

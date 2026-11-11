@@ -170,11 +170,15 @@ class DiagnosticsHub @Inject constructor() {
     }
 
     @Synchronized
-    fun weatherFinished(success: Boolean, atMillis: Long = System.currentTimeMillis()) {
+    fun weatherFinished(
+        success: Boolean,
+        atMillis: Long = System.currentTimeMillis(),
+        sourceKind: String = "saatlik TAHMİN"
+    ) {
         if (!BuildConfig.DEBUG) return
         mutable.value = mutable.value.copy(
             weatherReceivedMillis = if (success) atMillis else mutable.value.weatherReceivedMillis,
-            weatherOutcome = if (success) "Başarılı (saatlik TAHMİN)" else "Başarısız"
+            weatherOutcome = if (success) "Başarılı ($sourceKind)" else "Başarısız"
         )
         event(if (success) DiagnosticEvent.WEATHER_SUCCEEDED
               else DiagnosticEvent.WEATHER_FAILED, atMillis)
