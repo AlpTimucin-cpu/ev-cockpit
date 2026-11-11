@@ -5,6 +5,9 @@ import com.evcockpit.domain.usecase.ForecastStop
 import com.google.gson.JsonParser
 import org.junit.Assert.*
 import org.junit.Test
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 class HourlyForecastParserTest {
     private val epoch = 1_800_000_000L
@@ -39,6 +42,24 @@ class HourlyForecastParserTest {
             etaEpochMillis = (epoch + 3600L + 2800L) * 1000L
         )
         assertNull(HourlyForecastParser.match(afterLastAvailableHour, payload()))
+    }
+
+    @Test fun utcUnixModelHourDoesNotDoubleShiftInDstOrIstanbul() {
+        val firstUtc = Instant.parse("2026-11-01T05:30:00Z")
+        val secondUtc = Instant.parse("2026-11-01T06:30:00Z")
+        val before = firstUtc.atZone(ZoneId.of("America/New_York"))
+        val after = secondUtc.atZone(ZoneId.of("America/New_York"))
+        assertEquals(1, before.hour)
+        assertEquals(1, after.hour)
+        assertEquals(ZoneOffset.ofHours(-4), before.offset)
+        assertEquals(ZoneOffset.ofHours(-5), after.offset)
+        assertEquals(8, firstUtc.atZone(ZoneId.of("Europe/Istanbul")).hour)
+        val data = payload(times =
+            "${firstUtc.epochSecond},${secondUtc.epochSecond}")
+        val found = HourlyForecastParser.match(
+            site.copy(etaEpochMillis = secondUtc.toEpochMilli()), data
+        )
+        assertEquals(secondUtc.toString(), found?.observedAt)
     }
 
     @Test fun rejectsMissingOrInvalidNumericalData() {

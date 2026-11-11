@@ -41,6 +41,16 @@ class WeatherChangeAlertGateTest {
         assertNotNull(gate.increasedWarning(forecast(95), now, 0f))
     }
 
+    @Test fun warnsOnlyOnIncreasedNormalRainFogSnowStormSeverity() {
+        val gate = WeatherChangeAlertGate()
+        assertNull(gate.increasedWarning(forecast(0), now, 0f))
+        assertNotNull(gate.increasedWarning(forecast(45), now, 0f))
+        assertNull(gate.increasedWarning(forecast(63), now, 0f))
+        assertNotNull(gate.increasedWarning(forecast(71), now, 0f))
+        assertNotNull(gate.increasedWarning(forecast(95), now, 0f))
+        assertNull(gate.increasedWarning(forecast(95), now, 0f))
+    }
+
     @Test fun routeSwitchResetsGateButStaleModelsAreSilent() {
         val gate = WeatherChangeAlertGate()
         assertNotNull(gate.increasedWarning(forecast(95), now, .1f))

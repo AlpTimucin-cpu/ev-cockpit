@@ -233,6 +233,8 @@ class NavigationViewModel @Inject constructor(
             }.distinctUntilChanged().collectLatest { activeId ->
                 if (activeId == null) return@collectLatest
                 val changeGate = WeatherChangeAlertGate()
+                var pendingWeather: WeatherWaypoint? = null
+                var pendingUntilMs = 0L
                 while (true) {
                     val now = System.currentTimeMillis()
                     val forecast = weatherRepository.latestForecast.value
@@ -243,7 +245,21 @@ class NavigationViewModel @Inject constructor(
                     ) changeGate.increasedWarning(
                         forecast, now, route.validProgress()
                     ) else null
-                    if (risk != null && route != null && _foreground.value &&
+                    if (risk != null) {
+                        pendingWeather = risk
+                        pendingUntilMs = now + 2L * 60_000L
+                    }
+                    // Maneuver voice has priority. A pending weather transition
+                    // expires rather than becoming a stale warning.
+                    val upcomingKm = forecast.routeLengthKm
+                        ?.times(route?.validProgress()?.toDouble() ?: Double.NaN)
+                    val pending = pendingWeather?.takeIf { item ->
+                        now <= pendingUntilMs && upcomingKm?.isFinite() == true &&
+                            item.distanceFromStartKm + 0.25 >= upcomingKm &&
+                            item.forecastEtaEpochMs?.let { it >= now - 60_000L } == true
+                    }
+                    if (pending == null) pendingWeather = null
+                    if (pending != null && route != null && _foreground.value &&
                         (route.nextTurnMeters == null || route.nextTurnMeters > 650.0) &&
                         setting.enabled && setting.status in setOf(
                             NativeVoiceGuide.Status.READY,
@@ -251,12 +267,13 @@ class NavigationViewModel @Inject constructor(
                         )
                     ) {
                         val message = "Rota üzerindeki saatlik hava tahmininde " +
-                            "${risk.summaryTr} hava bekleniyor. Yol koşullarına dikkat."
+                            "${pending.summaryTr} hava bekleniyor. Yol koşullarına dikkat."
                         if (guide.speakIfIdle(message, setting.volume)) {
+                            pendingWeather = null
                             _weatherAlerts.tryEmit(message)
                         }
                     }
-                    delay(60_000L)
+                    delay(15_000L)
                 }
             }
         }
