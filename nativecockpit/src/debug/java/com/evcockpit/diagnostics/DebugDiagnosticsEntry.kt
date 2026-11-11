@@ -38,6 +38,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evcockpit.BuildConfig
 import com.evcockpit.car.CarWeatherRefreshGate
+import com.evcockpit.presentation.onboarding.PermissionSnapshot
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -166,6 +167,10 @@ internal fun diagnosticReport(
             BuildConfig.APPLICATION_ID + " · debug=" + BuildConfig.DEBUG)
         appendLine("İzinler: konum " + location + " · bildirim " + notification +
             " · Bluetooth " + bluetooth)
+        val permissionIssues = PermissionSnapshot.read(context).missingCapabilities()
+        appendLine("İzin etkileri: " + if (permissionIssues.isEmpty())
+            "İzin kısıtı görünmüyor; sensör/araç bağlantısı doğrulanmadı."
+        else permissionIssues.joinToString(" | "))
         appendLine("Foreground konum: " + if (state.locationFgsActive) "çalışıyor" else "çalışmıyor")
         appendLine("Foreground OBD: " + if (state.obdFgsActive) "çalışıyor" else "çalışmıyor")
         appendLine("Son gerçek GPS: " + gps)
