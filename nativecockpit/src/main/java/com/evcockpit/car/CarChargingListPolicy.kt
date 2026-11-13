@@ -12,6 +12,7 @@ import com.evcockpit.domain.usecase.AutomaticDcChargingPlanner
 import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.domain.usecase.RouteProgressTracker
 import com.evcockpit.domain.usecase.VerifiedBatterySocPolicy
+import com.evcockpit.domain.usecase.EpdkProvenancePolicy
 import java.time.Duration
 import java.util.Locale
 import kotlin.math.asin
@@ -28,7 +29,9 @@ internal data class CarChargeItem(
     /** Straight-line GPS distance only. It is NOT a driving detour. */
     val directDistanceMeters: Double?,
     /** User-calibrated MODEL only; null unless verified road detour and BMS exist. */
-    val modelArrivalSocPercent: Double?
+    val modelArrivalSocPercent: Double?,
+    /** min(verified station CCS kW, user-confirmed vehicle peak), NOT measured power. */
+    val acceptedNameplateDcKw: Double? = null
 )
 
 internal data class CarChargeList(
@@ -43,7 +46,7 @@ internal data class CarChargeList(
  */
 internal object CarChargingListPolicy {
     fun candidates(route: RouteSnapshot?, catalog: ChargingCatalog): List<DCCorridorCandidate> {
-        if (route == null || !validRouteGeometry(route.routePoints) ||
+        if (catalog.staleCache || route == null || !validRouteGeometry(route.routePoints) ||
             route.routeId.isNullOrBlank() || route.totalKm == null ||
             !route.totalKm.isFinite() || route.totalKm <= 0.0
         ) return emptyList()
@@ -72,6 +75,10 @@ internal object CarChargingListPolicy {
         if (route == null || route.routeId.isNullOrBlank() ||
             !validRouteGeometry(route.routePoints)
         ) return CarChargeList(message = "Telefondan gerçek OSRM rotası seçin.", catalogLabel = label)
+        if (catalog.staleCache) return CarChargeList(
+            message = "EPDK verisi eski/önbellekte. Güncel kaynak doğrulanana kadar rota şarj önerisi yok.",
+            catalogLabel = label
+        )
         if (catalog.stations.isEmpty()) return CarChargeList(
             message = if (catalog.loading) "EPDK istasyon verisi yükleniyor."
                 else "EPDK istasyon verisi kullanılamıyor.",
@@ -124,8 +131,11 @@ internal object CarChargingListPolicy {
                         (usableCapacity * 1_000.0) * 100.0
                     projected.takeIf { it.isFinite() && it in 0.0..100.0 }
                 } else null
+                val accepted = EpdkProvenancePolicy.acceptedDcPowerKw(
+                    verifiedPower, profile.peakDcKw, profile.userConfirmed
+                )
                 CarChargeItem(station, candidate.distanceFromStartKm,
-                    verifiedPower, meters, soc)
+                    verifiedPower, meters, soc, accepted)
             }.toList()
         return CarChargeList(
             items = selected,
@@ -141,7 +151,11 @@ internal object CarChargingListPolicy {
         val power = item.verifiedCcsPowerKw?.let {
             " · " + String.format(Locale.forLanguageTag("tr-TR"), "%.0f kW", it)
         } ?: " · güç kullanılamıyor"
-        return connector + power
+        val cap = item.acceptedNameplateDcKw?.let {
+            " · araç üst sınır ≈" +
+                String.format(Locale.forLanguageTag("tr-TR"), "%.0f kW", it)
+        } ?: " · araç kabul gücü kullanılamıyor"
+        return connector + power + cap
     }
 
     fun detail(item: CarChargeItem): String =

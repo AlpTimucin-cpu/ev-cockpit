@@ -1,0 +1,83 @@
+name: Phase 3 · Verify EPDK public stations (data branch only)
+on:
+  push:
+    branches: [phase3/epdk-provenance-route-dc-20261113]
+    paths:
+      - ".github/workflows/phase3-epdk-public-refresh.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: epdk-public-data-source-branch
+  cancel-in-progress: false
+jobs:
+  verify-public:
+    if: github.ref == 'refs/heads/phase3/epdk-provenance-route-dc-20261113'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      # Deliberately use the branch already serving the app's EPDK public gzip.
+      # Do NOT merge the Phase 3 code or overwrite main/other features.
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ev-cockpit
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test official public station exporter
+        run: python3 -m unittest discover -s scripts/tests -p 'test_epdk_public_stations.py' -v
+      - name: Fetch REAL official EPDK public records and validate full export
+        run: python3 scripts/update_epdk_public_stations.py
+      - name: Independent metadata and gzip consistency check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import gzip, json
+          from datetime import datetime, timezone, timedelta
+          from pathlib import Path
+          root = Path("data/charging")
+          gzip_path = root/"epdk_public_stations.json.gz"
+          meta = json.loads((root/"epdk_public_snapshot_meta.json").read_text())
+          assert meta["source_url"] == "https://apigateway.epdk.gov.tr/sarjIstasyonlari"
+          assert meta["prices_included"] is False and meta["live_status_included"] is False
+          assert meta["compressed_bytes"] == gzip_path.stat().st_size
+          verified = datetime.fromisoformat(meta["verified_at_utc"].replace("Z","+00:00"))
+          age = datetime.now(timezone.utc) - verified
+          assert timedelta(seconds=-300) <= age <= timedelta(hours=72)
+          doc = json.loads(gzip.decompress(gzip_path.read_bytes()))
+          assert doc["source_url"] == meta["source_url"]
+          assert doc["verified_at_utc"] == meta["verified_at_utc"]
+          assert len(doc["stations"]) == meta["geocoded_public_rows_count"]
+          assert 5000 <= len(doc["stations"]) <= meta["public_rows_count"]
+          assert meta["public_rows_count"] <= meta["all_rows_count"] <= 100000
+          print("EPDK official public export verified; source timestamp:",meta["verified_at_utc"])
+          print("National public rows:",meta["public_rows_count"])
+          print("Geocoded rows:",len(doc["stations"]))
+          PY
+          sha256sum data/charging/epdk_public_stations.json.gz
+      - name: Publish verified public data ONLY to existing source branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "feature/ev-cockpit"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- data/charging/epdk_public_stations.json.gz data/charging/epdk_public_snapshot_meta.json
+          if ! git diff --cached --quiet; then
+            actual="$(git diff --cached --name-only | LC_ALL=C sort)"
+            expected="$(printf '%s\n' data/charging/epdk_public_snapshot_meta.json data/charging/epdk_public_stations.json.gz)"
+            test "$actual" = "$expected"
+            git commit -m "data: verified public EPDK snapshot (Phase 3 source only)"
+            git push origin HEAD:refs/heads/feature/ev-cockpit
+          else
+            echo "Official public export is unchanged."
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase3-epdk-public-source-proof
+          path: |
+            data/charging/epdk_public_snapshot_meta.json
+            data/charging/epdk_schema.json
+          retention-days: 7

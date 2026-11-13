@@ -202,6 +202,15 @@ internal fun diagnosticReport(
         appendLine("Son EPDK veri zamanı (UTC): " +
             (state.chargeSnapshotUtc ?: "kullanılamıyor"))
         appendLine("EPDK: " + state.chargingStatus)
+        appendLine("EPDK son indirme denemesi: " + stamp(state.chargeDownloadAttemptMillis))
+        appendLine("EPDK son başarılı snapshot indirilişi: " +
+            stamp(state.chargeDownloadSuccessMillis))
+        appendLine("EPDK doğrulanmış coğrafi kayıt sayısı: " +
+            (state.chargeNationalRowsCount?.toString() ?: "kullanılamıyor"))
+        appendLine("EPDK halka açık ham kayıt sayısı: " +
+            (state.chargePublicRowsCount?.toString() ?: "kullanılamıyor"))
+        appendLine("EPDK kaynak: resmî EPDK REST kayıtlarından tarihli yayın snapshot'ı; " +
+            "anlık doluluk ve tarife içermez")
         appendLine("OBD bağlantı: " + state.obdStatus)
         appendLine("Son izinli UDS ham yanıt öneki: " + state.obdRawMasked)
         appendLine("Android Auto yeniden bağlanma: " + state.carReattachments)

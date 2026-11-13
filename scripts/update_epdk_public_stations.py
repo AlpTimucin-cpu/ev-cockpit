@@ -119,6 +119,8 @@ def compile_epdk(payload):
     result.sort(key=lambda x: x["official_station_id"])
     return {
         "schema_version": 1,
+        "country": "TR",
+        "complete": True,
         "source_url": URL,
         "verified_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "all_rows_count": len(items),
@@ -153,7 +155,7 @@ def main():
         raise ValueError("Unreasonable exported snapshot size")
     DEST.write_bytes(compressed)
     meta = {k: document[k] for k in (
-        "schema_version", "source_url", "verified_at_utc",
+        "schema_version", "country", "complete", "source_url", "verified_at_utc",
         "all_rows_count", "public_rows_count", "geocoded_public_rows_count",
         "prices_included", "live_status_included")}
     meta["compressed_bytes"] = len(compressed)

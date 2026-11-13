@@ -35,7 +35,12 @@ data class ChargingCatalog(
     val verifiedAtUtc: String? = null,
     val loading: Boolean = true,
     val staleCache: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val sourceUrl: String? = null,
+    val sourceRecordCount: Int? = null,
+    val publicRecordCount: Int? = null,
+    val downloadAttemptAtMillis: Long? = null,
+    val downloadSuccessAtMillis: Long? = null
 )
 
 data class GeoViewport(val south: Double, val west: Double, val north: Double, val east: Double) {

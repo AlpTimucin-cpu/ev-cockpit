@@ -113,3 +113,17 @@ CI, on-device acceptance and owner review succeed. No automatic Release.
 
 Independent project; no affiliation with Volkswagen, Android Auto, Google,
 streaming services or charging-network operators is implied.
+
+## Phase 3: EPDK national snapshot provenance — DRAFT
+- Branch `phase3/epdk-provenance-route-dc-20261113` builds on Phase 2 PR #56;
+  no merge to `main` and no physical vehicle claims.
+- EPDK published station list must be an atomically validated whole-country
+  snapshot, with exact publisher counts, official source, date and <=72h age.
+  A successful GitHub download of a 2026-10-17 old file is **not** a fresh EPDK
+  dataset. No live station availability or tariff is inferred from this file.
+- Debug diagnostics record **real attempted/successful snapshot download times**
+  separately from publisher export time and station counts, never coordinates.
+- Historic/stale lists cannot drive Android Auto/phone route CCS recommendations.
+  Socket kW requires explicit unit; driver-confirmed peak DC results in an
+  upper-bound **MODEL** of min(station kW, car setting), never actual charge power.
+- See [Phase 3 validation and device checklist](docs/PHASE3_EPDK_PROVENANCE_TR.md).

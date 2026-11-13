@@ -47,6 +47,9 @@ import com.evcockpit.presentation.route.RoutePlannerUiState
 import com.evcockpit.presentation.voice.NativeVoiceGuide
 import com.evcockpit.presentation.voice.TtsPackageWarningDialog
 import com.evcockpit.presentation.weather.WeatherDetailSheet
+import com.evcockpit.car.CarChargingListPolicy
+import com.evcockpit.domain.usecase.EpdkProvenancePolicy
+import java.util.Locale
 import com.evcockpit.data.traffic.TomTomTrafficState
 import com.evcockpit.presentation.traffic.TrafficDetailSheet
 
@@ -98,7 +101,8 @@ fun CockpitScreen(
     voiceError: String?,
     onVoiceTest: () -> Unit,
     soundUnavailable: Boolean = false,
-    onOpenSoundSettings: () -> Unit = {}
+    onOpenSoundSettings: () -> Unit = {},
+    vehicleProfile: VehicleProfileConfig = VehicleProfileConfig()
 ) {
     // Disconnects invalidate *all* live battery/vehicle readings immediately.
     // GPS and route state remain independent of the OBD adapter.
@@ -285,6 +289,25 @@ fun CockpitScreen(
                     Text(socket.kind + " · " + socket.type + " · " +
                         socket.powerRaw.ifBlank { "Güç belirtilmemiş" })
                 }
+                val stationCcsKw = selected.sockets.asSequence()
+                    .filter { it.isDc && it.isCcs }
+                    .mapNotNull { CarChargingListPolicy.explicitPowerKw(it.powerRaw) }
+                    .maxOrNull()
+                val acceptedPeak = EpdkProvenancePolicy.acceptedDcPowerKw(
+                    stationCcsKw, vehicleProfile.peakDcKw, vehicleProfile.userConfirmed
+                )
+                Text(
+                    if (acceptedPeak != null)
+                        "DC kabul üst sınırı (TEORİK): " +
+                            String.format(Locale.forLanguageTag("tr-TR"),
+                                "%.0f kW", acceptedPeak)
+                    else "DC kabul üst sınırı: kullanılamıyor; " +
+                        "CCS kW birimi ve araç DC tepe güç ayarını doğrulayın.",
+                    color = SoftText,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text("Gerçek şarj gücü batarya sıcaklığı, SoC ve istasyon paylaşımına bağlıdır.",
+                    color = SoftText, style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider(color = GlassLine)
                 Text("GÜNCEL FİYAT · TL/kWh", color = NeonGreen,
                     style = MaterialTheme.typography.labelMedium)
@@ -313,7 +336,8 @@ fun CockpitScreen(
                     style = MaterialTheme.typography.labelSmall, color = SoftText)
                 Button(
                     onClick = { onAddChargingStop(selected); station = null },
-                    enabled = route?.routeId != null &&
+                    enabled = chargingUi.sourceFresh &&
+                        route?.routeId != null &&
                         routePlannerUi.startLocation != null &&
                         routePlannerUi.destinationSelected != null &&
                         !routePlannerUi.planning,
@@ -725,6 +749,30 @@ private fun ChargingPanel(ui: ChargingUiState, onFilter: (StationFilter) -> Unit
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(stringResource(R.string.native_epdk_station_filters), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            "Kaynak: EPDK resmî şarj istasyonu REST kaydından yayımlanan tarihli snapshot. " +
+                if (ui.sourceFresh) "Kaynak verisi 72 saat içinde doğrulandı."
+                else "ESKİ/DOĞRULANMADI · Rota önerileri ve harita işaretleri kapalı.",
+            color = SoftText, style = MaterialTheme.typography.bodySmall
+        )
+        Text("Yayın snapshot zamanı: " +
+            (ui.verifiedAtUtc ?: "kullanılamıyor"),
+            color = SoftText, style = MaterialTheme.typography.bodySmall)
+        Text("Son başarılı uygulama indirmesi (UTC): " +
+            (ui.downloadSuccessAtMillis?.let {
+                java.time.Instant.ofEpochMilli(it).toString()
+            } ?: "kullanılamıyor"),
+            color = SoftText, style = MaterialTheme.typography.bodySmall)
+        Text(
+            "Kaynak kayıtları: halka açık ${ui.publicRecordCount ?: 0}; " +
+                "doğrulanan koordinatlı ${ui.sourceRecordCount ?: 0}. " +
+                "Güncel DC/CCS ${ui.verifiedDcCcsStationCount}; " +
+                "birimi açık kW ${ui.explicitDcCcsPowerCount}.",
+            color = SoftText, style = MaterialTheme.typography.bodySmall
+        )
+        Text("Fiyat kapsaması istasyon/soket için doğrulanmadıysa " +
+            "'fiyat bilgisi yok' gösterilir. Anlık doluluk bu veri setinde bulunmaz.",
+            color = SoftText, style = MaterialTheme.typography.bodySmall)
         StationFilter.entries.forEach { filter ->
             val title = stringResource(when (filter) {
                 StationFilter.ALL -> R.string.cockpit_filter_all
@@ -734,7 +782,8 @@ private fun ChargingPanel(ui: ChargingUiState, onFilter: (StationFilter) -> Unit
             })
             FilterChip(selected = ui.selectedFilter == filter,
                 onClick = { onFilter(filter) }, label = { Text(title) },
-                enabled = ui.routeProvided || filter == StationFilter.ALL || filter == StationFilter.DC)
+                enabled = ui.sourceFresh &&
+                    (ui.routeProvided || filter == StationFilter.ALL || filter == StationFilter.DC))
         }
         TextButton(onClick = onRefresh) { Text(stringResource(R.string.native_refresh)) }
         if (ui.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
