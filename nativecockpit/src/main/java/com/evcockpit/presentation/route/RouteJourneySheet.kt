@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.evcockpit.domain.model.ChargingStation
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.usecase.AutomaticChargePlan
+import com.evcockpit.domain.usecase.TrafficEvidencePolicy
 import com.evcockpit.presentation.charging.RouteChargingUiState
 import com.evcockpit.presentation.charging.RouteStopPreference
 import java.util.Locale
@@ -142,6 +143,9 @@ fun RouteJourneySheet(
                                 )
                                 Text("OSRM tahmini · canlı trafik içermez",
                                     color = SheetSubtle,
+                                    style = MaterialTheme.typography.labelSmall)
+                                Text(TrafficEvidencePolicy.disabled.label,
+                                    color = SheetWarn,
                                     style = MaterialTheme.typography.labelSmall)
                             }
                             Text(kilometers(route.totalKm),

@@ -5,6 +5,7 @@ import com.evcockpit.diagnostics.DiagnosticsHub
 import com.evcockpit.diagnostics.DebugDiagnosticsEntry
 import com.evcockpit.car.CarContinuityPhase
 import com.evcockpit.car.CarContinuityState
+import com.evcockpit.domain.usecase.TrafficEvidencePolicy
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -109,6 +110,12 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Text("Araç ve Servis Ayarları", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    TrafficEvidencePolicy.disabled.label +
+                        " · Trafik sağlayıcısı ve yeni API anahtarı henüz onaylanmadı. " +
+                        "OSRM ETA trafiksiz tahmindir; hız sınırı kullanılamıyor.",
+                    style = MaterialTheme.typography.bodySmall
+                )
                 if (BuildConfig.DEBUG) {
                     DebugDiagnosticsEntry(diagnosticsHub)
                 }

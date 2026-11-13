@@ -31,6 +31,14 @@ App Library 1.7.0.
   `.github/workflows/release.yml` signing job remains **disabled**. No
   trusted signed Release or Play Store distribution is authorized.
 
+## Phase 2 approval gate (not active)
+- [Draft Phase 2 provider review](docs/PHASE2_TRAFFIC_PROVIDER_REVIEW_2026-11-13_TR.md):
+  TomTom is a proposed provider, **not activated**. Until owner approval,
+  verified fresh credentials and legal checks, the app shows
+  "Trafik: kullanılamıyor" and keeps OSRM ETA labelled "trafiksiz tahmin".
+  No real-time traffic data, road incidents, speed limits or traffic-aware ETA
+  are currently claimed. Historical TomTom key revocation remains unverified.
+
 ## Data and safety invariants
 
 - Real, permissioned Fused GPS and real OSRM route geometry only; times, energy
