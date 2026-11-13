@@ -49,6 +49,7 @@ import com.evcockpit.presentation.voice.TtsPackageWarningDialog
 import com.evcockpit.presentation.weather.WeatherDetailSheet
 import com.evcockpit.car.CarChargingListPolicy
 import com.evcockpit.domain.usecase.EpdkProvenancePolicy
+import java.util.Locale
 import com.evcockpit.data.traffic.TomTomTrafficState
 import com.evcockpit.presentation.traffic.TrafficDetailSheet
 
@@ -335,8 +336,8 @@ fun CockpitScreen(
                     style = MaterialTheme.typography.labelSmall, color = SoftText)
                 Button(
                     onClick = { onAddChargingStop(selected); station = null },
-                    enabled = chargingUi.sourceFresh,
-                    enabled = route?.routeId != null &&
+                    enabled = chargingUi.sourceFresh &&
+                        route?.routeId != null &&
                         routePlannerUi.startLocation != null &&
                         routePlannerUi.destinationSelected != null &&
                         !routePlannerUi.planning,
