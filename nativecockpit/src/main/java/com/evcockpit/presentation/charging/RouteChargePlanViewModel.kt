@@ -92,9 +92,15 @@ class RouteChargePlanViewModel @Inject constructor(
         withContext(Dispatchers.Default) {
             Prepared(
                 route = route,
-                candidates = if (route == null) emptyList()
+                candidates = if (route == null || catalog.staleCache ||
+                    !EpdkProvenancePolicy.isFresh(
+                        catalog.verifiedAtUtc, System.currentTimeMillis()
+                    )) emptyList()
                     else AutomaticDcChargingPlanner.candidates(route, catalog.stations),
-                cacheStale = catalog.staleCache
+                cacheStale = catalog.staleCache ||
+                    !EpdkProvenancePolicy.isFresh(
+                        catalog.verifiedAtUtc, System.currentTimeMillis()
+                    )
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), Prepared())

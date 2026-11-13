@@ -19,6 +19,9 @@ import com.evcockpit.domain.model.*
 import com.evcockpit.domain.repository.ChargingRepository
 import com.evcockpit.domain.repository.RouteRepository
 import com.evcockpit.domain.usecase.StationCorridor
+import com.evcockpit.domain.usecase.EpdkProvenancePolicy
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.delay
 
 data class ChargingUiState(
     val visible: List<ChargingStation> = emptyList(),
@@ -32,7 +35,13 @@ data class ChargingUiState(
     val verifiedAtUtc: String? = null,
     val loading: Boolean = true,
     val fromCache: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val sourceFresh: Boolean = false,
+    val sourceRecordCount: Int? = null,
+    val publicRecordCount: Int? = null,
+    val downloadSuccessAtMillis: Long? = null,
+    val verifiedDcCcsStationCount: Int = 0,
+    val explicitDcCcsPowerCount: Int = 0
 )
 
 @HiltViewModel
@@ -49,7 +58,8 @@ class ChargingViewModel @Inject constructor(
         val catalog: ChargingCatalog,
         val selected: StationFilter,
         val points: List<GeoCoordinate>,
-        val fetchError: String?
+        val fetchError: String?,
+        val nowMs: Long
     )
 
     init { refresh() }
@@ -70,22 +80,42 @@ class ChargingViewModel @Inject constructor(
     fun changeFilter(value: StationFilter) { filter.value=value }
     fun viewportChanged(bounds: GeoViewport) { if(bounds.valid())viewport.value=bounds }
 
+    private val freshnessClock = flow {
+        while (true) {
+            emit(System.currentTimeMillis())
+            delay(60_000L)
+        }
+    }
+
     val uiState: StateFlow<ChargingUiState> = combine(
-        chargingRepository.catalog, filter, route, refreshError
-    ) { catalog, selected, actualRoute, error ->
-        Inputs(catalog, selected, actualRoute?.routePoints.orEmpty(), error)
+        chargingRepository.catalog, filter, route, refreshError, freshnessClock
+    ) { catalog, selected, actualRoute, error, now ->
+        Inputs(catalog, selected, actualRoute?.routePoints.orEmpty(), error, now)
     }.mapLatest { input ->
         withContext(Dispatchers.Default) {
             val catalog = input.catalog
             val selected = input.selected
             val routePoints = input.points
+            val sourceFresh = !catalog.staleCache &&
+                EpdkProvenancePolicy.isFresh(catalog.verifiedAtUtc, input.nowMs)
+            // A stale national export is not a live charging recommendation.
+            val safeStations = catalog.stations.takeIf { sourceFresh }.orEmpty()
+            val verifiedCcs = safeStations.count { it.hasDcCcs }
+            val withExplicitPower = safeStations.count { station ->
+                station.sockets.any { socket ->
+                    socket.isDc && socket.isCcs &&
+                        com.evcockpit.car.CarChargingListPolicy.explicitPowerKw(
+                            socket.powerRaw
+                        ) != null
+                }
+            }
             // Exact corridor checks use indexed local route segments, not
             // a scan of every OSRM vertex for every one of 13k+ stations.
             val index=if(routePoints.size>=2) StationCorridor.index(routePoints) else null
             val alongIds=if(index!=null)
-                catalog.stations.asSequence().filter(index::isDcAlongRoute).map { it.id }.toSet()
+                safeStations.asSequence().filter(index::isDcAlongRoute).map { it.id }.toSet()
             else emptySet()
-            val visible=catalog.stations.asSequence()
+            val visible=safeStations.asSequence()
                 .filter { when(selected){
                     StationFilter.ALL -> true
                     StationFilter.DC -> it.hasDc
@@ -94,17 +124,26 @@ class ChargingViewModel @Inject constructor(
                 }}.toList()
             ChargingUiState(
                 visible = visible,
-                allStations = catalog.stations,
+                allStations = safeStations,
                 selectedFilter = selected,
                 total = catalog.stations.size,
                 corridorCount = if (index != null) alongIds.size else null,
                 corridorStations = if (index != null)
-                    catalog.stations.filter { it.id in alongIds } else emptyList(),
+                    safeStations.filter { it.id in alongIds } else emptyList(),
                 routeProvided = routePoints.size >= 2,
                 verifiedAtUtc = catalog.verifiedAtUtc,
                 loading = catalog.loading,
-                fromCache = catalog.staleCache,
+                fromCache = catalog.staleCache || !sourceFresh,
                 error = input.fetchError ?: catalog.error
+                    ?: if (!sourceFresh && catalog.stations.isNotEmpty())
+                        "EPDK kaynak verisi 72 saatten eski: şarj önerileri gizlendi."
+                    else null,
+                sourceFresh = sourceFresh,
+                sourceRecordCount = catalog.sourceRecordCount,
+                publicRecordCount = catalog.publicRecordCount,
+                downloadSuccessAtMillis = catalog.downloadSuccessAtMillis,
+                verifiedDcCcsStationCount = verifiedCcs,
+                explicitDcCcsPowerCount = withExplicitPower
             )
         }
     }.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),ChargingUiState())

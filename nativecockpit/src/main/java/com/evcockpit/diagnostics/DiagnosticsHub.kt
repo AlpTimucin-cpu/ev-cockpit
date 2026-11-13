@@ -34,6 +34,8 @@ enum class DiagnosticEvent(val title: String) {
     WEATHER_SUCCEEDED("Rota hava tahmini alındı"),
     WEATHER_FAILED("Rota hava tahmini yenilemesi başarısız"),
     CHARGING_UPDATED("EPDK katalog durumu değişti"),
+    CHARGING_FETCH_STARTED("EPDK snapshot indirme denendi"),
+    CHARGING_FETCH_OK("EPDK tarihli snapshot doğrulandı"),
     TRAFFIC_STARTED("TomTom trafik isteği denendi"),
     TRAFFIC_SUCCESS("TomTom gerçek trafik yanıtı alındı"),
     TRAFFIC_FAILED("TomTom trafik bilgisi kullanılamıyor")
@@ -59,6 +61,10 @@ data class DiagnosticsSnapshot(
     val weatherRoutePointCount: Int? = null,
     val chargeSnapshotUtc: String? = null,
     val chargingStatus: String = "Kullanılamıyor",
+    val chargeDownloadAttemptMillis: Long? = null,
+    val chargeDownloadSuccessMillis: Long? = null,
+    val chargeNationalRowsCount: Int? = null,
+    val chargePublicRowsCount: Int? = null,
     val obdStatus: String = "DISCONNECTED",
     val obdRawMasked: String = "Kullanılamıyor",
     val carReattachments: Int = 0,
@@ -236,21 +242,48 @@ class DiagnosticsHub @Inject constructor() {
         event(if (success) DiagnosticEvent.TRAFFIC_SUCCESS else DiagnosticEvent.TRAFFIC_FAILED)
     }
 
+    /** Real download-start evidence. No implicit success timestamp. */
+    @Synchronized
+    fun chargingAttempt(atMillis: Long = System.currentTimeMillis()) {
+        if (!BuildConfig.DEBUG) return
+        mutable.value = mutable.value.copy(
+            chargeDownloadAttemptMillis = atMillis,
+            chargingStatus = "EPDK indiriliyor / kaynak doğrulanmadı"
+        )
+        event(DiagnosticEvent.CHARGING_FETCH_STARTED, atMillis)
+    }
+
     @Synchronized
     fun charging(catalog: ChargingCatalog) {
         if (!BuildConfig.DEBUG) return
         val stamp = catalog.verifiedAtUtc?.takeIf { safeUtc.matches(it) }
+        val fresh = !catalog.staleCache &&
+            com.evcockpit.domain.usecase.EpdkProvenancePolicy.isFresh(
+                catalog.verifiedAtUtc, System.currentTimeMillis())
         val outcome = when {
+            catalog.error != null -> "Yenileme başarısız / kaynak eski veya geçersiz"
+            catalog.staleCache || !fresh -> "Önbellek / eski veri (72 saat sınırı)"
             catalog.loading -> "Yükleniyor"
-            catalog.staleCache -> "Önbellek / güncel değil"
-            catalog.error != null -> "Yenileme başarısız"
-            stamp != null -> "EPDK anlık doluluk verisi değil"
+            fresh -> "EPDK yayın snapshot'ı · canlı doluluk içermez"
             else -> "Kullanılamıyor"
         }
         val before = mutable.value
-        if (before.chargeSnapshotUtc == stamp && before.chargingStatus == outcome) return
-        mutable.value = before.copy(chargeSnapshotUtc = stamp, chargingStatus = outcome)
+        if (before.chargeSnapshotUtc == stamp && before.chargingStatus == outcome &&
+            before.chargeDownloadSuccessMillis == catalog.downloadSuccessAtMillis &&
+            before.chargeNationalRowsCount == catalog.sourceRecordCount &&
+            before.chargePublicRowsCount == catalog.publicRecordCount) return
+        mutable.value = before.copy(
+            chargeSnapshotUtc = stamp,
+            chargingStatus = outcome,
+            chargeDownloadSuccessMillis = catalog.downloadSuccessAtMillis
+                ?: before.chargeDownloadSuccessMillis,
+            chargeNationalRowsCount = catalog.sourceRecordCount,
+            chargePublicRowsCount = catalog.publicRecordCount
+        )
         event(DiagnosticEvent.CHARGING_UPDATED)
+        if (catalog.downloadSuccessAtMillis != null &&
+            before.chargeDownloadSuccessMillis != catalog.downloadSuccessAtMillis)
+            event(DiagnosticEvent.CHARGING_FETCH_OK)
     }
 
     @Synchronized

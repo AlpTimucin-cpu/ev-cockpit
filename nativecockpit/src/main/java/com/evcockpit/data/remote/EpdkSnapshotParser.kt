@@ -48,6 +48,10 @@ object EpdkSnapshotParser {
         require(root.optInt("schema_version") == 1) { "Incompatible EPDK version" }
         require(!root.optBoolean("prices_included",true) &&
             !root.optBoolean("live_status_included",true)) { "Source contains unexpected fields" }
+        val rawPreflight=root.getJSONArray("stations")
+        require(rawPreflight.length() in MIN_STATIONS..100_000) {
+            "EPDK station list is empty or incomplete"
+        }
         val source=root.getString("source_url")
         require(source == EpdkProvenancePolicy.OFFICIAL_SOURCE) {
             "Unverified EPDK snapshot origin"
