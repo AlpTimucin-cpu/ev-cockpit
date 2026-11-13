@@ -13,6 +13,7 @@ import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,6 +75,8 @@ class TomTomTrafficRepository @Inject constructor(
         TomTomTrafficState = mutex.withLock {
         val access = vault.access.value
         if (!access.enabled || !access.keyAvailable) {
+            lastRouteId = null
+            lastAttemptMs = 0L
             _state.value = TomTomTrafficState(failure =
                 if (access.keyAvailable) TrafficFailure.PROVIDER_NOT_APPROVED
                 else TrafficFailure.KEY_MISSING)
@@ -82,6 +85,7 @@ class TomTomTrafficRepository @Inject constructor(
         val now = System.currentTimeMillis()
         val routeId = route?.routeId?.takeIf(String::isNotBlank)
         if (routeId == null || fix?.usable(now) != true || fix.accuracyMeters > 35f) {
+            lastAttemptMs = 0L
             _state.value = TomTomTrafficState(routeId = routeId,
                 failure = TrafficFailure.UNVERIFIED)
             return@withLock _state.value
@@ -161,7 +165,16 @@ class TomTomTrafficRepository @Inject constructor(
             else _state.value = fresh
             diagnostics.trafficFinished(_state.value)
             _state.value
+        } catch (timeout: TimeoutCancellationException) {
+            _state.value = TomTomTrafficState(
+                routeId = routeId, failure = TrafficFailure.NETWORK_UNAVAILABLE
+            )
+            diagnostics.trafficFinished(_state.value)
+            _state.value
         } catch (cancel: CancellationException) {
+            _state.value = TomTomTrafficState(
+                routeId = routeId, failure = TrafficFailure.UNVERIFIED
+            )
             throw cancel
         } catch (error: Exception) {
             val failure = when (error) {

@@ -1,93 +1,127 @@
-# FAZ 2 · Trafik sağlayıcısı seçimi ve devre dışı güvenlik iskeleti
-**13 Kasım 2026 — TASLAK / SAHİP ONAYI BEKLENİYOR**
+# FAZ 2 — TomTom Orbis Traffic v2, güvenli etkinleştirme
+**13 Kasım 2026 — TASLAK / canlı anahtar + telefon + ID.4 kabulü DOĞRULANMADI.**
 
-## Kaynak gerçekliği
-- `main` eski Media Hub kaynaklarıdır. Faz 2, Faz 1 PR #55'in
-  `44c070772fb5a56ed31fc206dd627c91b887dd26` commit'ini temel alır.
-- Mevcut `OsrmRouteRepository` rota geometrisi/süre ve yol profili üretir;
-  bunlar **trafiksiz tahmin** olup canlı trafik ölçümü değildir.
-- Henüz doğrulanmış canlı trafik yanıtı, ücretli trafik hesabı, kullanıma
-  hazır TomTom anahtarı, yol olay kaynağı veya trafik ETA'sı yoktur:
-  **Trafik: kullanılamıyor**. Rota renkli hız profili canlı trafik
-  olarak etiketlenmemelidir.
-- Bu PR, kaynak ve zaman doğrulama politikası + JVM testleri + 
-  telefon/Debug ekranında doğru kullanılamıyor etiketini ekler.
-  Ağ çağrısı, yeni anahtar, otomatik istek veya araç overlay'i EKLEMEZ.
+## Yetki ve sınır
+- Kullanıcı TomTom Orbis Traffic'i 13 Kasım 2026'da onayladı.
+  Önceden sızmış olabilecek eski TomTom anahtarını **kullanmayın**;
+  eski anahtarın TomTom panelinden iptali **doğrulanmadı**.
+- Uygulamada Ayarlar → Yeni TomTom API anahtarı: karakterler
+  maskelenir, yalnız AndroidKeyStore AES-GCM anahtarıyla şifrelenmiş
+  blob özel SharedPreferences'a yazılır. Geçersiz biçim/kırılmış
+  Keystore kabul edilmez. Kullanıcı daha sonra ayrı konum paylaşım
+  anahtarını **açıkça açmadan** HTTP isteği yoktur. Sildikten sonra
+  istek ve gösterim kapatılır. Depo, sohbete, APK BuildConfig'ine,
+  Debug raporuna veya URL query'sine anahtarı eklemeyin.
+- Tarafınızdan açılan konum paylaşımı; gerçek GPS/OSRM güzergâhına
+  ait sınırlı koordinatları TomTom API'ye iletir. Kullanım
+  koşullarını ve veri aktarımını inceleyin.
 
-## Sağlayıcı karşılaştırması (resmî yayımlanmış kaynaklar)
-| Sağlayıcı | Veri | Kota/ücret | Entegrasyon ve koşul |
-| --- | --- | --- | --- |
-| **TomTom Orbis Traffic** | Flow/incident tile, incident details; TomTom Routing trafikli ETA | İncident details ücretsiz 2.500/ay; vector/raster flow+incident tiles 200.000/ay; Routing 20.000/ay | Kişisel API key, hesap kotası/kullanım koşulu, atıf; Android native MapLibre REST katmanı. Türkiye güzergâh örneklemesi **doğrulanmadı** |
-| TomTom eski Maps Flow Segment API | Nokta segment current/free-flow hız | Ücretsiz 20.000/ay (ayrı ürün) | Yeni geliştirmede Orbis öneriliyor; legacy endpoint'i karıştırma |
-| HERE Traffic API v7 | Incidents, flow, coğrafi koridor filtresi | Güncel ücretsiz sayısal kota bu incelemede **doğrulanmadı** | API key, hesap ve Base Plan kullanım kısıtları; araçla ilgili telemetri/uyarı kapsamı ayrıca hukuk incelemesi gerektirir |
-| Mapbox Directions driving-traffic | Trafikli güzergâh ETA; raw traffic ayrı data lisansı | Directions ilk 100.000/ay ücretsiz gösteriliyor; ham Traffic Data ayrıca satış lisansı | Trafik segmentlerinin MapLibre'da bağımsız kullanımı ayrı lisans denetimi |
+## Kod
+- `data/traffic/TomTomCredentialVault.kt`: yalnız cihazda Keystore.
+- `data/traffic/TomTomTrafficHttp.kt`: sabit HTTPS TomTom origin,
+  `TomTom-Api-Key` başlığı, redirect kapalı, MIME/boyut sınırları,
+  GET Incident Details Orbis v2 ve Raster Flow v2.
+- `TomTomIncidentParser`: sağlayıcının GeoJSON olaylarını ayrıştırır,
+  `timeValidity=present` ve bilinen kategorileri kabul eder;
+  rota noktasına **yaklaşık 3 km** uzaklıktaki adayları gösterir.
+  Yakınlık aynı yol/şerit/yön etkilenmesinin kesin kanıtı değildir.
+- `TomTomCorridorPolicy`: taze GPS ≤35 m, OSRM snap,
+  yaklaşık sonraki 40 km bounded bbox, maksimum 6 raster
+  örneği. Raster **sağlayıcının gerçek renkli PNG verisidir**;
+  OSRM profile hız grafiği trafik sanılmasın diye gizli.
+  Uygulama hız yüzdelerini veya road speed limit tahmin etmez.
+- `TomTomTrafficRepository`: ortak StateFlow, Mutex,
+  otomatik ≥5 dakika, kullanıcı elle yenilemesi ≥60 saniye,
+  API 429/401/403 ve yerel kota 30 dakika backoff,
+  güvenli timeout, ağ yoksa/konum yoksa/rota uyuşmazsa
+  anında **Trafik: kullanılamıyor**.
+- Yerel koruyucu rezerv: aylık **2.000 Incident Details** ve
+  **80.000 raster flow tile** istek (başarısızlar da sayılır).
+  Bu kota sahibin TomTom hesabındaki gerçek hakları
+  garanti etmez ve diğer uygulama/anahtar kullanımını kapsamaz.
+- `TomTomTrafficMapRenderer.kt`: MapLibre native `ImageSource`
+  + `RasterLayer` + gerçek olay noktası; TTL sonrası layer'ları
+  kaldırır. Telefon ve Android Auto Car Surface aynı şablon
+  güvenli MapLibre kaynaklarını kullanır. Hiçbir video/WebView yok.
+- `TrafficDetailSheet.kt`: telefonun ayrıntılı olay listesi;
+  olayın lastReportTime (varsa) ve API HTTP sunucu saati
+  birbirinden açıkça farklıdır. © TomTom atfı.
+- `DebugDiagnosticsEntry.kt`: son istek/başarı, HTTP sunucu
+  zamanını, olay/akış karo sayısını, sabit hata sınıfını
+  verir; **koordinat, VIN, MAC, API key, URL, incident metni yok**.
+- `TrafficEvidencePolicy.kt`: hatalı kaynaktan trafikli ETA
+  çıkarmayı engeller. **Trafikli ETA, hız sınırı hâlen kullanılamıyor**:
+  Orbis Routing v3 ile OSRM yol geometrisinin eşleşmesi
+  test edilmeden rota süresi değiştirilmeyecek.
 
-Resmî kaynaklar (güncel doğrulama):
-- TomTom https://docs.tomtom.com/pricing
-- TomTom Orbis https://docs.tomtom.com/traffic-api/documentation/tomtom-orbis-maps/v2/product-information/introduction
-- TomTom API kullanım koşulları https://www.tomtom.com/en-gb/legal/third-party-product-terms/
-- HERE https://docs.here.com/traffic-api/docs/send-request-readme
-- HERE Base Plan restrictions https://www.here.com/get-started/pricing/base-plan-restrictions
-- Mapbox https://docs.mapbox.com/data/traffic/
-- Mapbox Directions https://www.mapbox.com/pricing
+## Doğrulanmış API sözleşmesi ve kullanım şartları
+- Incident GET /maps/orbis/traffic/incidents/details
+  `apiVersion=2&bbox=minLon,minLat,maxLon,maxLat&timeValidity=present`.
+  Tek bbox <10.000 km², API başlığıyla kimlik doğrulama.
+  https://docs.tomtom.com/traffic-api/documentation/tomtom-orbis-maps/v2/traffic-incidents/incident-details
+- Raster tile GET /maps/orbis/traffic/flow/raster/tile/z/x/y,
+  `apiVersion=2&style=dark&tileSize=256`.
+  https://docs.tomtom.com/traffic-api/documentation/tomtom-orbis-maps/v2/traffic-flow/raster-flow-tiles
+- Trafikli ETA ayrı Orbis Routing v3 POST:
+  https://docs.tomtom.com/routing-api/documentation/tomtom-orbis-maps/v3/calculate-route
+- Resmî fiyat ve limit dokümanı:
+  https://docs.tomtom.com/pricing
+  Yayınlanan free tier **Incident Details 2.500/ay,
+  trafik tile 200.000/ay, Routing 20.000/ay**; hesap
+  özel kota/plan, harcama, Türkiye kapsaması, production
+  kullanım izni ve SLA **doğrulanmadı**. Kotalar değişebilir.
+- Lisans/attribution:
+  https://www.tomtom.com/en-gb/legal/third-party-product-terms/
+  © TomTom gösterimi korunur. Başka sağlayıcının döşeme
+  ve verilerini lisans ihlaliyle kopyalamayın.
+- Sunucu yanıtındaki HTTP `Date` başlığı yalnız **sunucu
+  yanıt zamanı**; sensör/flow gözlem zamanına çevrilmez.
+  Stale/failure/clock skew sonrası katman gizlenir.
 
-## ÖNERİ / ONAY KAPISI
-**Tek öneri: TomTom Orbis Traffic + gerektiğinde ayrı TomTom Routing API.**
-Neden: Resmî free-tier tabloları açık, olay/akış verisi ve trafik
-duyarlı rota aynı sağlayıcı ailesinde, MapLibre katmanı için uygun
-veri biçimleri var. Android Kotlin katmanında SDK JS kopyalanmaz:
-sağlayıcı onayından sonra lisans ve endpoint'e uygun REST
-istemcisi/kısa ömürlü katman tasarlanır. Trafik ETA'sı verilmeden
-önce tek tek bağımsız rota yanıtının mevcut OSRM rotasıyla kapsam/
-zaman eşleşmesi doğrulanır; farklı rotanın ETA'sı mevcut rotanın
-ETA'sı gibi yazılmaz.
-
-**Sahip onayına kadar TomTom çağrısı ve anahtar girişi AKTİF DEĞİL.**
-Eski TomTom anahtarının iptali/rotasyonu **DOĞRULANMADI**; önce sahibi
-my.tomtom.com üzerinden iptal/kota/harcama/kapsamı kontrol etmeli.
-Yeni anahtar sahibi tarafından uygulamaya girilecek; sohbete/GitHub
-secret dosyasına girilmez. Android Keystore AES-GCM/uygulama özel
-şifreli kayıt, URL/HTTP hata/günlüklerde anahtar maskeleme ve 429'dan
-sonra kontrollü bekleme **sağlayıcı onayını izleyen kod adımıdır**.
-İstek gövdesinde/URL'de koordinatın sağlayıcıya aktarılması
-gizlilik bilgilendirmesi gerektirir; kullanıcı izni olmadan aktarılmaz.
-
-## Sonraki Faz 2 alt işleri — henüz tamamlanmadı
-- Sağlayıcı + ToS + Türk şehirlerarası rota kapsamı onayı.
-- Anahtarın cihazda Keystore ile saklanması; hiçbir anahtar APK,
-  BuildConfig, GitHub, log, Crashlytics'e konulmaz.
-- Gerçek olay yanıtı (kaynak tarihi/olay türü/seviyesi/geometri) ve
-  taze trafik akışı/segmentleri; en az 5 dakikada bir yaşı
-  ve ağ-kota sınırlaması açık; kaynak artık bayatsa kırmızı/yeşil
-  trafik katmanı silinir ve durum kullanılamıyor'a döner.
-- Gerçek trafik-aware routing API cevabında ETA ve rota eşleşmesi.
-  OSRM profili ile trafik gecikmesi asla türetilmez.
-- Hız sınırı yalnız kaynağı doğrulanmışsa; görülmüyorsa
-  'kullanılamıyor'. Android Auto Car App Library navigation
-  template/Alert/ses önceliği sınırları ve gerçek 12,9 ekran kabulü.
-- Faz 2 Debug Tanılama'nın canlı veri saatleri, olay/kayıt sayısı,
-  hata/kota gibi sayımları yalnız gerçek yanıtla dolmalıdır.
-
-## CI ve gerçek kabul
+## CI ve kod testleri
 ```bash
 python3 -m unittest discover -s tests -p 'test_phase2_traffic_gate.py' -v
-./gradlew :nativecockpit:lintDebug :nativecockpit:testDebugUnitTest :nativecockpit:assembleDebug
+./gradlew :nativecockpit:lintDebug :nativecockpit:testDebugUnitTest :nativecockpit:assembleDebug --no-daemon
 ```
-TrafficEvidencePolicyTest: onaysız/key'siz/verisiz durum, stale,
-farklı rota, 429, network failure, trafik-aware ETA provenance.
-Kaynak testi: UI ve Debug etiketlerinin düzmece veri üretmemesi.
-Gitleaks/R8/OBD read-only kapıları korunacak.
+- `TomTomTrafficHttpTest`: MockWebServer ile doğrulanmış
+  gerçek request formatı, header/URL sır güvenliği, 429
+  ve GeoJSON olay ayrıştırma; gerçek TomTom hesabı testi DEĞİL.
+- `TomTomKeySyntaxTest`: kontrol karakteri/CRLF ve
+  şüpheli key biçimi reddi; gerçek AES-GCM cihaz testi eksik.
+- `TomTomQuotaLimitsTest`: 429 ve yerel bütçe, TTL/route
+  güvenliği; `TomTomTileQuadTest`: döşeme geometri sırası.
+- Kaynak regresyonları: `test_phase2_traffic_gate.py`,
+  secret scan/Gitleaks, OBD wire-only 01/22 kuralları ve
+  R8 Release smoke hiçbir production APK dağıtmadan geçmeli.
+- **Ağ hizmeti/canlı olay/gerçek Türkiye trafik kapsaması
+  ve gerçek 12,9" ekran testi doğrulanmadı.**
 
-Sahip mobil kabulü:
-1. PR Faz 2 Debug APK artefact'ını yükle, Settings ve Rota planı:
-   **Trafik: kullanılamıyor**, **OSRM trafiksiz tahmin** görünmeli.
-2. Debug Tanılama: trafik veri saati/olay/speed limit
-   kullanılamıyor; key/VIN/MAC/konum görünmemeli.
-3. Android Auto parkta: canlı trafik akışı/olay göstermemeli,
-   OSRM profil renkleri canlı ölçüm diye sunulmamalı.
-4. Henüz sağlayıcı onaylanmadığı için hesap/API erişimi/traffic ETA/
-   hız limiti **DENENMEDİ / DOĞRULANMADI**.
-Faz 2 kullanıcı onayı ve tam gerçek veri CI + araç testi olmadan
-Faz 3'e geçilmez; PR birleştirilmez, Release kapalı kalır.
-Geri dönüş: PR'ı kapat, yalnız Faz 2 dalını sil;
-main/Faz 1/Releases değişmez.
+## Telefon/araç kabulü — bilgisayarsız
+1. Actions'taki **son HEAD** `EV-Cockpit-Native-Debug-APK`
+   artifact'ını telefona kur; `com.evcockpit.debug`.
+2. Ayarlar: anahtar yokken **Trafik: kullanılamıyor**,
+   anahtar girildikten sonra açık paylaşım izni KAPALI.
+3. Yeni TomTom key'i **yalnız uygulamada** girin;
+   ayrı paylaşım anahtarını açın. İnternet/konum/hassas GPS
+   ve gerçek OSRM güzergâh seçin. Gerçek olay ve akış
+   görünmezse Debug Tanılama'da istek/HTTP durumunu inceleyin.
+4. Telefon rota ekranında kırmızı/yeşil yalnız TomTom
+   flow PNG'den, yoksa trafik yok; OSRM ETA **trafiksiz**.
+5. İnterneti kapat, GPS'i kes veya anahtarı sil: trafik
+   simgeleri kaybolmalı; 5 dakika eski veri gösterilmemeli.
+6. 429/kota/hata varsa rapor güvenli sınıf kodunu gösterecek;
+   gerçek 429 test edilemiyorsa **DOĞRULANMADI**.
+7. Park hâlinde ID.4 Android Auto Hava/Şarj/Navigasyon
+   ekranı ve harita: TomTom raster/olay yalnız taze
+   veri varsa, video/WebView yok, host satır limitleri
+   aşılmıyor. 12,9" fiziksel kabul özellikle gerekli.
+8. AndroidKeystore API key gizliliği, anahtar silme ve
+   cihaz yeniden açıldıktan sonra yalnız yerel saklama
+   kabulünü doğrula. Paylaşacağın rapor/fotodan API key,
+   VIN, MAC, koordinat gizlenmiş olmalı.
+
+**Geri alma:** #56 DRAFT PR'ını kapat,
+`phase2/traffic-provider-review-20261113` dalını sil;
+`main`, üretim Release ve Faz 3 değişmez.
+**Faz 2 cihaz kabulü ve kullanıcının ek onayı olmadan
+Faz 3, merge, release YOK.**

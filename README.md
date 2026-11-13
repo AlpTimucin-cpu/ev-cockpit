@@ -31,13 +31,25 @@ App Library 1.7.0.
   `.github/workflows/release.yml` signing job remains **disabled**. No
   trusted signed Release or Play Store distribution is authorized.
 
-## Phase 2 approval gate (not active)
-- [Draft Phase 2 provider review](docs/PHASE2_TRAFFIC_PROVIDER_REVIEW_2026-11-13_TR.md):
-  TomTom is a proposed provider, **not activated**. Until owner approval,
-  verified fresh credentials and legal checks, the app shows
-  "Trafik: kullanılamıyor" and keeps OSRM ETA labelled "trafiksiz tahmin".
-  No real-time traffic data, road incidents, speed limits or traffic-aware ETA
-  are currently claimed. Historical TomTom key revocation remains unverified.
+## Phase 2 · TomTom Orbis Traffic (DRAFT, device tests pending)
+
+- The owner approved **TomTom Orbis Traffic v2**, but NOT reuse of the
+  previously exposed key. A user-entered **new** key is encrypted with
+  AndroidKeyStore AES-256-GCM; outbound route/GPS transfer requires a
+  separate explicit phone setting. Removing the key disables traffic.
+- Foreground phone or active Android Auto host requests are limited to
+  real recent precise GPS and a verified OSRM route. The app fetches
+  TomTom incidents (bbox) and a small selection of raster flow PNG tiles,
+  checks HTTP response time as an HTTP time (NOT raw sensor sample time),
+  keeps a 5-minute display TTL and applies local monthly request caps.
+  429/quota/network/route mismatch disables live display, not OSRM routing.
+- Phone has incident detail sheet; native MapLibre on phone and Android
+  Auto displays provider-provided pixels and nearby incident markers.
+  **Traffic-aware ETA and speed limit remain unavailable**, never copied
+  from OSRM estimates. Physical phone/car behavior and live API response
+  are **not yet verified**; neither can be proved by CI.
+- [Phase 2 source, ToS and mobile acceptance](docs/PHASE2_TRAFFIC_PROVIDER_REVIEW_2026-11-13_TR.md).
+  PR #56 is DRAFT; no release or integration merge.
 
 ## Data and safety invariants
 

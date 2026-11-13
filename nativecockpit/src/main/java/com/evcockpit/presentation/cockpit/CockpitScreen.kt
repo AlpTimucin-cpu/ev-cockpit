@@ -165,6 +165,7 @@ fun CockpitScreen(
         route = route,
         planner = routePlannerUi,
         charging = automaticChargePlan,
+        trafficState = trafficUi,
         realObdSocPercent = if (obdConnection.phase == ObdPhase.CONNECTED)
             displayState.socPercent else null,
         onDismiss = { journeySheet = false },

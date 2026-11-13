@@ -13,12 +13,11 @@ class Phase2TrafficGateTest(unittest.TestCase):
         self.assertIn('val label: String = "Trafik: kullanılamıyor"', gate)
         self.assertIn("if (!ownerApproved)", gate)
         self.assertIn("if (!keyAvailable)", gate)
-        self.assertIn("TrafficEvidencePolicy.disabled.label", route)
+        self.assertIn("trafficState.label(route.routeId, System.currentTimeMillis())", route)
         cockpit = code("presentation/cockpit/CockpitScreen.kt")
         self.assertIn("speedProfile = emptyList()", cockpit)
         self.assertNotIn("speedProfile = route?.profileSpeeds.orEmpty()", cockpit)
         self.assertIn("OSRM tahmini · canlı trafik içermez", route)
-        self.assertIn("TrafikEvidence", gate) if False else None
         self.assertIn("trafficAccess.statusTr", settings)
         self.assertIn("PasswordVisualTransformation()", settings)
         self.assertIn("viewModel.saveTomTomKey(newTomTomKey)", settings)

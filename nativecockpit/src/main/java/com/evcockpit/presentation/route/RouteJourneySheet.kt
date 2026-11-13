@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.sp
 import com.evcockpit.domain.model.ChargingStation
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.usecase.AutomaticChargePlan
-import com.evcockpit.domain.usecase.TrafficEvidencePolicy
+import com.evcockpit.data.traffic.TomTomTrafficState
 import com.evcockpit.presentation.charging.RouteChargingUiState
 import com.evcockpit.presentation.charging.RouteStopPreference
 import java.util.Locale
@@ -59,6 +59,7 @@ fun RouteJourneySheet(
     planner: RoutePlannerUiState,
     charging: RouteChargingUiState,
     realObdSocPercent: Double?,
+    trafficState: TomTomTrafficState = TomTomTrafficState(),
     onDismiss: () -> Unit,
     onEditTargets: () -> Unit,
     onSelectAlternative: (Int) -> Unit,
@@ -144,7 +145,7 @@ fun RouteJourneySheet(
                                 Text("OSRM tahmini · canlı trafik içermez",
                                     color = SheetSubtle,
                                     style = MaterialTheme.typography.labelSmall)
-                                Text(TrafficEvidencePolicy.disabled.label,
+                                Text(trafficState.label(route.routeId, System.currentTimeMillis()),
                                     color = SheetWarn,
                                     style = MaterialTheme.typography.labelSmall)
                             }
