@@ -19,7 +19,15 @@ class Phase2TrafficGateTest(unittest.TestCase):
         self.assertNotIn("speedProfile = route?.profileSpeeds.orEmpty()", cockpit)
         self.assertIn("OSRM tahmini · canlı trafik içermez", route)
         self.assertIn("TrafikEvidence", gate) if False else None
-        self.assertIn("TrafficEvidencePolicy.disabled.label", settings)
+        self.assertIn("trafficAccess.statusTr", settings)
+        self.assertIn("PasswordVisualTransformation()", settings)
+        self.assertIn("viewModel.saveTomTomKey(newTomTomKey)", settings)
+        vault = code("data/traffic/TomTomCredentialVault.kt")
+        self.assertIn('KeyStore.getInstance("AndroidKeyStore")', vault)
+        self.assertIn('Cipher.getInstance("AES/GCM/NoPadding")', vault)
+        self.assertIn('GCMParameterSpec(128,', vault)
+        self.assertIn('putBoolean("location_consent", false)', vault)
+        self.assertNotIn('putString("sealed_key", candidate)', vault)
 
     def test_stale_quota_route_and_eta_fail_closed(self):
         gate = code("domain/usecase/TrafficEvidencePolicy.kt")

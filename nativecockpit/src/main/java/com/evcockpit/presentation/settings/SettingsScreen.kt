@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evcockpit.data.settings.UserSettingsRepository
 import com.evcockpit.domain.model.ZipId4PureReference
@@ -65,6 +66,9 @@ fun SettingsScreen(
     val voices by viewModel.voiceOptions.collectAsStateWithLifecycle()
     val configuration by viewModel.appConfiguration.collectAsStateWithLifecycle()
     val configurationError by viewModel.configError.collectAsStateWithLifecycle()
+    val trafficAccess by viewModel.trafficAccess.collectAsStateWithLifecycle()
+    val trafficResult by viewModel.trafficResult.collectAsStateWithLifecycle()
+    var newTomTomKey by remember { mutableStateOf("") }
     var batteryEntry by remember(configuration.vehicle) {
         mutableStateOf(configuration.vehicle.usableBatteryKwh?.toString().orEmpty())
     }
@@ -110,12 +114,46 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 Text("Araç ve Servis Ayarları", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    TrafficEvidencePolicy.disabled.label +
-                        " · Trafik sağlayıcısı ve yeni API anahtarı henüz onaylanmadı. " +
-                        "OSRM ETA trafiksiz tahmindir; hız sınırı kullanılamıyor.",
-                    style = MaterialTheme.typography.bodySmall
+                Text("TomTom Orbis · " + trafficAccess.statusTr,
+                    style = MaterialTheme.typography.bodySmall)
+                Text("Trafik verisi için mevcut GPS/rota konumu TomTom'a gönderilir. " +
+                    "Yalnız kendi yeni anahtarınızı girin; eski/sızmış anahtarı kullanmayın. " +
+                    "Anahtar cihazda Android Keystore AES-GCM ile şifrelenir; " +
+                    "kodu, raporları ve GitHub'ı etkilemez.",
+                    style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = newTomTomKey,
+                    onValueChange = { newTomTomKey = it.take(256) },
+                    label = { Text("Yeni TomTom API anahtarı (gizli)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
+                Button(onClick = {
+                    viewModel.saveTomTomKey(newTomTomKey)
+                    newTomTomKey = ""
+                }, enabled = newTomTomKey.length in 8..256) {
+                    Text("Anahtarı cihazda şifreleyerek kaydet")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = trafficAccess.enabled,
+                        enabled = trafficAccess.keyAvailable,
+                        onCheckedChange = viewModel::setTrafficEnabled
+                    )
+                    Text("Rota konumunu TomTom ile paylaş; gerçek trafik al",
+                        modifier = Modifier.padding(start = 10.dp))
+                }
+                OutlinedButton(onClick = viewModel::clearTomTomKey,
+                    enabled = trafficAccess.keyAvailable) {
+                    Text("TomTom anahtarını sil ve trafiği kapat")
+                }
+                trafficResult?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
+                Text("OSRM ETA trafiksiz tahmindir; TomTom trafikli ETA ve doğrulanmış " +
+                    "hız limiti mevcut değilse 'kullanılamıyor'.",
+                    style = MaterialTheme.typography.bodySmall)
                 if (BuildConfig.DEBUG) {
                     DebugDiagnosticsEntry(diagnosticsHub)
                 }
