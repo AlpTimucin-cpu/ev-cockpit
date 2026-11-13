@@ -68,6 +68,10 @@ import com.evcockpit.presentation.voice.NativeVoiceGuide
 import com.evcockpit.presentation.voice.TtsPackageWarningDialog
 import com.evcockpit.presentation.voice.WelcomeGreetingManager
 import com.evcockpit.presentation.weather.RouteWeatherViewModel
+import com.evcockpit.data.traffic.TomTomTrafficRepository
+import com.evcockpit.data.traffic.TomTomCredentialVault
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.delay
@@ -102,6 +106,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var diagnosticsHub: DiagnosticsHub
     @Inject lateinit var chargingRepository: ChargingRepository
     @Inject lateinit var locationRepository: LocationRepository
+    @Inject lateinit var trafficRepository: TomTomTrafficRepository
+    @Inject lateinit var trafficVault: TomTomCredentialVault
 
     private data class SoundFrame(
         val settings: UserSettings,
@@ -254,6 +260,32 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Foreground only: the host can stop the Activity without creating
+        // background GPS polling. Distinct route/permission changes wake early.
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                val minute = flow {
+                    while (true) {
+                        emit(System.currentTimeMillis())
+                        delay(60_000L)
+                    }
+                }
+                combine(
+                    routes.currentRoute.map { it?.routeId }.distinctUntilChanged(),
+                    locationRepository.gpsFix.map {
+                        it?.usable(System.currentTimeMillis()) == true &&
+                            it.accuracyMeters <= 35f
+                    }.distinctUntilChanged(),
+                    trafficVault.access,
+                    minute
+                ) { _, _, _, _ -> Unit }.collect {
+                    trafficRepository.refresh(
+                        routes.currentRoute.value, locationRepository.gpsFix.value
+                    )
+                }
+            }
+        }
+
         setContent {
             val context = LocalContext.current
             val wizardPreferences = remember(context) {
@@ -355,6 +387,7 @@ class MainActivity : ComponentActivity() {
             val stations by charging.uiState.collectAsStateWithLifecycle()
             val automaticChargePlan by chargePlan.uiState.collectAsStateWithLifecycle()
             val routeWeather by weather.uiState.collectAsStateWithLifecycle()
+            val trafficUi by trafficRepository.state.collectAsStateWithLifecycle()
             val obdConnection by obd.connection.collectAsStateWithLifecycle()
             val engineering by obd.engineering.collectAsStateWithLifecycle()
             val engineeringMetrics by obd.engineeringMetrics.collectAsStateWithLifecycle()
@@ -394,6 +427,16 @@ class MainActivity : ComponentActivity() {
                             automaticChargePlan = automaticChargePlan,
                             weatherUi = routeWeather,
                             onRefreshWeather = weather::refresh,
+                            trafficUi = trafficUi,
+                            onRefreshTraffic = {
+                                lifecycleScope.launch {
+                                    trafficRepository.refresh(
+                                        routes.currentRoute.value,
+                                        locationRepository.gpsFix.value,
+                                        manual = true
+                                    )
+                                }
+                            },
                             onStationFilter = charging::changeFilter,
                             onMapViewport = charging::viewportChanged,
                             onRefreshStations = charging::refresh,

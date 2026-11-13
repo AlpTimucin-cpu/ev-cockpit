@@ -47,6 +47,8 @@ import com.evcockpit.presentation.route.RoutePlannerUiState
 import com.evcockpit.presentation.voice.NativeVoiceGuide
 import com.evcockpit.presentation.voice.TtsPackageWarningDialog
 import com.evcockpit.presentation.weather.WeatherDetailSheet
+import com.evcockpit.data.traffic.TomTomTrafficState
+import com.evcockpit.presentation.traffic.TrafficDetailSheet
 
 /** One full-size map, with compact overlays for the essential driving information. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +85,8 @@ fun CockpitScreen(
     automaticChargePlan: RouteChargingUiState,
     weatherUi: RouteWeatherState,
     onRefreshWeather: () -> Unit,
+    trafficUi: TomTomTrafficState = TomTomTrafficState(),
+    onRefreshTraffic: () -> Unit = {},
     onStationFilter: (StationFilter) -> Unit,
     onMapViewport: (GeoViewport) -> Unit,
     onRefreshStations: () -> Unit,
@@ -125,6 +129,7 @@ fun CockpitScreen(
     var journeySheet by remember { mutableStateOf(false) }
     var charging by remember { mutableStateOf(false) }
     var weatherDetails by remember { mutableStateOf(false) }
+    var trafficDetails by remember { mutableStateOf(false) }
     var selectedPage by rememberSaveable { mutableIntStateOf(0) } // 0 = Harita, 1 = Medya
     // User-controlled phone-only view. Never changes navigation, telemetry or car projection.
     var mapFocused by rememberSaveable { mutableStateOf(false) }
@@ -229,6 +234,10 @@ fun CockpitScreen(
         confirmButton = {
             TextButton(onClick = { voiceSettings = false }) { Text(stringResource(R.string.native_close)) }
         }
+    )
+    if (trafficDetails) TrafficDetailSheet(
+        state = trafficUi, routeId = route?.routeId,
+        onRefresh = onRefreshTraffic, onDismiss = { trafficDetails = false }
     )
     if (weatherDetails) WeatherDetailSheet(
         state = weatherUi,
@@ -382,6 +391,8 @@ fun CockpitScreen(
                         // traffic congestion. Until an approved, timestamped
                         // provider is connected, do not draw red/green traffic.
                         speedProfile = emptyList(),
+                        trafficState = trafficUi,
+                        trafficRouteId = route?.routeId,
                         onViewportChanged = onMapViewport,
                         onStationTapped = { station = it },
                         modifier = Modifier.fillMaxSize()
@@ -430,6 +441,12 @@ fun CockpitScreen(
                                 onVoiceToggle, modifier = Modifier.weight(1f), compact = true)
                             AssistPill(weatherStatus, { weatherDetails = true },
                                 modifier = Modifier.weight(1f), compact = true)
+                            AssistPill(
+                                if (trafficUi.freshFor(route?.routeId, nowMs))
+                                    "TomTom" else "Trafik yok",
+                                { trafficDetails = true },
+                                modifier = Modifier.weight(1f), compact = true
+                            )
                         }
                     } else {
                         Column(
@@ -440,6 +457,11 @@ fun CockpitScreen(
                             AssistPill("$weatherStatus · Ayrıntı",
                                 { weatherDetails = true },
                                 modifier = Modifier.widthIn(max = 220.dp))
+                            AssistPill(
+                                trafficUi.label(route?.routeId, nowMs),
+                                { trafficDetails = true },
+                                modifier = Modifier.widthIn(max = 220.dp)
+                            )
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 AssistPill(gpsStatus, onGpsClick)
                                 AssistPill(if (voiceEnabled) "Ses açık" else "Ses kapalı",
