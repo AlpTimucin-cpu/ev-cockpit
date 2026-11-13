@@ -77,7 +77,23 @@ class CarChargingListPolicyTest {
         val model = CarChargingListPolicy.build(route, stale, candidates, null,
             VehicleTelemetry(), VehicleProfileConfig(), null, now, 4)
         assertTrue(model.catalogLabel.contains("önbelleği"))
-        assertEquals(2, model.items.size)
+        assertTrue(model.items.isEmpty())
+        assertTrue(model.message.orEmpty().contains("eski"))
+    }
+
+    @Test fun verifiedSocketAndConfirmedCarPeakGiveOnlyTheoreticalLimit() {
+        val profile = VehicleProfileConfig(
+            peakDcKw = 110.0, userConfirmed = true
+        )
+        val items = CarChargingListPolicy.build(route, catalog, candidates, null,
+            VehicleTelemetry(), profile, null, now, 2)
+        assertEquals(110.0, items.items.first().acceptedNameplateDcKw!!, 0.001)
+        assertNull(items.items.last().acceptedNameplateDcKw)
+        assertTrue(CarChargingListPolicy.summary(items.items.first())
+            .contains("araç üst sınır"))
+        val missing = CarChargingListPolicy.build(route, catalog, candidates, null,
+            VehicleTelemetry(), VehicleProfileConfig(), null, now, 2)
+        assertNull(missing.items.first().acceptedNameplateDcKw)
     }
 
     @Test fun actualGpsOffersDirectDistanceButNotRoadKilometres() {

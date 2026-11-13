@@ -392,6 +392,7 @@ class MainActivity : ComponentActivity() {
             val engineering by obd.engineering.collectAsStateWithLifecycle()
             val engineeringMetrics by obd.engineeringMetrics.collectAsStateWithLifecycle()
             val soundSettings by settingsViewModel.settings.collectAsStateWithLifecycle()
+            val appConfiguration by settingsViewModel.appConfiguration.collectAsStateWithLifecycle()
             val soundUnavailable by activeSound.audioUnavailable.collectAsStateWithLifecycle()
             val welcomeWarning by welcome.warning.collectAsStateWithLifecycle()
             val carNavigationState by continuity.state.collectAsStateWithLifecycle()
@@ -456,7 +457,8 @@ class MainActivity : ComponentActivity() {
                             voiceError = ui.voice.error,
                             onVoiceTest = navigation::testVoice,
                             soundUnavailable = soundUnavailable,
-                            onOpenSoundSettings = { audioSettingsOpen = true }
+                            onOpenSoundSettings = { audioSettingsOpen = true },
+                            vehicleProfile = appConfiguration.vehicle
                         )
                         // Settings entry moved into the telemetry column to avoid HUD overlap.
                         // Show a dismissible warning when either Turkish TTS path is missing.
