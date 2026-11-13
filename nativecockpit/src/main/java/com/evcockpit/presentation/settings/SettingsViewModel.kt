@@ -13,6 +13,9 @@ import com.evcockpit.domain.model.ServiceEndpointConfig
 import com.evcockpit.domain.model.VehicleProfileConfig
 import com.evcockpit.data.settings.UserSettingsRepository
 import com.evcockpit.presentation.voice.NativeVoiceGuide
+import com.evcockpit.data.traffic.TomTomCredentialVault
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -29,6 +32,7 @@ data class VoiceOption(val name: String, val label: String)
 class SettingsViewModel @Inject constructor(
     private val repository: UserSettingsRepository,
     private val appConfigRepository: AppConfigRepository,
+    private val trafficVault: TomTomCredentialVault,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
     val settings = repository.settings.stateIn(
@@ -39,6 +43,36 @@ class SettingsViewModel @Inject constructor(
     )
     private val configErrorState = MutableStateFlow<String?>(null)
     val configError = configErrorState.asStateFlow()
+    val trafficAccess = trafficVault.access
+    private val trafficResultState = MutableStateFlow<String?>(null)
+    val trafficResult = trafficResultState.asStateFlow()
+
+    /** Never save the submitted key in a ViewModel or use a cloud-based secret. */
+    fun saveTomTomKey(value: String) {
+        viewModelScope.launch {
+            val stored = withContext(Dispatchers.IO) { trafficVault.saveNewKey(value) }
+            trafficResultState.value = if (stored)
+                "Yeni TomTom anahtarı Keystore ile şifrelendi; trafik hâlâ kapalı."
+            else "Anahtar saklanamadı. Biçimi veya Android Keystore'u kontrol edin."
+        }
+    }
+
+    fun setTrafficEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val done = withContext(Dispatchers.IO) { trafficVault.setEnabled(enabled) }
+            trafficResultState.value = if (done)
+                if (enabled) "Konumun TomTom'a gönderilmesi onaylandı." else "TomTom trafiği kapatıldı."
+            else "Anahtar yok veya Keystore açılamadı. Trafik kapalı kaldı."
+        }
+    }
+
+    fun clearTomTomKey() {
+        viewModelScope.launch {
+            val done = withContext(Dispatchers.IO) { trafficVault.clear() }
+            trafficResultState.value = if (done) "TomTom anahtarı temizlendi ve trafik kapatıldı."
+            else "Anahtar kayıt temizliği doğrulanamadı."
+        }
+    }
 
     /** Values are scenario assumptions, never live BMS telemetry. */
     fun saveVehicleConfig(

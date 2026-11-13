@@ -38,6 +38,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.evcockpit.BuildConfig
 import com.evcockpit.car.CarWeatherRefreshGate
+import com.evcockpit.domain.usecase.TrafficEvidencePolicy
 import com.evcockpit.presentation.onboarding.PermissionSnapshot
 import java.io.File
 import java.time.Instant
@@ -181,6 +182,17 @@ internal fun diagnosticReport(
         appendLine("Son hava yenileme denemesi: " + stamp(state.weatherAttemptMillis))
         appendLine("Son başarılı hava verisi: " + stamp(state.weatherReceivedMillis))
         appendLine("Hava sonucu: " + state.weatherOutcome)
+        appendLine("Trafik: " + state.trafficStatus)
+        appendLine("TomTom son gerçek istek: " + stamp(state.trafficAttemptMillis))
+        appendLine("TomTom son yanıt alınma: " + stamp(state.trafficReceivedMillis))
+        appendLine("TomTom HTTP sunucu zamanı: " + stamp(state.trafficServerMillis) +
+            " · ölçüm/model zamanı değildir")
+        appendLine("TomTom olay sayısı (yakın rota): " +
+            (state.trafficIncidentsCount?.toString() ?: "kullanılamıyor"))
+        appendLine("TomTom akış raster karo sayısı: " +
+            (state.trafficFlowTilesCount?.toString() ?: "kullanılamıyor"))
+        appendLine("Trafikli ETA: kullanılamıyor · OSRM ETA: trafiksiz tahmin")
+        appendLine("Hız sınırı: kullanılamıyor")
         appendLine("Hava güncel MODEL geçerliliği (UTC): " +
             (state.weatherCurrentModelUtc ?: "kullanılamıyor"))
         appendLine("Hava rota tahmin noktası (son başarılı istek): " +

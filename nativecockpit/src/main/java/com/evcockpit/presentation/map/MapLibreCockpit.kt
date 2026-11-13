@@ -54,6 +54,8 @@ import com.evcockpit.domain.model.ChargingStation
 import com.evcockpit.domain.model.GeoViewport
 import com.evcockpit.domain.model.WeatherWaypoint
 import com.evcockpit.domain.model.ProfileSpeedSegment
+import com.evcockpit.data.traffic.TomTomTrafficState
+import kotlinx.coroutines.delay
 import com.evcockpit.domain.usecase.StationCorridor
 import com.evcockpit.domain.model.validRouteGeometry
 
@@ -88,6 +90,8 @@ fun MapLibreCockpit(
     plannedStopIds: Set<String> = emptySet(),
     weatherPoints: List<WeatherWaypoint>,
     speedProfile: List<ProfileSpeedSegment> = emptyList(),
+    trafficState: TomTomTrafficState = TomTomTrafficState(),
+    trafficRouteId: String? = null,
     onViewportChanged: (GeoViewport) -> Unit,
     onStationTapped: (ChargingStation) -> Unit,
     modifier: Modifier = Modifier
@@ -269,6 +273,24 @@ fun MapLibreCockpit(
             ensureRouteOverlayZOrder(it)
         }
     }
+    var trafficAgeTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(trafficState.fetchedAtMillis) {
+        if (trafficState.fetchedAtMillis != null) {
+            while (true) {
+                trafficAgeTick = System.currentTimeMillis()
+                delay(30_000L)
+            }
+        }
+    }
+    LaunchedEffect(activeStyle, trafficState, trafficRouteId, trafficAgeTick) {
+        activeStyle?.let { style ->
+            runCatching {
+                TomTomTrafficMapRenderer.apply(
+                    style, trafficState, trafficRouteId, trafficAgeTick, ROUTE_LAYER
+                )
+            }
+        }
+    }
     LaunchedEffect(activeStyle, gpsFix, routePoints) {
         activeStyle?.let { carAnimator.update(it, gpsFix, routePoints, System.currentTimeMillis()) }
         if (!centeredOnRealGps && activeStyle != null &&
@@ -303,7 +325,9 @@ fun MapLibreCockpit(
         // The EPDK station totals remain on the Charging panel, avoiding overlap
         // between long station counts and the driving status strip on small screens.
         // Explicit provider attribution additionally to MapLibre's native attribution.
-        Text(stringResource(R.string.native_openfreemap_openstreetmap),
+        Text(stringResource(R.string.native_openfreemap_openstreetmap) +
+            if (trafficState.freshFor(trafficRouteId, trafficAgeTick))
+                " · © TomTom Traffic" else "",
             color = Color(0xFFD6E2EB), fontSize = 10.sp,
             // The parent cockpit already applies WindowInsets.safeDrawing.
             // Double navigationBarsPadding would raise this over the status strip.

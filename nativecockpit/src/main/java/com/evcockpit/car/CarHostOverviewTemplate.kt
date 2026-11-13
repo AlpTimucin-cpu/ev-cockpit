@@ -27,7 +27,8 @@ internal object CarHostOverviewTemplate {
         connectionIssue: String?,
         onBegin: () -> Unit,
         onEnd: () -> Unit,
-        onWeatherAndCharging: () -> Unit
+        onWeatherAndCharging: () -> Unit,
+        trafficLabel: String = "Trafik: kullanılamıyor"
     ): Template {
         val rows = listOf(
             Row.Builder().setTitle("Rota")
@@ -37,8 +38,9 @@ internal object CarHostOverviewTemplate {
             Row.Builder().setTitle("Yönlendirme")
                 .addText(detail.take(160))
                 .build(),
-            Row.Builder().setTitle("GPS")
+            Row.Builder().setTitle("GPS / trafik")
                 .addText(summary.locationStatus.take(110))
+                .addText(trafficLabel.take(110))
                 .build()
         )
         val pane = Pane.Builder()

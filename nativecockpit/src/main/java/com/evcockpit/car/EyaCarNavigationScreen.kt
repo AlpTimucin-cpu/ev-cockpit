@@ -53,6 +53,8 @@ import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.repository.OsrmRoadDetourRepository
 import com.evcockpit.data.weather.OpenMeteoWeatherRepository
+import com.evcockpit.data.traffic.TomTomTrafficRepository
+import com.evcockpit.data.traffic.TomTomTrafficState
 import com.evcockpit.domain.usecase.WeatherChangeAlertGate
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
@@ -76,6 +78,7 @@ class EyaCarNavigationScreen(
     private val config: AppConfigRepository,
     private val detours: OsrmRoadDetourRepository,
     private val weather: OpenMeteoWeatherRepository,
+    private val traffic: TomTomTrafficRepository,
     private val continuity: CarNavigationContinuity,
     private val diagnostics: DiagnosticsHub,
     ducking: AppAudioDucking,
@@ -133,6 +136,10 @@ class EyaCarNavigationScreen(
     private var weatherSpeechUntilMs: Long = 0L
     private var lastWeatherPageMinute: Long = -1L
     private var weatherMapPointsExpired = false
+    private var trafficJob: Job? = null
+    private var lastTrafficTickMs: Long = 0L
+    private var lastTrafficRouteId: String? = null
+    private var lastTrafficStatusKey: String? = null
 
     private companion object {
         const val WEATHER_ALERT_ID = 0xEA12
@@ -229,6 +236,7 @@ class EyaCarNavigationScreen(
                             invalidate()
                         }
                         maybeRefreshWeather(r, f, now)
+                        maybeRefreshTraffic(r, f, now)
                         if (!weatherMapPointsExpired && weatherState.points.isNotEmpty() &&
                             weatherState.ageMinutes(now)?.let { it > 45L } == true
                         ) {
@@ -273,6 +281,7 @@ class EyaCarNavigationScreen(
                 detourVerificationJob?.cancel(); detourVerificationJob = null
                 detourVerificationKey = null
                 weatherJob?.cancel(); weatherJob = null
+                trafficJob?.cancel(); trafficJob = null
                 dismissWeatherAlert()
                 work?.cancel(); work = null
                 tracker.stop()
@@ -285,6 +294,7 @@ class EyaCarNavigationScreen(
                 chargingModelJob?.cancel(); chargingModelJob = null
                 detourVerificationJob?.cancel(); detourVerificationJob = null
                 weatherJob?.cancel(); weatherJob = null
+                trafficJob?.cancel(); trafficJob = null
                 work?.cancel(); work = null
                 tracker.stop()
                 surface.release()
@@ -527,6 +537,41 @@ class EyaCarNavigationScreen(
         } else if (!voicePrefs.enabled) voice.stop()
     }
 
+
+    /** Live Car Screen only: no application background polling, no fake route. */
+    private fun maybeRefreshTraffic(
+        currentRoute: RouteSnapshot?, currentFix: GpsFix?, nowMs: Long
+    ) {
+        val id = currentRoute?.routeId
+        // Always purge stale images from the host Surface when the 5-min TTL expires.
+        val visible = traffic.state.value
+        surface.updateTraffic(visible, id)
+        val statusKey = (id ?: "-") + ":" +
+            (if (visible.freshFor(id, nowMs)) visible.fetchedAtMillis else visible.failure)
+        if (statusKey != lastTrafficStatusKey) {
+            lastTrafficStatusKey = statusKey
+            invalidate()
+        }
+        val changedRoute = id != lastTrafficRouteId
+        if (changedRoute) {
+            lastTrafficRouteId = id
+            lastTrafficTickMs = 0L
+            trafficJob?.cancel(); trafficJob = null
+        }
+        if (lastTrafficTickMs != 0L && nowMs - lastTrafficTickMs in 0L..59_999L) return
+        if (trafficJob?.isActive == true) return
+        val scope = work ?: return
+        lastTrafficTickMs = nowMs
+        trafficJob = scope.launch {
+            traffic.refresh(currentRoute, currentFix)
+            val snapshot = traffic.state.value
+            if (routes.currentRoute.value?.routeId == id) {
+                surface.updateTraffic(snapshot, id)
+                lastTrafficStatusKey = null
+                invalidate()
+            }
+        }
+    }
 
     private fun resetWeatherForRoute(nextRouteId: String?) {
         if (weatherRouteId == nextRouteId) return
@@ -1011,7 +1056,8 @@ class EyaCarNavigationScreen(
             },
             onBegin = ::beginNavigation,
             onEnd = ::endNavigation,
-            onWeatherAndCharging = ::showWeather
+            onWeatherAndCharging = ::showWeather,
+            trafficLabel = traffic.state.value.label(route?.routeId, now)
         )
     }
 }

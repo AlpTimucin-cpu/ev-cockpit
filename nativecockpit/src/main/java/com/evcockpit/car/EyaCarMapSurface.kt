@@ -29,6 +29,8 @@ import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import com.evcockpit.domain.model.ChargingStation
 import com.evcockpit.domain.model.WeatherWaypoint
+import com.evcockpit.data.traffic.TomTomTrafficState
+import com.evcockpit.presentation.map.TomTomTrafficMapRenderer
 import com.evcockpit.domain.model.GpsFix
 import com.evcockpit.domain.model.RouteSnapshot
 import com.evcockpit.domain.model.validRouteGeometry
@@ -54,6 +56,9 @@ internal class EyaCarMapSurface(
     private var appliedChargingSignature: String? = null
     private var pendingWeatherPoints: List<WeatherWaypoint> = emptyList()
     private var appliedWeatherSignature: String? = null
+    private var pendingTraffic: TomTomTrafficState = TomTomTrafficState()
+    private var pendingTrafficRouteId: String? = null
+    private var trafficSignature: String? = null
     private var appliedRoute: String? = null
     private var appliedGpsAt: Long? = null
     private var centeredOnGps = false
@@ -150,8 +155,10 @@ internal class EyaCarMapSurface(
                     appliedGpsAt = null
                     appliedChargingSignature = null
                     appliedWeatherSignature = null
+                    trafficSignature = null
                     lastPadding = null
                     render()
+                    renderTraffic()
                     fitCamera()
                 }
             }
@@ -202,6 +209,28 @@ internal class EyaCarMapSurface(
         pendingRoute = route
         pendingGps = fix?.takeIf { it.usable(System.currentTimeMillis()) }
         render()
+    }
+
+    /** GPS-bounded TomTom provider bitmap+incident layers; zero secret URLs in MapLibre. */
+    fun updateTraffic(snapshot: TomTomTrafficState, routeId: String?) {
+        pendingTraffic = snapshot
+        pendingTrafficRouteId = routeId
+        renderTraffic()
+    }
+
+    private fun renderTraffic() {
+        val ready = style ?: return
+        val now = System.currentTimeMillis()
+        val active = pendingTraffic.freshFor(pendingTrafficRouteId, now)
+        val signature = (pendingTrafficRouteId ?: "-") + ":" +
+            (if (active) pendingTraffic.fetchedAtMillis?.toString() else "stale")
+        if (signature == trafficSignature) return
+        runCatching {
+            TomTomTrafficMapRenderer.apply(
+                ready, pendingTraffic, pendingTrafficRouteId, now, "eya-car-route-line"
+            )
+            trafficSignature = signature
+        }
     }
 
     /** Draw only EPDK-proven DC/CCS coordinates; never an invented POI pin. */
@@ -383,6 +412,9 @@ internal class EyaCarMapSurface(
         pendingChargingStations = emptyList()
         pendingWeatherPoints = emptyList()
         appliedWeatherSignature = null
+        pendingTraffic = TomTomTrafficState()
+        pendingTrafficRouteId = null
+        trafficSignature = null
         centeredOnGps = false
         lastPadding = null
         viewport = null
