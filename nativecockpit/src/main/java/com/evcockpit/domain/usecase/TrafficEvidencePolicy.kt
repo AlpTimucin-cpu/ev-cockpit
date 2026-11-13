@@ -5,7 +5,7 @@ package com.evcockpit.domain.usecase
  * configured: no real-time traffic may be displayed until owner approval.
  * This model cannot generate road shapes or speed-limit values.
  */
-internal enum class TrafficFailure {
+enum class TrafficFailure {
     PROVIDER_NOT_APPROVED, KEY_MISSING, QUOTA_EXCEEDED,
     NETWORK_UNAVAILABLE, HTTP_FAILURE, UNVERIFIED, STALE, WRONG_ROUTE,
     AUTH_FAILED, BUDGET_EXHAUSTED

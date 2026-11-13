@@ -23,7 +23,7 @@ internal object TomTomKeySyntax {
         text.length in 8..256 && text.all { it.code in 0x21..0x7e && it != '?' && it != '&' }
 }
 
-internal data class TrafficAccess(val enabled: Boolean, val keyAvailable: Boolean) {
+data class TrafficAccess(val enabled: Boolean, val keyAvailable: Boolean) {
     val statusTr: String get() = when {
         !keyAvailable -> "TomTom anahtarı yok · Trafik: kullanılamıyor"
         !enabled -> "TomTom kapalı · Trafik: kullanılamıyor"
