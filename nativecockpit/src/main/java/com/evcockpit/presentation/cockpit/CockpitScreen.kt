@@ -378,7 +378,10 @@ fun CockpitScreen(
                                 weatherUi.routeId == route?.routeId &&
                                     weatherUi.ageMinutes(nowMs)?.let { it <= 45L } == true
                             }.orEmpty(),
-                        speedProfile = route?.profileSpeeds.orEmpty(),
+                        // OSRM speed-profile colors could be mistaken for real
+                        // traffic congestion. Until an approved, timestamped
+                        // provider is connected, do not draw red/green traffic.
+                        speedProfile = emptyList(),
                         onViewportChanged = onMapViewport,
                         onStationTapped = { station = it },
                         modifier = Modifier.fillMaxSize()

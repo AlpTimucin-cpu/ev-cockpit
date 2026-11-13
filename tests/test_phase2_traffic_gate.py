@@ -14,6 +14,9 @@ class Phase2TrafficGateTest(unittest.TestCase):
         self.assertIn("if (!ownerApproved)", gate)
         self.assertIn("if (!keyAvailable)", gate)
         self.assertIn("TrafficEvidencePolicy.disabled.label", route)
+        cockpit = code("presentation/cockpit/CockpitScreen.kt")
+        self.assertIn("speedProfile = emptyList()", cockpit)
+        self.assertNotIn("speedProfile = route?.profileSpeeds.orEmpty()", cockpit)
         self.assertIn("OSRM tahmini · canlı trafik içermez", route)
         self.assertIn("TrafikEvidence", gate) if False else None
         self.assertIn("TrafficEvidencePolicy.disabled.label", settings)
