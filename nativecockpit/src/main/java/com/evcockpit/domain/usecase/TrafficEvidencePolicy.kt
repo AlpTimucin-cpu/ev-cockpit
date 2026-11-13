@@ -7,7 +7,8 @@ package com.evcockpit.domain.usecase
  */
 internal enum class TrafficFailure {
     PROVIDER_NOT_APPROVED, KEY_MISSING, QUOTA_EXCEEDED,
-    NETWORK_UNAVAILABLE, HTTP_FAILURE, UNVERIFIED, STALE, WRONG_ROUTE
+    NETWORK_UNAVAILABLE, HTTP_FAILURE, UNVERIFIED, STALE, WRONG_ROUTE,
+    AUTH_FAILED, BUDGET_EXHAUSTED
 }
 internal enum class TrafficProvider { TOMTOM, HERE, MAPBOX }
 
