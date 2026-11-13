@@ -4,6 +4,7 @@ import com.evcockpit.BuildConfig
 import com.evcockpit.data.obd.MebUdsParser
 import com.evcockpit.domain.model.ChargingCatalog
 import com.evcockpit.domain.model.GpsFix
+import com.evcockpit.data.traffic.TomTomTrafficState
 import com.evcockpit.domain.model.ObdConnectionState
 import com.evcockpit.domain.model.MebDiagnosticReport
 import java.time.Instant
@@ -32,7 +33,10 @@ enum class DiagnosticEvent(val title: String) {
     WEATHER_STARTED("Rota hava tahmini yenilemesi denendi"),
     WEATHER_SUCCEEDED("Rota hava tahmini alındı"),
     WEATHER_FAILED("Rota hava tahmini yenilemesi başarısız"),
-    CHARGING_UPDATED("EPDK katalog durumu değişti")
+    CHARGING_UPDATED("EPDK katalog durumu değişti"),
+    TRAFFIC_STARTED("TomTom trafik isteği denendi"),
+    TRAFFIC_SUCCESS("TomTom gerçek trafik yanıtı alındı"),
+    TRAFFIC_FAILED("TomTom trafik bilgisi kullanılamıyor")
 }
 
 data class DiagnosticsSnapshot(
@@ -57,7 +61,13 @@ data class DiagnosticsSnapshot(
     val chargingStatus: String = "Kullanılamıyor",
     val obdStatus: String = "DISCONNECTED",
     val obdRawMasked: String = "Kullanılamıyor",
-    val carReattachments: Int = 0
+    val carReattachments: Int = 0,
+    val trafficAttemptMillis: Long? = null,
+    val trafficReceivedMillis: Long? = null,
+    val trafficServerMillis: Long? = null,
+    val trafficStatus: String = "Trafik: kullanılamıyor",
+    val trafficIncidentsCount: Int? = null,
+    val trafficFlowTilesCount: Int? = null
 )
 
 /**
@@ -196,6 +206,34 @@ class DiagnosticsHub @Inject constructor() {
             weatherCurrentModelUtc = safeModelTime,
             weatherRoutePointCount = routePointCount
         )
+    }
+
+    /** Debug-only fixed-status provenance; no key, route ID, URL, incident body or GPS. */
+    @Synchronized
+    fun trafficAttempt(atMs: Long = System.currentTimeMillis()) {
+        if (!BuildConfig.DEBUG) return
+        mutable.value = mutable.value.copy(
+            trafficAttemptMillis = atMs, trafficStatus = "TomTom istek deneniyor"
+        )
+        event(DiagnosticEvent.TRAFFIC_STARTED, atMs)
+    }
+
+    @Synchronized
+    fun trafficFinished(result: TomTomTrafficState) {
+        if (!BuildConfig.DEBUG) return
+        val success = result.failure == null && result.incidentRequestVerified &&
+            result.fetchedAtMillis != null && result.serverAtMillis != null
+        val label = if (success) "TomTom olay ve akış yanıtı alındı"
+            else "Trafik: kullanılamıyor · " + (result.failure?.name ?: "UNVERIFIED")
+        mutable.value = mutable.value.copy(
+            trafficReceivedMillis = if (success) result.fetchedAtMillis
+                else mutable.value.trafficReceivedMillis,
+            trafficServerMillis = if (success) result.serverAtMillis else null,
+            trafficStatus = label,
+            trafficIncidentsCount = if (success) result.incidents.size.coerceIn(0,120) else null,
+            trafficFlowTilesCount = if (success) result.flowTiles.size.coerceIn(0,6) else null
+        )
+        event(if (success) DiagnosticEvent.TRAFFIC_SUCCESS else DiagnosticEvent.TRAFFIC_FAILED)
     }
 
     @Synchronized

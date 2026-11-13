@@ -182,10 +182,17 @@ internal fun diagnosticReport(
         appendLine("Son hava yenileme denemesi: " + stamp(state.weatherAttemptMillis))
         appendLine("Son başarılı hava verisi: " + stamp(state.weatherReceivedMillis))
         appendLine("Hava sonucu: " + state.weatherOutcome)
-        appendLine(TrafficEvidencePolicy.disabled.label +
-            " · sağlayıcı onayı/anahtar yok · son kaynak: kullanılamıyor")
+        appendLine("Trafik: " + state.trafficStatus)
+        appendLine("TomTom son gerçek istek: " + stamp(state.trafficAttemptMillis))
+        appendLine("TomTom son yanıt alınma: " + stamp(state.trafficReceivedMillis))
+        appendLine("TomTom HTTP sunucu zamanı: " + stamp(state.trafficServerMillis) +
+            " · ölçüm/model zamanı değildir")
+        appendLine("TomTom olay sayısı (yakın rota): " +
+            (state.trafficIncidentsCount?.toString() ?: "kullanılamıyor"))
+        appendLine("TomTom akış raster karo sayısı: " +
+            (state.trafficFlowTilesCount?.toString() ?: "kullanılamıyor"))
         appendLine("Trafikli ETA: kullanılamıyor · OSRM ETA: trafiksiz tahmin")
-        appendLine("Trafik olayları/hız sınırı: kullanılamıyor")
+        appendLine("Hız sınırı: kullanılamıyor")
         appendLine("Hava güncel MODEL geçerliliği (UTC): " +
             (state.weatherCurrentModelUtc ?: "kullanılamıyor"))
         appendLine("Hava rota tahmin noktası (son başarılı istek): " +

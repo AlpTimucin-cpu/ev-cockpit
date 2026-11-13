@@ -42,7 +42,14 @@ class Phase2TrafficGateTest(unittest.TestCase):
         debug = (ROOT / "nativecockpit/src/debug/java/com/evcockpit"
                  "/diagnostics/DebugDiagnosticsEntry.kt").read_text(encoding="utf-8")
         self.assertIn("Trafikli ETA: kullanılamıyor", debug)
-        self.assertIn("Trafik olayları/hız sınırı: kullanılamıyor", debug)
+        self.assertIn("Hız sınırı: kullanılamıyor", debug)
+        self.assertIn("TomTom HTTP sunucu zamanı: ", debug)
+        self.assertIn("state.trafficFlowTilesCount", debug)
+        renderer = code("presentation/map/TomTomTrafficMapRenderer.kt")
+        self.assertIn("ImageSource(", renderer)
+        self.assertIn("RasterLayer(", renderer)
+        self.assertIn("snapshot.freshFor(routeId, nowMs)", renderer)
+        self.assertNotIn("TomTom-Api-Key", renderer)
         self.assertNotIn("TOMTOM_API_KEY", debug)
         self.assertNotIn("https://api.tomtom.com/", debug)
 if __name__ == "__main__":
