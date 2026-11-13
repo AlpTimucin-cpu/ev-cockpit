@@ -16,6 +16,7 @@ import com.evcockpit.domain.repository.VehicleRepository
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.repository.OsrmRoadDetourRepository
 import com.evcockpit.data.weather.OpenMeteoWeatherRepository
+import com.evcockpit.data.traffic.TomTomTrafficRepository
 import com.evcockpit.presentation.voice.WelcomeGreetingManager
 import com.evcockpit.presentation.voice.AppAudioDucking
 
@@ -28,6 +29,7 @@ class EyaCarAppService : CarAppService() {
     @Inject lateinit var config: AppConfigRepository
     @Inject lateinit var detours: OsrmRoadDetourRepository
     @Inject lateinit var weather: OpenMeteoWeatherRepository
+    @Inject lateinit var traffic: TomTomTrafficRepository
     @Inject lateinit var continuity: CarNavigationContinuity
     @Inject lateinit var diagnostics: DiagnosticsHub
     @Inject lateinit var welcome: WelcomeGreetingManager
@@ -42,12 +44,12 @@ class EyaCarAppService : CarAppService() {
     override fun onCreateSession(): Session {
         // Shared singleton gate prevents duplicates if OBD connects as well.
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, diagnostics, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, weather, traffic, continuity, diagnostics, ducking, welcome)
     }
 
     override fun onCreateSession(sessionInfo: SessionInfo): Session {
         welcome.launchWelcomeGreeting()
-        return EyaCarSession(routes, charging, vehicle, config, detours, weather, continuity, diagnostics, ducking, welcome)
+        return EyaCarSession(routes, charging, vehicle, config, detours, weather, traffic, continuity, diagnostics, ducking, welcome)
     }
 }
 
@@ -58,11 +60,12 @@ private class EyaCarSession(
     private val config: AppConfigRepository,
     private val detours: OsrmRoadDetourRepository,
     private val weather: OpenMeteoWeatherRepository,
+    private val traffic: TomTomTrafficRepository,
     private val continuity: CarNavigationContinuity,
     private val diagnostics: DiagnosticsHub,
     private val ducking: AppAudioDucking,
     private val welcome: WelcomeGreetingManager
 ) : Session() {
     override fun onCreateScreen(intent: Intent): Screen =
-        EyaCarNavigationScreen(carContext, routes, charging, vehicle, config, detours, weather, continuity, diagnostics, ducking, welcome)
+        EyaCarNavigationScreen(carContext, routes, charging, vehicle, config, detours, weather, traffic, continuity, diagnostics, ducking, welcome)
 }
