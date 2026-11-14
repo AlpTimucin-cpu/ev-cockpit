@@ -52,6 +52,7 @@ import com.evcockpit.domain.model.VehicleTelemetry
 import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.domain.usecase.EpdkSourceAgePolicy
 import com.evcockpit.domain.model.OsrmEndpointSelector
+import com.evcockpit.domain.model.OsrmEndpointSelection
 import com.evcockpit.BuildConfig
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.repository.OsrmRoadDetourRepository
@@ -120,6 +121,7 @@ class EyaCarNavigationScreen(
     private var roadDetours = RoadDetourCatalog()
     private var vehicleTelemetry = VehicleTelemetry()
     private var vehicleProfile = VehicleProfileConfig()
+    private var selectedRouter: OsrmEndpointSelection? = null
     private var chargingDisplay = CarChargeList()
     private var chargingModelJob: Job? = null
     private var detourVerificationJob: Job? = null
@@ -210,7 +212,22 @@ class EyaCarNavigationScreen(
                     }.collect { (_, telemetry, settings) ->
                         vehicleTelemetry = telemetry
                         vehicleProfile = settings.vehicle
-                        if (chargingVisible) refreshChargingModel()
+                        val currentRouter = OsrmEndpointSelector.choose(
+                            settings.endpoints, BuildConfig.DEBUG
+                        )
+                        if (selectedRouter != currentRouter) {
+                            selectedRouter = currentRouter
+                            // Drop evidence immediately on router change, including
+                            // any pending result produced by the old route server.
+                            roadDetours = RoadDetourCatalog()
+                            detourVerificationJob?.cancel()
+                            detourVerificationJob = null
+                            detourVerificationKey = null
+                        }
+                        if (chargingVisible) {
+                            requestDetourVerification()
+                            refreshChargingModel()
+                        }
                     }
                 }
                 scope.launch {
@@ -812,7 +829,7 @@ class EyaCarNavigationScreen(
         if (!chargingVisible || chargingCatalog.loading || chargingCatalog.staleCache ||
             EpdkSourceAgePolicy.assess(chargingCatalog.verifiedAtUtc).needsCaution ||
             !OsrmRoadDetourRepository.sourceMatches(
-                current, OsrmEndpointSelector.choose(config.configuration.value.endpoints, BuildConfig.DEBUG)
+                current, selectedRouter
             ) ||
             chargingCandidates.isEmpty() || current.routeId.isNullOrBlank() ||
             preparedChargingRouteId != current.routeId
@@ -855,7 +872,7 @@ class EyaCarNavigationScreen(
         val telemetry = vehicleTelemetry
         val profile = vehicleProfile
         val sameSource = r != null && OsrmRoadDetourRepository.sourceMatches(
-            r, OsrmEndpointSelector.choose(config.configuration.value.endpoints, BuildConfig.DEBUG)
+            r, selectedRouter
         )
         val roads = roadDetours.takeIf { sameSource } ?: RoadDetourCatalog()
         val now = System.currentTimeMillis()
