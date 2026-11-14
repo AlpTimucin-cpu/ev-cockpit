@@ -20,17 +20,17 @@ class CarChargingListPolicyTest {
     private val s1 = ChargingStation(
         "epdk-1", "Test Station 1", "Verified operator", "Address", a,
         listOf(ChargingSocket("c1", "CCS2", "DC", "150 kW")),
-        "2026-11-08T00:00:00Z"
+        java.time.Instant.ofEpochMilli(now - 60_000L).toString()
     )
     private val s2 = ChargingStation(
         "epdk-2", "Test Station 2", "Verified operator", "Address",
         GeoCoordinate(38.01, 34.0),
         listOf(ChargingSocket("c2", "CCS2", "DC", "150")),
-        "2026-11-08T00:00:00Z"
+        java.time.Instant.ofEpochMilli(now - 60_000L).toString()
     )
     private val catalog = ChargingCatalog(
         stations = listOf(s1, s2),
-        verifiedAtUtc = "2026-11-08T00:00:00Z",
+        verifiedAtUtc = java.time.Instant.ofEpochMilli(now - 60_000L).toString(),
         loading = false
     )
     private val candidates = listOf(
