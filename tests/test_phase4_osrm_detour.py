@@ -16,7 +16,7 @@ class Phase4DetourTest(unittest.TestCase):
         assert "verificationMutex.withLock" in verify
         assert "cachedAtMs" in verify
         assert "selectCandidates(route, candidates)" in verify
-        assert "calculateVia(" not in verify
+        assert "api.route(request)" in verify  # read-only OSRM call; no RouteRepository mutation
     def test_android_auto_epdk_age_and_ends_snapping(self):
         aa = self.text("car/EyaCarNavigationScreen.kt")
         planner = self.text("presentation/charging/RouteChargePlanViewModel.kt")
