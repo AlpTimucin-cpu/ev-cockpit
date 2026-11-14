@@ -40,6 +40,10 @@ object EpdkSnapshotParser {
         require(root.optInt("schema_version") == 1) { "Incompatible EPDK version" }
         require(!root.optBoolean("prices_included",true) &&
             !root.optBoolean("live_status_included",true)) { "Source contains unexpected fields" }
+        require(root.optString("source_url") ==
+            "https://apigateway.epdk.gov.tr/sarjIstasyonlari") {
+            "EPDK source URL is not the approved public origin"
+        }
         val verified=root.getString("verified_at_utc")
         val verifiedTime=Instant.parse(verified)
         val now=Instant.now()

@@ -85,16 +85,22 @@ class RouteChargePlanViewModel @Inject constructor(
     private data class Prepared(
         val route: RouteSnapshot? = null,
         val candidates: List<DCCorridorCandidate> = emptyList(),
-        val cacheStale: Boolean = false
+        val cacheStale: Boolean = false,
+        val catalogPublicationUtc: String? = null
     )
 
     private val prepared = combine(routes.currentRoute, charging.catalog) { route, catalog ->
         withContext(Dispatchers.Default) {
             Prepared(
                 route = route,
-                candidates = if (route == null) emptyList()
-                    else AutomaticDcChargingPlanner.candidates(route, catalog.stations),
-                cacheStale = catalog.staleCache
+                // A stale/unverified publication must not trigger network detour
+                // verification or manufacture an automatic charging stop.
+                candidates = if (route == null ||
+                    EpdkSourceAgePolicy.assess(catalog.verifiedAtUtc).needsCaution)
+                    emptyList()
+                else AutomaticDcChargingPlanner.candidates(route, catalog.stations),
+                cacheStale = catalog.staleCache,
+                catalogPublicationUtc = catalog.verifiedAtUtc
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), Prepared())
@@ -147,13 +153,23 @@ class RouteChargePlanViewModel @Inject constructor(
                 stopPreference = selectedOptions.preference,
                 plan = plan,
                 socSource = source,
-                catalogIsStale = prepared.cacheStale,
+                catalogIsStale = prepared.cacheStale ||
+                    EpdkSourceAgePolicy.assess(prepared.catalogPublicationUtc, now).needsCaution,
                 roadDetours = currentRoads
             )
 
         if (route?.routeId == null) return@combine state(
             AutomaticChargePlan.Empty, "MODEL/ESTIMATE"
         )
+        if (EpdkSourceAgePolicy.assess(prepared.catalogPublicationUtc, now).needsCaution) {
+            return@combine state(
+                AutomaticChargePlan.Unavailable(
+                    "EPDK istasyon listesinin kaynak tarihi eski veya doğrulanamıyor. " +
+                        "Otomatik şarj durağı önerisi güncel kayıt bekliyor."
+                ),
+                "EPDK KAYNAK TARİHİ GÜNCEL DEĞİL"
+            )
+        }
         val gps = selected.gps?.takeIf { it.usable(now) }
         val progressed = tracker.enrich(route, gps, now)
         val energy = RemainingRouteEnergyPolicy.estimate(

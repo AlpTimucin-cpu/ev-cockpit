@@ -19,6 +19,7 @@ import com.evcockpit.domain.model.*
 import com.evcockpit.domain.repository.ChargingRepository
 import com.evcockpit.domain.repository.RouteRepository
 import com.evcockpit.domain.usecase.StationCorridor
+import com.evcockpit.domain.usecase.EpdkSourceAgePolicy
 
 data class ChargingUiState(
     val visible: List<ChargingStation> = emptyList(),
@@ -32,6 +33,9 @@ data class ChargingUiState(
     val verifiedAtUtc: String? = null,
     val loading: Boolean = true,
     val fromCache: Boolean = false,
+    /** Static EPDK publication date, not occupancy or a tariff update. */
+    val sourceAge: EpdkSourceAgePolicy.Assessment =
+        EpdkSourceAgePolicy.assess(null),
     val error: String? = null
 )
 
@@ -104,6 +108,7 @@ class ChargingViewModel @Inject constructor(
                 verifiedAtUtc = catalog.verifiedAtUtc,
                 loading = catalog.loading,
                 fromCache = catalog.staleCache,
+                sourceAge = EpdkSourceAgePolicy.assess(catalog.verifiedAtUtc),
                 error = input.fetchError ?: catalog.error
             )
         }

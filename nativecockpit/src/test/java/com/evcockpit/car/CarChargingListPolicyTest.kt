@@ -20,17 +20,17 @@ class CarChargingListPolicyTest {
     private val s1 = ChargingStation(
         "epdk-1", "Test Station 1", "Verified operator", "Address", a,
         listOf(ChargingSocket("c1", "CCS2", "DC", "150 kW")),
-        "2026-11-08T00:00:00Z"
+        java.time.Instant.ofEpochMilli(now - 60_000L).toString()
     )
     private val s2 = ChargingStation(
         "epdk-2", "Test Station 2", "Verified operator", "Address",
         GeoCoordinate(38.01, 34.0),
         listOf(ChargingSocket("c2", "CCS2", "DC", "150")),
-        "2026-11-08T00:00:00Z"
+        java.time.Instant.ofEpochMilli(now - 60_000L).toString()
     )
     private val catalog = ChargingCatalog(
         stations = listOf(s1, s2),
-        verifiedAtUtc = "2026-11-08T00:00:00Z",
+        verifiedAtUtc = java.time.Instant.ofEpochMilli(now - 60_000L).toString(),
         loading = false
     )
     private val candidates = listOf(
@@ -78,6 +78,30 @@ class CarChargingListPolicyTest {
             VehicleTelemetry(), VehicleProfileConfig(), null, now, 4)
         assertTrue(model.catalogLabel.contains("önbelleği"))
         assertEquals(2, model.items.size)
+    }
+
+    @Test fun outdatedSnapshotNeverProducesArrivalSocEvenWithVerifiedBms() {
+        val expired = catalog.copy(verifiedAtUtc = "2026-01-01T00:00:00Z")
+        val profile = VehicleProfileConfig(
+            usableBatteryKwh = 52.0,
+            consumptionKwhPer100Km = 18.0,
+            arrivalReservePercent = 20.0,
+            userConfirmed = true
+        )
+        val fix = GpsFix(a, 4f, now - 200)
+        val road = RoadDetour(
+            routeId = route.routeId!!, stationId = s1.id,
+            additionalKm = 0.4, roadDistanceToStationKm = 1.5,
+            totalViaDistanceKm = 3.1, additionalMinutes = 2.0,
+            verifiedAtMillis = now - 200
+        )
+        val result = CarChargingListPolicy.build(
+            route, expired, candidates, fix, verifiedBms(), profile,
+            RoadDetourCatalog(routeId = route.routeId, checked = listOf(road)), now, 4
+        )
+        assertTrue(result.catalogLabel.contains("ESKİ VERİ"))
+        assertEquals(2, result.items.size)
+        assertNull(result.items.first().modelArrivalSocPercent)
     }
 
     @Test fun actualGpsOffersDirectDistanceButNotRoadKilometres() {

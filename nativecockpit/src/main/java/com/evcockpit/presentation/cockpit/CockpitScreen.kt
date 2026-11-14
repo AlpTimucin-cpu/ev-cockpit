@@ -740,7 +740,14 @@ private fun ChargingPanel(ui: ChargingUiState, onFilter: (StationFilter) -> Unit
         if (ui.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         ui.error?.let { Text(it, color = SoftText) }
         Text(stringResource(R.string.cockpit_station_count, ui.visible.size, ui.total), style = MaterialTheme.typography.bodySmall)
-        Text(ui.verifiedAtUtc ?: stringResource(R.string.cockpit_source_date_unknown), style = MaterialTheme.typography.bodySmall)
+        Text(ui.sourceAge.labelTr, style = MaterialTheme.typography.bodySmall,
+            color = if (ui.sourceAge.needsCaution) Color(0xFFFFCA80) else SoftText)
+        Text("Kaynak tarihi: " +
+            (ui.sourceAge.sourceUtc ?: ui.verifiedAtUtc ?: "doğrulanamadı") +
+            " · Bu liste soket boş/dolu durumu veya canlı tarife sağlamaz.",
+            style = MaterialTheme.typography.bodySmall)
+        if (ui.fromCache) Text("Çevrimdışı önbellekten gösteriliyor.",
+            style = MaterialTheme.typography.bodySmall)
         ui.visible.take(100).forEach { candidate ->
             TextButton(onClick = { onStation(candidate) }, modifier = Modifier.fillMaxWidth()) {
                 Text(candidate.name, modifier = Modifier.fillMaxWidth(), maxLines = 2)
