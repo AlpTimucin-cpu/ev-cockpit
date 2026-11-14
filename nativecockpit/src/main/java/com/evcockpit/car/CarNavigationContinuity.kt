@@ -72,7 +72,10 @@ class CarNavigationContinuity @Inject constructor() {
     @Synchronized
     fun serviceStarted(routeId: String, token: Any): Boolean {
         if (routeId.isBlank() || mutable.value.routeId != routeId ||
-            mutable.value.phase == CarContinuityPhase.OFF
+            mutable.value.phase == CarContinuityPhase.OFF ||
+            mutable.value.phase == CarContinuityPhase.PHONE_ACTION_REQUIRED ||
+            // A late duplicate service must not steal ownership from an active one.
+            (serviceOwner != null && serviceOwner !== token)
         ) return false
         serviceOwner = token
         mutable.value = CarContinuityState(
