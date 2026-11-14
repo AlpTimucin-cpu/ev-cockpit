@@ -103,6 +103,44 @@ class CarNavigationContinuityTest {
         assertEquals(CarContinuityPhase.OFF, CarNavigationContinuity().state.value.phase)
     }
 
+    @Test fun delayedDuplicateServiceCannotStealCurrentOwnership() {
+        val c = CarNavigationContinuity()
+        val first = Any()
+        val late = Any()
+        assertTrue(c.hostStarted("route"))
+        assertTrue(c.serviceStarted("route", first))
+        assertFalse(c.serviceStarted("route", late))
+        c.serviceGps("route", first, fix(), now)
+        assertEquals(CarContinuityPhase.ACTIVE, c.state.value.phase)
+        c.serviceGps("route", late, null, now + 100L)
+        assertEquals(CarContinuityPhase.ACTIVE, c.state.value.phase)
+        c.serviceEnded(late)
+        assertTrue(c.canResume("route", fix(), now))
+    }
+
+    @Test fun restrictedLaunchRejectsUnapprovedServiceStart() {
+        val c = CarNavigationContinuity()
+        c.hostStarted("route")
+        c.launchRestricted("route")
+        assertFalse(c.serviceStarted("route", Any()))
+        assertEquals(CarContinuityPhase.PHONE_ACTION_REQUIRED, c.state.value.phase)
+        assertTrue(c.retryFromPhone("route"))
+        assertTrue(c.serviceStarted("route", Any()))
+    }
+
+    @Test fun replacementRouteCanStartAfterHostExplicitlyChangesRoute() {
+        val c = CarNavigationContinuity()
+        val previous = Any()
+        val replacement = Any()
+        c.hostStarted("old-route")
+        assertTrue(c.serviceStarted("old-route", previous))
+        c.hostStarted("new-route")
+        assertFalse(c.serviceStarted("old-route", previous))
+        assertTrue(c.serviceStarted("new-route", replacement))
+        c.serviceEnded(previous)
+        assertEquals("new-route", c.state.value.routeId)
+    }
+
     @Test fun hostStartRejectsBlankRouteId() {
         val c = CarNavigationContinuity()
         assertFalse(c.hostStarted(""))
