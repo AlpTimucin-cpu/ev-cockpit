@@ -13,6 +13,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import java.io.IOException
@@ -30,6 +32,12 @@ import kotlin.math.abs
 class OsrmRoadDetourRepository @Inject constructor(
     private val configuration: AppConfigRepository
 ) {
+    // Serialize phone + Android Auto verifier requests; no duplicate bursts.
+    private val verificationMutex = Mutex()
+    private var cachedKey: String? = null
+    private var cachedAtMs: Long = 0L
+    private var cachedCatalog: RoadDetourCatalog? = null
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(13, TimeUnit.SECONDS)
@@ -39,7 +47,8 @@ class OsrmRoadDetourRepository @Inject constructor(
     suspend fun inspect(
         route: RouteSnapshot,
         candidates: List<DCCorridorCandidate>
-    ): RoadDetourCatalog = withContext(Dispatchers.IO) {
+    ): RoadDetourCatalog = verificationMutex.withLock {
+        withContext(Dispatchers.IO) {
         val routeId = route.routeId ?: return@withContext RoadDetourCatalog(
             message = "Doğrulanmış OSRM rotası bulunamadı"
         )
@@ -62,7 +71,28 @@ class OsrmRoadDetourRepository @Inject constructor(
             candidates = chosen.map { it.station },
             message = "Şarj sapması doğrulanamadı. Özel HTTPS rota servisi gereklidir."
         )
+        if (!sourceMatches(route, endpoint)) return@withContext RoadDetourCatalog(
+            routeId = routeId,
+            candidates = chosen.map { it.station },
+            message = "Rota ve sapma sunucusu aynı doğrulanmış OSRM kaynağı değil. Rotayı yeniden hesaplayın."
+        )
         val root = endpoint.baseUrl
+        val cacheKey = buildString {
+            append(routeId).append('|').append(root)
+            append('|').append(route.totalKm).append('|').append(route.osrmDurationSeconds)
+            chosen.forEach {
+                append('|').append(it.station.id).append('@')
+                append(it.station.coordinate.latitude).append(',')
+                append(it.station.coordinate.longitude).append(':')
+                append(it.station.sourceVerifiedAtUtc)
+            }
+        }
+        val now = System.currentTimeMillis()
+        val previous = cachedCatalog
+        val ttl = if (previous?.checked?.isNotEmpty() == true) 30L * 60_000L else 60_000L
+        if (cachedKey == cacheKey && previous != null && now >= cachedAtMs &&
+            now - cachedAtMs < ttl) return@withContext previous
+
         val api = Retrofit.Builder().baseUrl(root).client(http).build()
             .create(OsrmService::class.java)
         val results = mutableListOf<RoadDetour>()
@@ -100,7 +130,7 @@ class OsrmRoadDetourRepository @Inject constructor(
                 // Malformed server payload must not become a fake detour estimate.
             }
         }
-        RoadDetourCatalog(
+        val catalog = RoadDetourCatalog(
             routeId = routeId,
             checked = results,
             candidates = chosen.map { it.station },
@@ -110,9 +140,19 @@ class OsrmRoadDetourRepository @Inject constructor(
                 else -> null
             }
         )
+        cachedKey = cacheKey
+        cachedAtMs = System.currentTimeMillis()
+        cachedCatalog = catalog
+        catalog
+        }
     }
 
     companion object {
+        /** Unattributed and cross-server routes cannot generate verified detours. */
+        internal fun sourceMatches(route: RouteSnapshot, endpoint: OsrmEndpointSelection?): Boolean =
+            !route.routeId.isNullOrBlank() && endpoint != null && !endpoint.demo &&
+                !route.osrmBaseUrl.isNullOrBlank() && route.osrmBaseUrl == endpoint.baseUrl
+
         /** At most six evenly distributed CCS stops (real road calls are bounded). */
         internal fun selectCandidates(
             route: RouteSnapshot,

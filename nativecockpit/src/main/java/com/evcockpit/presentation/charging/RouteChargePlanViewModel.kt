@@ -144,8 +144,13 @@ class RouteChargePlanViewModel @Inject constructor(
         val reserve = selectedOptions.reserveOverridePercent?.toDouble()
             ?: selected.config.vehicle.arrivalReservePercent
         val displayReserve = (reserve?.toFloat() ?: 20f).coerceIn(0f, 50f)
-        val currentRoads = roads.takeIf { it.routeId == route?.routeId }
-            ?: RoadDetourCatalog(routeId = route?.routeId, loading = true)
+        val sameOsrmOrigin = route?.osrmBaseUrl != null &&
+            route.osrmBaseUrl == OsrmEndpointSelector.choose(
+                selected.config.endpoints, com.evcockpit.BuildConfig.DEBUG
+            )?.baseUrl
+        val currentRoads = roads.takeIf { sameOsrmOrigin && it.routeId == route?.routeId }
+            ?: RoadDetourCatalog(routeId = route?.routeId,
+                message = "Sapma hesabı için rotayı seçili OSRM sunucusunda yeniden hesaplayın.")
         fun state(plan: AutomaticChargePlan, source: String): RouteChargingUiState =
             RouteChargingUiState(
                 routeId = route?.routeId,

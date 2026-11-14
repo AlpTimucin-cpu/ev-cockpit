@@ -31,7 +31,9 @@ data class RouteSnapshot(
     val maneuvers: List<NavigationManeuver> = emptyList(),
     /** OSRM duration is not live-traffic aware. */
     val osrmDurationSeconds: Double? = null,
-    val profileSpeeds: List<ProfileSpeedSegment> = emptyList()
+    val profileSpeeds: List<ProfileSpeedSegment> = emptyList(),
+    /** Config-validated OSRM origin that generated this particular route. */
+    val osrmBaseUrl: String? = null
 ) {
     // Never transform an absent or out-of-range GPS progress into 0%.
     fun validProgress(): Float? = gpsProgressFraction?.takeIf {

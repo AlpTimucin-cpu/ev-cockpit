@@ -146,10 +146,14 @@ class OsrmRouteRepository @Inject constructor(
                     "OSRM rota verileri okunamadı: ${error.message?.take(80) ?: "geçersiz JSON"}")
             }
             // Publish only a completely validated response. Do not publish a partial route.
-            variants.value = alternatives
+            // Never compare road distances measured by different OSRM origins.
+            val sourced = alternatives.map { option ->
+                option.copy(snapshot = option.snapshot.copy(osrmBaseUrl = root))
+            }
+            variants.value = sourced
             index.value = 0
-            selected.value = alternatives.first().snapshot
-            RouteCalculationResult.Success(alternatives.size)
+            selected.value = sourced.first().snapshot
+            RouteCalculationResult.Success(sourced.size)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (_: UnknownHostException) {
