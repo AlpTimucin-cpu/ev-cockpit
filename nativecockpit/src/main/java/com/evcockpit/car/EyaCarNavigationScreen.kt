@@ -50,6 +50,9 @@ import com.evcockpit.domain.model.RoadDetourCatalog
 import com.evcockpit.domain.model.VehicleProfileConfig
 import com.evcockpit.domain.model.VehicleTelemetry
 import com.evcockpit.domain.usecase.DCCorridorCandidate
+import com.evcockpit.domain.usecase.EpdkSourceAgePolicy
+import com.evcockpit.domain.model.OsrmEndpointSelector
+import com.evcockpit.BuildConfig
 import com.evcockpit.data.settings.AppConfigRepository
 import com.evcockpit.data.repository.OsrmRoadDetourRepository
 import com.evcockpit.data.weather.OpenMeteoWeatherRepository
@@ -807,6 +810,10 @@ class EyaCarNavigationScreen(
     private fun requestDetourVerification() {
         val current = route ?: return
         if (!chargingVisible || chargingCatalog.loading || chargingCatalog.staleCache ||
+            EpdkSourceAgePolicy.assess(chargingCatalog.verifiedAtUtc).needsCaution ||
+            !OsrmRoadDetourRepository.sourceMatches(
+                current, OsrmEndpointSelector.choose(config.configuration.value.endpoints, BuildConfig.DEBUG)
+            ) ||
             chargingCandidates.isEmpty() || current.routeId.isNullOrBlank() ||
             preparedChargingRouteId != current.routeId
         ) return
@@ -847,7 +854,10 @@ class EyaCarNavigationScreen(
         val currentFix = fix
         val telemetry = vehicleTelemetry
         val profile = vehicleProfile
-        val roads = roadDetours
+        val sameSource = r != null && OsrmRoadDetourRepository.sourceMatches(
+            r, OsrmEndpointSelector.choose(config.configuration.value.endpoints, BuildConfig.DEBUG)
+        )
+        val roads = roadDetours.takeIf { sameSource } ?: RoadDetourCatalog()
         val now = System.currentTimeMillis()
         val cap = chargingHostLimit()
         chargingModelJob = scope.launch {

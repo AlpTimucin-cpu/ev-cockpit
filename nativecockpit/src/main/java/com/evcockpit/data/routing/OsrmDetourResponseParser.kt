@@ -27,6 +27,12 @@ internal object OsrmDetourResponseParser {
             if (root.primitiveString("code") != "Ok") return null
             val waypoints = root.getAsJsonArray("waypoints") ?: return null
             if (waypoints.size() != 3) return null
+            // Also validate start/end snap; the EPDK station is not enough.
+            if (listOf(0, 2).any { i ->
+                    val d = waypoints[i].asJsonObject.finite("distance")
+                    d == null || d !in 0.0..500.0
+                }
+            ) return null
             val middle = waypoints[1].asJsonObject
             // OSRM can otherwise snap an off-road charger to a distant motorway.
             val snapMeters = middle.finite("distance") ?: return null

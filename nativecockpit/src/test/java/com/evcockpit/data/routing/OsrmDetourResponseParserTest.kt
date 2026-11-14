@@ -26,6 +26,23 @@ class OsrmDetourResponseParserTest {
         assertFalse(verified.validFor("different-route", "station-one"))
     }
 
+    @Test fun rejectsFarStartAndDestinationRoadSnaps() {
+        val badStart = fixture().replace(
+            """{"distance":2},{"distance":22.0}""",
+            """{"distance":1200},{"distance":22.0}"""
+        )
+        val badEnd = fixture().replace(
+            """{"distance":22.0},
+            {"distance":2}""",
+            """{"distance":22.0},
+            {"distance":1400}"""
+        )
+        assertNull(OsrmDetourResponseParser.parse(
+            badStart, "r", "s", 300.0, null, 1700000000000L))
+        assertNull(OsrmDetourResponseParser.parse(
+            badEnd, "r", "s", 300.0, null, 1700000000000L))
+    }
+
     @Test fun rejectsFarRoadSnapAndAlternativeShorterThanBaseline() {
         assertNull(OsrmDetourResponseParser.parse(
             fixture(snap = 2500.0), "r", "s", 300.0, null, 1700000000000L

@@ -23,6 +23,19 @@ class OsrmRoadDetourRepositoryTest {
             distanceFromStartKm = distance
         )
 
+    @Test fun noCrossServerDetourEvidenceAndNoDemoFallback() {
+        val verified = route.copy(osrmBaseUrl = "https://owner-osrm.example/")
+        assertTrue(OsrmRoadDetourRepository.sourceMatches(
+            verified, OsrmEndpointSelection("https://owner-osrm.example/", false)))
+        assertFalse(OsrmRoadDetourRepository.sourceMatches(
+            route, OsrmEndpointSelection("https://owner-osrm.example/", false)))
+        assertFalse(OsrmRoadDetourRepository.sourceMatches(
+            verified, OsrmEndpointSelection("https://other-osrm.example/", false)))
+        assertFalse(OsrmRoadDetourRepository.sourceMatches(
+            verified, OsrmEndpointSelection("https://owner-osrm.example/", true)))
+        assertFalse(OsrmRoadDetourRepository.sourceMatches(verified, null))
+    }
+
     @Test fun selectsAtMostSixDistributedRealCcsCandidates() {
         val many = (1..30).map { candidate(it, it * 10.0) }
         val result = OsrmRoadDetourRepository.selectCandidates(route, many)
