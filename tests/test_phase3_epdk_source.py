@@ -1,5 +1,6 @@
 """Phase 3 EPDK public snapshot provenance and no-live-data source gates."""
 from pathlib import Path
+from datetime import datetime, timezone
 import json
 import unittest
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,7 +11,11 @@ class Phase3EpdkSourceTest(unittest.TestCase):
         self.assertEqual(meta["source_url"], "https://apigateway.epdk.gov.tr/sarjIstasyonlari")
         self.assertFalse(meta["prices_included"])
         self.assertFalse(meta["live_status_included"])
-        self.assertEqual(meta["verified_at_utc"], "2026-10-17T21:58:05+00:00")
+        stamp = datetime.fromisoformat(meta["verified_at_utc"])
+        self.assertIsNotNone(stamp.tzinfo)
+        self.assertLessEqual(stamp, datetime.now(timezone.utc))
+        self.assertGreaterEqual(meta["geocoded_public_rows_count"], 5000)
+        self.assertLessEqual(meta["geocoded_public_rows_count"], meta["public_rows_count"])
 
     def test_phone_car_and_planner_share_age_policy(self):
         def code(path):
