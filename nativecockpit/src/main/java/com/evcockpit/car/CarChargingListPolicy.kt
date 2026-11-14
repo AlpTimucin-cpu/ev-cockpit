@@ -67,7 +67,7 @@ internal object CarChargingListPolicy {
         val label = when {
             catalog.stations.isEmpty() && catalog.loading -> "EPDK yükleniyor"
             catalog.stations.isEmpty() -> "EPDK verisi kullanılamıyor"
-            catalog.staleCache -> sourceAge.labelTr + " · önbellek"
+            catalog.staleCache -> "EPDK önbelleği · " + sourceAge.labelTr
             else -> sourceAge.labelTr
         }
         if (route == null || route.routeId.isNullOrBlank() ||
@@ -89,7 +89,7 @@ internal object CarChargingListPolicy {
             fraction <= 0.001f &&
             haversine(validGps.coordinate.latitude, validGps.coordinate.longitude,
                 route.routePoints.first().latitude, route.routePoints.first().longitude) <= 250.0
-        val verifiedSoc = if (originMatched && profile.readyForEstimate())
+        val verifiedSoc = if (sourceAge.isFresh && originMatched && profile.readyForEstimate())
             VerifiedBatterySocPolicy.read(telemetry, nowMs)?.percent else null
         val consumption = profile.referenceWhPerKm()
         val usableCapacity = profile.usableBatteryKwh
