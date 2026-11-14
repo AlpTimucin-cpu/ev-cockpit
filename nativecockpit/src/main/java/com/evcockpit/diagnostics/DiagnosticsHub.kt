@@ -3,6 +3,7 @@ package com.evcockpit.diagnostics
 import com.evcockpit.BuildConfig
 import com.evcockpit.data.obd.MebUdsParser
 import com.evcockpit.domain.model.ChargingCatalog
+import com.evcockpit.domain.usecase.EpdkSourceAgePolicy
 import com.evcockpit.domain.model.GpsFix
 import com.evcockpit.data.traffic.TomTomTrafficState
 import com.evcockpit.domain.model.ObdConnectionState
@@ -239,13 +240,14 @@ class DiagnosticsHub @Inject constructor() {
     @Synchronized
     fun charging(catalog: ChargingCatalog) {
         if (!BuildConfig.DEBUG) return
-        val stamp = catalog.verifiedAtUtc?.takeIf { safeUtc.matches(it) }
+        val provenance = EpdkSourceAgePolicy.assess(catalog.verifiedAtUtc)
+        val stamp = provenance.sourceUtc?.takeIf { safeUtc.matches(it) }
         val outcome = when {
-            catalog.loading -> "Yükleniyor"
-            catalog.staleCache -> "Önbellek / güncel değil"
-            catalog.error != null -> "Yenileme başarısız"
-            stamp != null -> "EPDK anlık doluluk verisi değil"
-            else -> "Kullanılamıyor"
+            catalog.loading -> "Yükleniyor · " + provenance.labelTr
+            catalog.error != null -> "Yenileme başarısız · " + provenance.labelTr
+            catalog.staleCache -> provenance.labelTr + " · önbellek"
+            catalog.stations.isNotEmpty() -> provenance.labelTr
+            else -> "Kullanılamıyor · kaynak tarihi doğrulanamadı"
         }
         val before = mutable.value
         if (before.chargeSnapshotUtc == stamp && before.chargingStatus == outcome) return

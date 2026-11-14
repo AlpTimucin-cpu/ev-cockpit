@@ -85,7 +85,8 @@ class RouteChargePlanViewModel @Inject constructor(
     private data class Prepared(
         val route: RouteSnapshot? = null,
         val candidates: List<DCCorridorCandidate> = emptyList(),
-        val cacheStale: Boolean = false
+        val cacheStale: Boolean = false,
+        val catalogPublicationUtc: String? = null
     )
 
     private val prepared = combine(routes.currentRoute, charging.catalog) { route, catalog ->
@@ -94,7 +95,8 @@ class RouteChargePlanViewModel @Inject constructor(
                 route = route,
                 candidates = if (route == null) emptyList()
                     else AutomaticDcChargingPlanner.candidates(route, catalog.stations),
-                cacheStale = catalog.staleCache
+                cacheStale = catalog.staleCache,
+                catalogPublicationUtc = catalog.verifiedAtUtc
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), Prepared())
@@ -147,7 +149,8 @@ class RouteChargePlanViewModel @Inject constructor(
                 stopPreference = selectedOptions.preference,
                 plan = plan,
                 socSource = source,
-                catalogIsStale = prepared.cacheStale,
+                catalogIsStale = prepared.cacheStale ||
+                    EpdkSourceAgePolicy.assess(prepared.catalogPublicationUtc, now).needsCaution,
                 roadDetours = currentRoads
             )
 

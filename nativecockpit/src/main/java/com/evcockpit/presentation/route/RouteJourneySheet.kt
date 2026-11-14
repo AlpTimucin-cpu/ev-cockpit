@@ -154,6 +154,12 @@ fun RouteJourneySheet(
                                 fontWeight = FontWeight.Bold)
                         }
                         HorizontalDivider(color = Color.DarkGray)
+                        if (charging.catalogIsStale) {
+                            Text("EPDK istasyon kaynağı eski/doğrulanmamış veya önbellekte. " +
+                                "Şarj durağı önerisi güncel hizmet garantisi değildir.",
+                                color = SheetWarn,
+                                style = MaterialTheme.typography.labelSmall)
+                        }
                         val stopCount = (plan as? AutomaticChargePlan.Estimate)?.stops?.size
                         Text(
                             if (routeMatches && stopCount != null)

@@ -12,6 +12,7 @@ import com.evcockpit.domain.usecase.AutomaticDcChargingPlanner
 import com.evcockpit.domain.usecase.DCCorridorCandidate
 import com.evcockpit.domain.usecase.RouteProgressTracker
 import com.evcockpit.domain.usecase.VerifiedBatterySocPolicy
+import com.evcockpit.domain.usecase.EpdkSourceAgePolicy
 import java.time.Duration
 import java.util.Locale
 import kotlin.math.asin
@@ -62,12 +63,12 @@ internal object CarChargingListPolicy {
         nowMs: Long,
         hostLimit: Int
     ): CarChargeList {
-        val stamp = catalog.verifiedAtUtc?.take(20) ?: "tarih bilinmiyor"
+        val sourceAge = EpdkSourceAgePolicy.assess(catalog.verifiedAtUtc, nowMs)
         val label = when {
-            catalog.staleCache -> "EPDK önbelleği · $stamp"
-            catalog.loading -> "EPDK yükleniyor · $stamp"
-            catalog.stations.isNotEmpty() -> "EPDK kaydı · $stamp"
-            else -> "EPDK verisi kullanılamıyor"
+            catalog.stations.isEmpty() && catalog.loading -> "EPDK yükleniyor"
+            catalog.stations.isEmpty() -> "EPDK verisi kullanılamıyor"
+            catalog.staleCache -> sourceAge.labelTr + " · önbellek"
+            else -> sourceAge.labelTr
         }
         if (route == null || route.routeId.isNullOrBlank() ||
             !validRouteGeometry(route.routePoints)
